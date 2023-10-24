@@ -16,6 +16,8 @@ CVolumeViewerView::CVolumeViewerView(QWidget* parent)
     timerTextAboveCursor = new QTimer(this);
     connect(timerTextAboveCursor, &QTimer::timeout, this, &CVolumeViewerView::hideTextAboveCursor);
     timerTextAboveCursor->setSingleShot(true);
+    setMouseTracking(true);
+    viewport()->setMouseTracking(true);
 }
 
 void CVolumeViewerView::setup()
@@ -58,6 +60,25 @@ void CVolumeViewerView::keyReleaseEvent(QKeyEvent* event)
         curvePanKeyPressed = false;
         event->accept();
     }
+}
+
+void CVolumeViewerView::mouseMoveEvent(QMouseEvent* pEvent)
+{
+    QGraphicsView::mouseMoveEvent(pEvent);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void CVolumeViewerView::mousePressEvent(QMouseEvent* pEvent)
+{
+    QGraphicsView::mousePressEvent(pEvent);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void CVolumeViewerView::mouseReleaseEvent(QMouseEvent* pEvent)
+{
+    QGraphicsView::mouseReleaseEvent(pEvent);
 }
 
 void CVolumeViewerView::showTextAboveCursor(const QString& value, const QString& label, const QColor& color)
@@ -149,6 +170,7 @@ CVolumeViewer::CVolumeViewer(QWidget* parent)
     // Create graphics view
     fGraphicsView = new CVolumeViewerView(this);
     fGraphicsView->setRenderHint(QPainter::Antialiasing);
+    fGraphicsView->setMouseTracking(true);
     setFocusProxy(fGraphicsView);
 
     // Create graphics scene
@@ -241,6 +263,10 @@ void CVolumeViewer::setNumSlices(int num)
 
 bool CVolumeViewer::eventFilter(QObject* watched, QEvent* event)
 {
+    if (event->type() == QEvent::HoverEnter || event->type() == QEvent::GraphicsSceneHoverEnter) {
+        std::cout << "Hover enter filter " << std::endl;
+    }
+
     // Wheel events
     if (watched == fGraphicsView || (fGraphicsView && watched == fGraphicsView->viewport()) && event->type() == QEvent::Wheel) {
 
@@ -289,12 +315,6 @@ bool CVolumeViewer::eventFilter(QObject* watched, QEvent* event)
         }
     }
     return QWidget::eventFilter(watched, event);
-}
-
-// Handle paint event
-void CVolumeViewer::paintEvent(QPaintEvent* /*event*/)
-{
-    // REVISIT - FILL ME HERE
 }
 
 void CVolumeViewer::ScaleImage(double nFactor)

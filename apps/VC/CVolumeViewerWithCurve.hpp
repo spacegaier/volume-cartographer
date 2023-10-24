@@ -22,9 +22,17 @@ namespace ChaoVis
 // REVISIT - NOTE - since there are two modes, edit and draw, for the
 // application, we need to add corresponding modes to the widget, too.
 
+class CCurvePointItem : public QGraphicsEllipseItem
+{
+public:
+    CCurvePointItem(qreal x, qreal y, qreal w, qreal h, const QPen& pen = QPen(), const QBrush& brush = QBrush(), QGraphicsItem* pParent = nullptr);
+
+    void hoverEnterEvent(QGraphicsSceneHoverEvent* event) override;
+    void hoverLeaveEvent(QGraphicsSceneHoverEvent* event) override;
+};
+
 class CVolumeViewerWithCurve : public CVolumeViewer
 {
-
     Q_OBJECT
 
 public:
@@ -55,7 +63,6 @@ protected:
     void mousePressEvent(QMouseEvent* event);
     void mouseMoveEvent(QMouseEvent* event);
     void mouseReleaseEvent(QMouseEvent* event);
-    void paintEvent(QPaintEvent* event);
     void UpdateButtons(void);
 
 private slots:

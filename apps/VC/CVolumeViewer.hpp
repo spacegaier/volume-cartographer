@@ -26,6 +26,10 @@ class CVolumeViewerView : public QGraphicsView
         void keyPressEvent(QKeyEvent* event) override;
         void keyReleaseEvent(QKeyEvent* event) override;
 
+        void mouseMoveEvent(QMouseEvent* pEvent) override;
+        void mousePressEvent(QMouseEvent* pEvent) override;
+        void mouseReleaseEvent(QMouseEvent* pEvent) override;
+
         bool isRangeKeyPressed() { return rangeKeyPressed; }
         bool isCurvePanKeyPressed() { return curvePanKeyPressed; }
 
@@ -77,7 +81,6 @@ public:
 
 protected:
     bool eventFilter(QObject* watched, QEvent* event);
-    void paintEvent(QPaintEvent* event);
 
 public slots:
     void OnZoomInClicked(void);

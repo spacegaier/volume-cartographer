@@ -11,6 +11,30 @@
 using namespace ChaoVis;
 
 // Constructor
+CCurvePointItem::CCurvePointItem(qreal x, qreal y, qreal w, qreal h, const QPen& pen, const QBrush& brush, QGraphicsItem* pParent)
+    : QGraphicsEllipseItem(x, y, w, h, pParent)
+{
+    setPen(pen);
+    setBrush(brush);
+    setFlag(ItemSendsScenePositionChanges);
+    setAcceptHoverEvents(true);
+    setFlag(QGraphicsItem::ItemIsSelectable, false);
+}
+
+void CCurvePointItem::hoverEnterEvent(QGraphicsSceneHoverEvent* event)
+{
+    std::cout  << "Hover enter" << std::endl;
+    setPen(QPen(QColor(255, 250, 230)));
+    setBrush(QBrush(QColor(255, 250, 230)));
+    update();
+}
+
+void CCurvePointItem::hoverLeaveEvent(QGraphicsSceneHoverEvent* event)
+{
+    std::cout  << "Hover leave" << std::endl;
+}
+
+// Constructor
 CVolumeViewerWithCurve::CVolumeViewerWithCurve(std::unordered_map<std::string, SegmentationStruct>& nSegStructMapRef)
     : fShowCurveBox(nullptr)
     , showCurve(true)
@@ -100,7 +124,7 @@ CVolumeViewerWithCurve::CVolumeViewerWithCurve(std::unordered_map<std::string, S
 
     UpdateButtons();
 
-    this->installEventFilter(this);
+    installEventFilter(this);
 }
 
 // Destructor
@@ -349,6 +373,10 @@ void CVolumeViewerWithCurve::mousePressEvent(QMouseEvent* event)
 // Handle mouse move event, currently only when we're editing
 void CVolumeViewerWithCurve::mouseMoveEvent(QMouseEvent* event)
 {
+    if (event->type() == QEvent::HoverEnter || event->type() == QEvent::GraphicsSceneHoverEnter) {
+        std::cout << "Hover enter filter " << std::endl;
+    }
+
     // If we have an active last pressed side button from the backwards/forwards move feature,
     // we cannot do any panning at the same time, nor do we want to move any curves.
     if (lastPressedSideButton) {
@@ -472,6 +500,10 @@ void CVolumeViewerWithCurve::mouseReleaseEvent(QMouseEvent* event)
 // capture mouse release
 bool CVolumeViewerWithCurve::eventFilter(QObject* watched, QEvent* event)
 {
+    if (event->type() == QEvent::HoverEnter || event->type() == QEvent::GraphicsSceneHoverEnter) {
+        std::cout << "Hover enter filter " << std::endl;
+    }
+
     // check for mouse release generic
     if (event->type() == QEvent::MouseButtonRelease) {
         QMouseEvent* mouseEvent = static_cast<QMouseEvent*>(event);
@@ -522,9 +554,6 @@ bool CVolumeViewerWithCurve::eventFilter(QObject* watched, QEvent* event)
     // also call parent class implementation
     return CVolumeViewer::eventFilter(watched, event);
 }
-
-// Handle paint event
-void CVolumeViewerWithCurve::paintEvent(QPaintEvent* /*event*/) {}
 
 void CVolumeViewerWithCurve::toggleShowCurveBox()
 {
@@ -647,8 +676,7 @@ void CVolumeViewerWithCurve::DrawIntersectionCurve(QGraphicsScene* scene) {
                 brushColor = brushColor.darker(150);
             }
 
-            QGraphicsEllipseItem* newEllipse = scene->addEllipse(p0, p1, 2, 2, QPen(penColor), QBrush(brushColor));
-            newEllipse->setVisible(true);
+            scene->addItem(new CCurvePointItem(p0, p1, 2, 2, QPen(penColor), QBrush(brushColor)));
         }
     }
 }
@@ -664,7 +692,7 @@ void CVolumeViewerWithCurve::DrawControlPoints(QGraphicsScene* scene) {
         // Create new ellipse points
         auto p0 = fControlPoints[i][0] - 0.5;
         auto p1 = fControlPoints[i][1] - 0.5;
-        QGraphicsEllipseItem* newEllipse = scene->addEllipse(p0, p1, 2, 2, QPen(QColor(r, g, b)), QBrush(QColor(r, g, b)));
+        scene->addItem(new CCurvePointItem(p0, p1, 2, 2, QPen(QColor(r, g, b)), QBrush(QColor(r, g, b))));
     }
 }
 
