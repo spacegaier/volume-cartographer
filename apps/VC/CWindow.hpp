@@ -166,6 +166,8 @@ private slots:
     void OnNewPathClicked(void);
     void OnRemovePathClicked(void);
     void OnPathItemClicked(QTreeWidgetItem* item, int column);
+    void OnPathCustomContextMenu(const QPoint& point);
+    void OnRunVcRender(QString segmentID);
 
     void PreviousSelectedId();
     void NextSelectedId();

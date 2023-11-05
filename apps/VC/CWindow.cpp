@@ -283,14 +283,11 @@ void CWindow::CreateWidgets(void)
     connect(fchkDisplayAll, &QCheckBox::toggled, this, &CWindow::toggleDisplayAll);
     connect(fchkComputeAll, &QCheckBox::toggled, this, &CWindow::toggleComputeAll);
 
-
     // list of paths
     fPathListWidget = this->findChild<QTreeWidget*>("treeWidgetPaths");
-    // connect(
-    //     fPathListWidget, SIGNAL(itemClicked(QListWidgetItem*)), this,
-    //     SLOT(OnPathItemClicked(QListWidgetItem*)));
-
     connect(fPathListWidget, SIGNAL(itemClicked(QTreeWidgetItem*, int)), this, SLOT(OnPathItemClicked(QTreeWidgetItem*, int)));
+    fPathListWidget->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(fPathListWidget, &QTreeWidget::customContextMenuRequested, this, &CWindow::OnPathCustomContextMenu);
 
     // segmentation methods
     auto* aSegMethodsComboBox = this->findChild<QComboBox*>("cmbSegMethods");
@@ -581,7 +578,7 @@ void CWindow::CreateMenus(void)
     fFileMenu->addSeparator();
 
     QSettings settingsJump("VC.ini", QSettings::IniFormat);
-    if(settingsJump.value("general/debug", 0).toInt() == 1) {
+    if(settingsJump.value("internal/debug", 0).toInt() == 1) {
         fHelpMenu->addAction(fPrintDebugInfo);
         fFileMenu->addSeparator();
     }
@@ -1914,6 +1911,35 @@ void CWindow::OnPathItemClicked(QTreeWidgetItem* item, int column)
     UpdateSegmentCheckboxes(aSegID);
 
     UpdateView();
+}
+
+void CWindow::OnPathCustomContextMenu(const QPoint& point)
+{
+    QModelIndex index = fPathListWidget->indexAt(point);
+    if (index.isValid()) {
+        QAction* actVcRender = new QAction(tr("Run vc_render"), this);
+        QString segID = fPathListWidget->itemFromIndex(index)->text(0);
+        connect(actVcRender, &QAction::triggered, this, [segID, this](){ OnRunVcRender(segID); });
+
+        QMenu menu(this);
+        menu.addAction(actVcRender);
+
+        menu.exec(fPathListWidget->viewport()->mapToGlobal(point));
+    }
+}
+
+void CWindow::OnRunVcRender(QString segmentID)
+{
+    QString program = "./vc_render";
+    QStringList arguments;
+    arguments << "-v" << fVpkgPath << "-s" << segmentID << "-o" << QString("test_%1.obj").arg(segmentID);
+
+    //vc_render -v my-project.volpkg -s 20230315130225 -o first-result.obj
+
+    std::cout << "Starting vc_render for segment " << segmentID.toStdString() << std::endl;
+
+    QProcess *myProcess = new QProcess(this);
+    myProcess->start(program, arguments);
 }
 
 // Logic to switch the selected Id
