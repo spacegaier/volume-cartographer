@@ -1932,13 +1932,22 @@ void CWindow::OnRunVcRender(QString segmentID)
 {
     QString program = "./vc_render";
     QStringList arguments;
-    arguments << "-v" << fVpkgPath << "-s" << segmentID << "-o" << QString("test_%1.obj").arg(segmentID);
+    arguments << "-v" << fVpkgPath << "-s" << segmentID << "-o" << QString("test_%1.obj").arg(segmentID) << "--uv-plot" << QString("test_uv_%1.tif").arg(segmentID) << "--mesh-resample-smoothing" << "3";
 
-    //vc_render -v my-project.volpkg -s 20230315130225 -o first-result.obj
+    //vc_render -v my-project.volpkg -s 20230503225234 -o test_20230503225234.obj
 
     std::cout << "Starting vc_render for segment " << segmentID.toStdString() << std::endl;
 
+    //std::cout << QDir::tempPath().toStdString() << std::endl;
+
+    std::cout << "Used arguments: ";
+    for(auto arg : arguments) {
+        std::cout << arg.toStdString() << " ";
+    }
+    std::cout << std::endl;
+
     QProcess *myProcess = new QProcess(this);
+    connect(myProcess, &QProcess::finished, this, [this, segmentID](){ std::cout << "Finished: " << segmentID.toStdString() << std::endl; });
     myProcess->start(program, arguments);
 }
 
