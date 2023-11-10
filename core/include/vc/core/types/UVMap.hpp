@@ -165,7 +165,7 @@ public:
      */
     static auto Plot(
         const UVMap& uv,
-        const ITKMesh::Pointer& mesh2D,
+        const ITKMesh::Pointer& uvMesh,
         int width = -1,
         int height = -1,
         const Color& color = color::LIGHT_GRAY) -> cv::Mat;
@@ -202,6 +202,9 @@ public:
 
     /** @brief Flip a UVMap across one or both of its axes */
     static void Flip(UVMap& uv, FlipAxis axis);
+
+    /** @brief Auto-orient a UVMap by ensuring that lower Z index values are at the bottom (Y axis) */
+    static void AutoOrient(UVMap& uv, const ITKMesh::Pointer& uvMesh);
     /**@}*/
 
 private:

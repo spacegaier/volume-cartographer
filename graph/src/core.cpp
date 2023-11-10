@@ -228,6 +228,41 @@ void WriteMeshNode::deserialize_(
     cacheArgs_ = meta["cacheArgs"].get<bool>();
 }
 
+AutoOrientUVMapNode::AutoOrientUVMapNode()
+    : Node{true}, uvMapIn{&uvMapIn_}, uvMesh{&uvMesh_}, uvMapOut{&uvMapOut_}
+{
+    registerInputPort("uvMapIn", uvMapIn);
+    registerInputPort("uvMesh", uvMesh);
+    registerOutputPort("uvMapOut", uvMapOut);
+
+    compute = [=]() {
+        if (uvMapIn_ and uvMesh_ and not uvMapIn_->empty()) {
+            uvMapOut_ = UVMap::New(*uvMapIn_);
+            UVMap::AutoOrient(*uvMapOut_, uvMesh_);
+        }
+    };
+}
+
+auto AutoOrientUVMapNode::serialize_(bool useCache, const fs::path& cacheDir)
+    -> smgl::Metadata
+{
+    smgl::Metadata meta;
+    if (useCache and uvMapOut_ and not uvMapOut_->empty()) {
+        io::WriteUVMap(cacheDir / "uvMap_auto_orient.uvm", *uvMapOut_);
+        meta["uvMap"] = "uvMap_auto_orient.uvm";
+    }
+    return meta;
+}
+
+void AutoOrientUVMapNode::deserialize_(
+    const smgl::Metadata& meta, const fs::path& cacheDir)
+{
+    if (meta.contains("uvMap")) {
+        auto uvMapFile = meta["uvMap"].get<std::string>();
+        uvMapOut_ = UVMap::New(io::ReadUVMap(cacheDir / uvMapFile));
+    }
+}
+
 RotateUVMapNode::RotateUVMapNode()
     : Node{true}, uvMapIn{&uvMapIn_}, theta{&theta_}, uvMapOut{&uvMapOut_}
 {

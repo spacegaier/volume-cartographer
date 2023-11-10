@@ -328,9 +328,48 @@ private:
 };
 
 /**
+ * @copybrief UVMap::AutoOrient()
+ *
+ * The input UVMap is not modified by this operation.
+ *
+ * @see UVMap::AutoOrient()
+ * @ingroup Graph
+ */
+class AutoOrientUVMapNode : public smgl::Node
+{
+private:
+    /** Input UVMap */
+    UVMap::Pointer uvMapIn_;
+    /** Input mesh */
+    ITKMesh::Pointer uvMesh_;
+    /** Output UVMap */
+    UVMap::Pointer uvMapOut_;
+
+public:
+    /** @brief Input UVMap */
+    smgl::InputPort<UVMap::Pointer> uvMapIn;
+    /** @brief Input mesh */
+    smgl::InputPort<ITKMesh::Pointer> uvMesh;
+    /** @brief Output UVMap */
+    smgl::OutputPort<UVMap::Pointer> uvMapOut;
+
+    /** Constructor */
+    AutoOrientUVMapNode();
+
+private:
+    /** Smeagol custom serialization */
+    auto serialize_(bool useCache, const filesystem::path& cacheDir)
+        -> smgl::Metadata override;
+
+    /** Smeagol custom deserialization */
+    void deserialize_(
+        const smgl::Metadata& meta, const filesystem::path& cacheDir) override;
+};
+
+/**
  * @copybrief UVMap::Rotate()
  *
- * The original UVMap is not modified by this operation. Unlike the static
+ * The input UVMap is not modified by this operation. Unlike the static
  * function, this node accepts input angles in degrees.
  *
  * @see UVMap::Rotate()

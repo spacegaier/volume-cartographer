@@ -2,10 +2,9 @@
 
 #include <opencv2/imgproc.hpp>
 
+#include "vc/core/io/ImageIO.hpp"
 #include "vc/core/util/Iteration.hpp"
-
 #include "vc/core/util/FloatComparison.hpp"
-
 
 /** Top-left UV Origin */
 const static cv::Vec2d ORIGIN_TOP_LEFT(0, 0);
@@ -20,6 +19,7 @@ const static cv::Vec2d ORIGIN_BOTTOM_RIGHT(1, 1);
 constexpr static int MIN_DEBUG_WIDTH = 50;
 
 using namespace volcart;
+namespace vc = volcart;
 
 inline auto OriginVector(const UVMap::Origin& o) -> cv::Vec2d;
 
@@ -108,7 +108,7 @@ auto UVMap::Plot(const UVMap& uv, const Color& color) -> cv::Mat
 
 auto UVMap::Plot(
     const UVMap& uv,
-    const ITKMesh::Pointer& mesh2D,
+    const ITKMesh::Pointer& uvMesh,
     int width,
     int height,
     const Color& color) -> cv::Mat
@@ -123,15 +123,8 @@ auto UVMap::Plot(
     }
     cv::Mat r = cv::Mat::zeros(height, width, CV_8UC3);
 
-    cv::Point2d low;
-    cv::Point2d high;
-    double indexLow = 99999;
-    double indexHigh = 0;
-    std::vector<cv::Point2d> lowPoints;
-    std::vector<cv::Point2d> highPoints;
-
-    auto c = mesh2D->GetCells()->Begin();
-    auto end = mesh2D->GetCells()->End();
+    auto c = uvMesh->GetCells()->Begin();
+    auto end = uvMesh->GetCells()->End();
     for (; c != end; ++c) {
         auto vIds = c.Value()->GetPointIdsContainer();
         for (const auto& [idx, vID] : enumerate(vIds)) {
@@ -142,94 +135,10 @@ auto UVMap::Plot(
             cv::Point2d A{a[0] * (width - 1), a[1] * (height - 1)};
             cv::Point2d B{b[0] * (width - 1), b[1] * (height - 1)};
             cv::line(r, A, B, color, 1, cv::LINE_AA);
-
-            if (mesh2D->GetPoint(vID)[2] > indexHigh) {
-                indexHigh = mesh2D->GetPoint(vID)[2];
-                high = {A.x, A.y};
-            }
-
-            if (mesh2D->GetPoint(vID)[2] < indexLow) {
-                indexLow = mesh2D->GetPoint(vID)[2];
-                low = {A.x, A.y};
-            }
         }
     }
 
-    // Get lowest and highest X percent of Z-index points
-    c = mesh2D->GetCells()->Begin();
-    end = mesh2D->GetCells()->End();
-    for (; c != end; ++c) {
-        auto vIds = c.Value()->GetPointIdsContainer();
-        for (const auto& [idx, vID] : enumerate(vIds)) {
-            auto a = uv.get(vID);
-            auto b = (idx + 1 == vIds.size()) ? uv.get(vIds[0])
-                                              : uv.get(vIds[idx + 1]);
-
-            cv::Point2d A{a[0] * (width - 1), a[1] * (height - 1)};
-
-            if (mesh2D->GetPoint(vID)[2] < indexLow + (indexHigh - indexLow) * 0.25) {
-                lowPoints.push_back(A);
-                cv::circle(r, A, 2, color::RED);
-            }
-
-            if (mesh2D->GetPoint(vID)[2] > indexHigh - (indexHigh - indexLow) * 0.25) {
-                highPoints.push_back(A);
-                cv::circle(r, A, 2, color::GREEN);
-            }
-        }
-    }
-
-    cv::Vec4d lowLine;
-    cv::fitLine(lowPoints, lowLine, cv::DIST_L2, 0, 0.01, 0.01);
-    if (true /* debug */) {
-        cv::arrowedLine(r, {lowLine[2] + lowLine[0] * 50, lowLine[3] + lowLine[1] * 50}, {lowLine[2], lowLine[3]}, color::CYAN, 1, cv::LINE_AA);
-        cv::circle(r, {lowLine[2], lowLine[3]}, 3, color::RED);
-    }
-
-    cv::Vec4d highLine;
-    cv::fitLine(highPoints, highLine, cv::DIST_L2, 0, 0.01, 0.01);
-    if (true /* debug */) {
-        cv::arrowedLine(r, {highLine[2] + highLine[0] * 50, highLine[3] + highLine[1] * 50}, {highLine[2], highLine[3]}, color::CYAN, 1, cv::LINE_AA);
-        cv::circle(r, {highLine[2], highLine[3]}, 3, color::GREEN);
-    }
-
-    // Determine required rotation angle
-    cv::Point2d center(width / 2, height / 2);
-    cv::Vec2d lineVec;
-    cv::normalize(cv::Vec2d{lowLine[0], lowLine[1]}, lineVec);
-    cv::Vec2d xAxis{1, 0};
-    auto cos = lineVec.dot(xAxis);
-    auto angle = std::acos(cos);
-
-    double PI_CONST{3.1415926535897932385L};
-    double DEG_TO_RAD{180.0 / PI_CONST};
-    angle *= DEG_TO_RAD;
-
-    // Visualize highes and lowest Z-index point
-    if (true /* debug */) {
-        std::cout << "Lowest Z Point:  " << low.x << ", " << low.y << ", " << indexLow << std::endl;
-        std::cout << "Highest Z Point: " << high.x << ", " << high.y << ", " << indexHigh << std::endl;
-        cv::circle(r, low, 10, color::CYAN);
-        cv::circle(r, high, 10, color::CYAN);
-        cv::arrowedLine(r, low, high, color::GREEN, 1, cv::LINE_AA);
-    }
-
-    // Flip image if heigher Z-index points are below the lower ones on the Y axis
-    cv::Mat dst;
-    if (highLine[3] > lowLine[3]){
-        cv::flip(r, dst, 0);
-        r = dst;
-    }
-
-    // Rotate image to align fitted line of bottom Z-index points with X axis.
-    // Also adjust the bounding box so we are not cropping anything.
-    cv::Mat rot = cv::getRotationMatrix2D(center, angle, 1.0);
-    cv::Rect2f bbox = cv::RotatedRect(cv::Point2f(), r.size(), angle).boundingRect2f();
-    rot.at<double>(0,2) += bbox.width/2.0 - r.cols/2.0;
-    rot.at<double>(1,2) += bbox.height/2.0 - r.rows/2.0;
-
-    cv::warpAffine(r, dst, rot, bbox.size());
-    return dst;
+    return r;
 }
 
 void UVMap::Rotate(UVMap& uv, Rotation rotation)
@@ -366,6 +275,134 @@ void UVMap::Rotate(
         cv::Size size{int(width), int(height)};
         cv::warpAffine(
             texture, texture, tfm.rowRange(0, 2), size, cv::INTER_CUBIC);
+    }
+}
+
+void UVMap::AutoOrient(
+    UVMap& uv,
+    const ITKMesh::Pointer& uvMesh)
+{
+    auto width = std::max(static_cast<int>(std::ceil(uv.ratio_.width)), MIN_DEBUG_WIDTH);
+    auto height = static_cast<int>(std::ceil(width / uv.ratio_.aspect));
+    cv::Mat img;
+
+    cv::Point2d low, high;
+    double indexLow = 99999;
+    double indexHigh = 0;
+    std::vector<cv::Point2d> lowPoints, highPoints;
+    bool debugVis = true;
+    float pointPercentage = 0.2;
+
+    // First loop to determine the high and low points of the Z index
+    auto c = uvMesh->GetCells()->Begin();
+    auto end = uvMesh->GetCells()->End();
+    for (; c != end; ++c) {
+        auto vIds = c.Value()->GetPointIdsContainer();
+        for (const auto& [idx, vID] : enumerate(vIds)) {
+            auto a = uv.get(vID);
+            cv::Point2d A{a[0] * (width - 1), a[1] * (height - 1)};
+
+            if (uvMesh->GetPoint(vID)[2] > indexHigh) {
+                indexHigh = uvMesh->GetPoint(vID)[2];
+                high = {A.x, A.y};
+            }
+
+            if (uvMesh->GetPoint(vID)[2] < indexLow) {
+                indexLow = uvMesh->GetPoint(vID)[2];
+                low = {A.x, A.y};
+            }
+        }
+    }
+
+    if (debugVis) {
+        img = UVMap::Plot(uv, uvMesh);
+    }
+
+    // Second loop to now collect the highest and lowest X percent of points
+    c = uvMesh->GetCells()->Begin();
+    end = uvMesh->GetCells()->End();
+    for (; c != end; ++c) {
+        auto vIds = c.Value()->GetPointIdsContainer();
+        for (const auto& [idx, vID] : enumerate(vIds)) {
+            auto a = uv.get(vID);
+            auto b = (idx + 1 == vIds.size()) ? uv.get(vIds[0])
+                                              : uv.get(vIds[idx + 1]);
+
+            cv::Point2d A{a[0] * (width - 1), a[1] * (height - 1)};
+
+            if (uvMesh->GetPoint(vID)[2] < indexLow + (indexHigh - indexLow) * pointPercentage) {
+                lowPoints.push_back(A);
+                cv::circle(img, A, 2, color::RED);
+            }
+
+            if (uvMesh->GetPoint(vID)[2] > indexHigh - (indexHigh - indexLow) * pointPercentage) {
+                highPoints.push_back(A);
+                cv::circle(img, A, 2, color::GREEN);
+            }
+        }
+    }
+
+    cv::Vec4d lowLine;
+    cv::fitLine(lowPoints, lowLine, cv::DIST_L2, 0, 0.01, 0.01);
+    if (debugVis) {
+        cv::arrowedLine(img, {lowLine[2] + lowLine[0] * 50, lowLine[3] + lowLine[1] * 50}, {lowLine[2], lowLine[3]}, color::CYAN, 1, cv::LINE_AA);
+        cv::circle(img, {lowLine[2], lowLine[3]}, 3, color::RED);
+    }
+
+    cv::Vec4d highLine;
+    cv::fitLine(highPoints, highLine, cv::DIST_L2, 0, 0.01, 0.01);
+    if (debugVis) {
+        cv::arrowedLine(img, {highLine[2] + highLine[0] * 50, highLine[3] + highLine[1] * 50}, {highLine[2], highLine[3]}, color::CYAN, 1, cv::LINE_AA);
+        cv::circle(img, {highLine[2], highLine[3]}, 3, color::GREEN);
+    }
+
+    // Determine required rotation angle
+    static constexpr double PI_CONST{3.1415926535897932385L};
+    static constexpr double RAD_TO_DEG{180.0 / PI_CONST};
+    cv::Point2d center(width / 2, height / 2);
+    cv::Vec2d lineVec;
+    cv::normalize(cv::Vec2d{lowLine[0], lowLine[1]}, lineVec);
+    cv::Vec2d xAxis{1, 0};
+    auto cos = lineVec.dot(xAxis);
+    auto radian = std::acos(cos) * (lineVec.val[1] < 0 ? -1 : 1);
+    auto angle = std::acos(cos) * RAD_TO_DEG * (lineVec.val[1] < 0 ? -1 : 1);
+
+    // Visualize highes and lowest Z-index point
+    if (debugVis) {
+        std::cout << "Lowest Z Point:  " << low.x << ", " << low.y << ", " << indexLow << std::endl;
+        std::cout << "Highest Z Point: " << high.x << ", " << high.y << ", " << indexHigh << std::endl;
+        std::cout << "Line Vec: " << lineVec.val[0] << ", " << lineVec.val[1] << std::endl;
+        cv::circle(img, low, 10, color::CYAN);
+        cv::circle(img, high, 10, color::CYAN);
+        cv::arrowedLine(img, low, high, color::BLUE, 1, cv::LINE_AA);
+        vc::WriteImage("uvAutoOrientBefore.tif", img);
+
+        cv::Mat dst;
+
+        // Rotate image to align fitted line of bottom Z-index points with X axis.
+        // Also adjust the bounding box so we are not cropping anything.
+        cv::Mat rot = cv::getRotationMatrix2D(center, angle, 1.0);
+        cv::Rect2f bbox = cv::RotatedRect(cv::Point2f(), img.size(), angle).boundingRect2f();
+        rot.at<double>(0, 2) += bbox.width / 2.0 - img.cols / 2.0;
+        rot.at<double>(1, 2) += bbox.height / 2.0 - img.rows / 2.0;
+        cv::warpAffine(img, dst, rot, bbox.size());
+        img = dst;
+
+        // Flip image if higher Z-index points are below the lower ones on the Y axis
+        if (highLine[3] > lowLine[3]){
+            cv::flip(img, dst, 0);
+            img = dst;
+        }
+
+        vc::WriteImage("uvAutoOrientAfter.tif", img);
+    }
+
+    cv::Mat unused;
+    UVMap::Rotate(uv, radian);
+
+    if (highLine[3] > lowLine[3]){
+        auto uvFlipAxis = UVMap::FlipAxis::Vertical;
+        UVMap::Flip(uv, uvFlipAxis);
     }
 }
 

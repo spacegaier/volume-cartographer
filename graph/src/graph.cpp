@@ -20,6 +20,7 @@ static auto RegisterNodesImpl() -> bool
         MeshPropertiesNode,
         LoadMeshNode,
         WriteMeshNode,
+        AutoOrientUVMapNode,
         RotateUVMapNode,
         FlipUVMapNode,
         PlotUVMapNode,

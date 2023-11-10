@@ -130,6 +130,7 @@ static auto GetUVOpts() -> po::options_description
                 "  0 = Vertical\n"
                 "  1 = Horizontal\n"
                 "  2 = Both")
+        ("uv-auto-orient", "Automatically orient the UV map (flipping an rotating) to amtch the scroll Z index direction")
         ("uv-plot", po::value<std::string>(), "Plot the UV points and save "
             "it to the provided image path.")
         ("uv-plot-error", po::value<std::string>(), "Plot the UV L-stretch "
@@ -530,6 +531,17 @@ auto main(int argc, char* argv[]) -> int
                 parsed["uv-algorithm"].as<int>());
             return EXIT_FAILURE;
         }
+    }
+
+    // Auto orientation
+    if (parsed.count("uv-auto-orient") > 0) {
+        auto autoOrient = graph->insertNode<AutoOrientUVMapNode>();
+        autoOrient->uvMapIn = *results["uvMap"];
+        autoOrient->uvMesh = *results["uvMesh"];
+        results["uvMap"] = &autoOrient->uvMapOut;
+
+        // UV Mesh needs to be recalculated after transform
+        results.erase("uvMesh");
     }
 
     // Rotate
