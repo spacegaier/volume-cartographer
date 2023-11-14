@@ -8,7 +8,10 @@
 
 #include <QCoreApplication> // To use QCoreApplication::sendEvent()
 
+#include <sstream>
+
 using namespace ChaoVis;
+namespace fs = volcart::filesystem;
 
 // Constructor
 CVolumeViewerWithCurve::CVolumeViewerWithCurve(std::unordered_map<std::string, SegmentationStruct>& nSegStructMapRef)
@@ -101,6 +104,21 @@ CVolumeViewerWithCurve::CVolumeViewerWithCurve(std::unordered_map<std::string, S
     UpdateButtons();
 
     this->installEventFilter(this);
+
+    if (fs::is_directory("./luts") && fs::exists("./luts")) {
+        unsigned char colorR[256];
+        unsigned char colorG[256];
+        unsigned char colorB[256];
+        std::ifstream inFile("./luts/spectrum.lut", std::ios::binary);
+        inFile.read(reinterpret_cast<char*>(&colorR), sizeof(colorR));
+        inFile.read(reinterpret_cast<char*>(&colorG), sizeof(colorG));
+        inFile.read(reinterpret_cast<char*>(&colorB), sizeof(colorB));
+
+        for(int i = 0; i < 256; i++) {
+            colorTable.push_back(qRgb(colorR[i], colorG[i], colorB[i]));
+        }
+        inFile.close();
+    }
 }
 
 // Destructor
@@ -123,8 +141,41 @@ void CVolumeViewerWithCurve::SetImage(const QImage& nSrc)
         *fImgQImage = nSrc;
     }
 
+    ColorGradient gradient = ColorGradient(512);
+    auto table = fImgQImage->colorTable();
+    for(int i = 0; i < table.size(); i++) {
+        std::cout << table.at(i) << std::endl;
+    }
+    QRgb test = fImgQImage->pixel(0, 0);
+    std::cout << "RGB: " << test << std::endl;
+    std::cout << "RGB: " << qRed(test) << qGreen(test) << qBlue(test) << std::endl;
+
+    QImage heatmap = fImgQImage->convertToFormat(QImage::Format_Indexed8);
+    test = heatmap.pixel(0, 0);
+    std::cout << "RGB Indexed: " << qRed(test) << qGreen(test) << qBlue(test) << std::endl;
+    //heatmap.setColorTable(gradient.getColorMap());
+
+    for(int i = 0; i < colorTable.size(); i++) {
+        std::cout << i << ": " << qRed(colorTable.at(i)) << ", " << qGreen(colorTable.at(i)) << ", " << qBlue(colorTable.at(i)) << std::endl;
+    }
+
+    std::cout << "Color count: " << heatmap.colorCount() << std::endl;
+
+    heatmap.setColorTable(colorTable);
+    // for(int h = 0; h < heatmap.height(); h++) {
+    //     for(int w = 0; w < heatmap.width(); w++) {
+    //         // heatmap.setColor(w* h, colorTable[qRed(heatmap.pixel(w, h))]);
+    //         heatmap.setPixel(w, h, qRed(heatmap.pixel(w, h))); // (qRed(heatmap.pixel(w, h)) + qBlue(heatmap.pixel(w, h)) + qGreen(heatmap.pixel(w, h)) / 3));
+    //     }
+    // }
+
+    test = heatmap.pixel(0, 0);
+    std::cout << "RGB: " << qRed(test) << ", " << qGreen(test) << ", " << qBlue(test) << std::endl;
+    std::cout << "Color count: " << heatmap.colorCount() << std::endl;
+    heatmap = heatmap.convertToFormat(QImage::Format_RGB888);
+
     // Create a QPixmap from the QImage
-    QPixmap pixmap = QPixmap::fromImage(*fImgQImage);
+    QPixmap pixmap = QPixmap::fromImage(heatmap);
 
     // Add the QPixmap to the scene as a QGraphicsPixmapItem
     if (fBaseImageItem) {

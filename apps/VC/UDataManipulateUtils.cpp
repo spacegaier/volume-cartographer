@@ -125,7 +125,7 @@ QImage Mat2QImage(const cv::Mat& nSrc)
     QImage result(
         static_cast<const uint8_t*>(tmp.data), tmp.cols, tmp.rows, tmp.step,
         QImage::Format_RGB888);
-    result.bits();  // enforce depp copy, see documentation of
+    result.bits();  // enforce deep copy, see documentation of
     // QImage::QImage( const uchar *dta, int width, int height, Format format )
     return result;
 }

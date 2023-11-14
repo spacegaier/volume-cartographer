@@ -10,6 +10,7 @@
 #include "CXCurve.hpp"
 #include "ColorFrame.hpp"
 #include "SegmentationStruct.hpp"
+#include "ColorGradient.hpp"
 
 #include <QList>
 #include <QGraphicsEllipseItem>
@@ -113,6 +114,7 @@ private:
     // image drawn
     cv::Mat fImgMat;
     cv::Mat fImgMatCache;
+    QVector<QRgb> colorTable;
 
     // Global or class-level storage for ellipse items
     QList<QGraphicsEllipseItem*> ellipseItems;
