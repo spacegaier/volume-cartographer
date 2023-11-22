@@ -636,8 +636,8 @@ void CVolumeViewerWithCurve::DrawIntersectionCurve(QGraphicsScene* scene) {
 
         for (int i = 0; i < pointsNum; ++i) {
             // Create new ellipse points
-            auto p0 = segStruct.fIntersectionCurve.GetPoint(i)[0] - 0.5;
-            auto p1 = segStruct.fIntersectionCurve.GetPoint(i)[1] - 0.5;
+            auto p0 = segStruct.fIntersectionCurve.GetPoint(i)[0] - 1;
+            auto p1 = segStruct.fIntersectionCurve.GetPoint(i)[1] - 1;
             auto manualPoint = (hasAnnotations && (std::get<long>(segStruct.fAnnotationCloud[pointIndex + i][ANO_EL_FLAGS]) & AnnotationBits::ANO_MANUAL))
                 || (segStruct.fPathOnSliceIndex == sliceIndexToolStart && segStruct.fBufferedChangedPoints.find(i) != segStruct.fBufferedChangedPoints.end());
 

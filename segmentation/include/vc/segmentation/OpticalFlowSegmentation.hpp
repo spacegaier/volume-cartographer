@@ -239,12 +239,14 @@ private:
 
     /**
      * Compute a sub portion of the algorithm, e.g. the regular "forward" portion or the backwards re-segmentation.
+     * @param points list of generated points (in rows)
      * @param startChainIndex index of the starting chain (!= first slice for which we are calculating a curve) that is used as input for the algorithm
      * @param endChainIndex index of the last chain (used for clamping the valid values in the method)
      * @param endIndex index until which the algorithm should run
      * @param initialStepAdjustment is required for the re-segmentation run in case of step sizes that do not directly hit the target anchor
     */
-    auto computeSub(std::vector<std::vector<Voxel>>& points, Chain currentVs, int startChainIndex, int endChainIndex, int endIndex, int initialStepAdjustment, bool backwards, size_t& iteration, bool insertFront, const fs::path outputDir, const fs::path wholeChainDir)
+    auto computeSub(std::vector<std::vector<Voxel>>& points, Chain currentVs, int startChainIndex, int endChainIndex, int endIndex, int initialStepAdjustment,
+        bool backwards, size_t& iteration, bool insertFront, const fs::path outputDir, const fs::path wholeChainDir)
         -> ChainSegmentationAlgorithm::Status;
 
     /** Start z-index */
