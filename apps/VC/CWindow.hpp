@@ -168,6 +168,7 @@ private slots:
     void OnPathItemClicked(QTreeWidgetItem* item, int column);
     void OnPathCustomContextMenu(const QPoint& point);
     void OnRunVcRender(QString segmentID);
+    void OnRunInkDetection(QString segmentID);
 
     void PreviousSelectedId();
     void NextSelectedId();
@@ -256,6 +257,7 @@ private:
     QAction* fPrintDebugInfo;
 
     CVolumeViewerWithCurve* fVolumeViewerWidget;
+    CVolumeViewerWithCurve* fLayerViewerWidget;
     QCheckBox* fchkDisplayAll;
     QCheckBox* fchkComputeAll;
     QTreeWidget* fPathListWidget;
