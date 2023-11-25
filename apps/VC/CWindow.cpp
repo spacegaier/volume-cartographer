@@ -85,6 +85,7 @@ CWindow::CWindow()
     , fHighlightedSegmentationId("")
     , fPathOnSliceIndex(0)
     , fVolumeViewerWidget(nullptr)
+    , fLayerViewerWidget(nullptr)
     , fPathListWidget(nullptr)
     , fAnnotationListWidget(nullptr)
     , fPenTool(nullptr)
@@ -234,6 +235,14 @@ void CWindow::CreateWidgets(void)
     connect(ui.btnNewPath, SIGNAL(clicked()), this, SLOT(OnNewPathClicked()));
     connect(ui.btnRemovePath, SIGNAL(clicked()), this, SLOT(OnRemovePathClicked()));
 
+    fLayerViewerWidget = new CVolumeViewerWithCurve(fSegStructMap);
+    dockWidgetLayers = new QDockWidget(tr("Layers"), this);
+    dockWidgetLayers->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetFloatable | QDockWidget::DockWidgetMovable);
+    dockWidgetLayers->setFloating(true);
+    dockWidgetLayers->hide();
+    dockWidgetLayers->setMinimumHeight(300);
+    connect(dockWidgetLayers, &QDockWidget::visibilityChanged, this, [this](bool visible) { if (!visible) { this->fSegIdLayers.clear(); }});
+
     // TODO CHANGE VOLUME LOADING; FIRST CHECK FOR OTHER VOLUMES IN THE STRUCTS
     volSelect = this->findChild<QComboBox*>("volSelect");
     connect(
@@ -285,6 +294,8 @@ void CWindow::CreateWidgets(void)
     fPathListWidget = this->findChild<QTreeWidget*>("treeWidgetPaths");
     connect(fPathListWidget, SIGNAL(itemClicked(QTreeWidgetItem*, int)), this, SLOT(OnPathItemClicked(QTreeWidgetItem*, int)));
     connect(fPathListWidget, &QTreeWidget::itemSelectionChanged, this, &CWindow::OnPathItemSelectionChanged);
+    fPathListWidget->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(fPathListWidget, &QTreeWidget::customContextMenuRequested, this, &CWindow::OnPathCustomContextMenu);
 
     // list of annotations
     fAnnotationListWidget = this->findChild<QTreeWidget*>("treeWidgetAnnotations");
@@ -572,9 +583,10 @@ void CWindow::CreateMenus(void)
     fEditMenu->addAction(redoAction);
 
     fViewMenu = new QMenu(tr("&View"), this);
-    fViewMenu->addAction(findChild<QDockWidget*>("dockWidgetVolumes")->toggleViewAction());
-    fViewMenu->addAction(findChild<QDockWidget*>("dockWidgetSegmentation")->toggleViewAction());
-    fViewMenu->addAction(findChild<QDockWidget*>("dockWidgetAnnotations")->toggleViewAction());
+    fViewMenu->addAction(ui.dockWidgetVolumes->toggleViewAction());
+    fViewMenu->addAction(ui.dockWidgetSegmentation->toggleViewAction());
+    fViewMenu->addAction(ui.dockWidgetAnnotations->toggleViewAction());
+    fViewMenu->addAction(dockWidgetLayers->toggleViewAction());
 
     fHelpMenu = new QMenu(tr("&Help"), this);
     fHelpMenu->addAction(fKeybinds);
@@ -1343,6 +1355,10 @@ void CWindow::executeNextSegmentation()
         SetUpCurves();
         SetUpAnnotations();
         UpdateView();
+
+        if (dockWidgetLayers->isVisible()) {
+                OnPathRunInkDetection(fSegIdLayers);
+        }
 
         // Needs to be called here since there never might be an callback to onSegmentationFinished() if
         // all segmentation runs fail

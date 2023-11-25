@@ -6,6 +6,7 @@ set(srcs
     VCAppMain.cpp
     CMesh.cpp
     CWindow.cpp
+    CWindowContextMenu.cpp
     CXCurve.cpp
     UDataManipulateUtils.cpp
     CVolumeViewer.cpp
@@ -66,6 +67,7 @@ target_link_libraries(${target}
     VC::core
     VC::meshing
     VC::segmentation
+    VC::texturing
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets

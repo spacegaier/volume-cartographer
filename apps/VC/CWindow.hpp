@@ -181,6 +181,9 @@ private slots:
     void OnRemovePathClicked(void);
     void OnPathItemClicked(QTreeWidgetItem* item, int column);
     void OnPathItemSelectionChanged();
+    void OnPathCustomContextMenu(const QPoint& point);
+    void OnPathRunVcRender(std::string segmentID);
+    void OnPathRunInkDetection(std::string segmentID);
 
     void PreviousSelectedId();
     void NextSelectedId();
@@ -237,6 +240,7 @@ private:
 
     std::string fSegmentationId;
     std::string fHighlightedSegmentationId;
+    std::string fSegIdLayers{""};
     volcart::Volume::Pointer currentVolume;
 
     static const int AMPLITUDE = 28000;
@@ -277,6 +281,7 @@ private:
     QAction* fPrintDebugInfo;
 
     CVolumeViewerWithCurve* fVolumeViewerWidget;
+    CVolumeViewerWithCurve* fLayerViewerWidget;
     QCheckBox* fchkDisplayAll;
     QCheckBox* fchkComputeAll;
     QTreeWidget* fPathListWidget;
@@ -285,6 +290,7 @@ private:
     QPushButton* fSegTool;
     QComboBox* volSelect;
     QPushButton* assignVol;
+    QDockWidget* dockWidgetLayers;
 
     QSpinBox* fEdtWindowWidth;
     QLineEdit* fEdtDistanceWeight;
