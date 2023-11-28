@@ -16,14 +16,11 @@ CCurvePointItem::CCurvePointItem(qreal x, qreal y, qreal w, qreal h, const QPen&
 {
     setPen(pen);
     setBrush(brush);
-    setFlag(ItemSendsScenePositionChanges);
     setAcceptHoverEvents(true);
-    setFlag(QGraphicsItem::ItemIsSelectable, false);
 }
 
 void CCurvePointItem::hoverEnterEvent(QGraphicsSceneHoverEvent* event)
 {
-    std::cout  << "Hover enter" << std::endl;
     setPen(QPen(QColor(255, 250, 230)));
     setBrush(QBrush(QColor(255, 250, 230)));
     update();
@@ -31,7 +28,6 @@ void CCurvePointItem::hoverEnterEvent(QGraphicsSceneHoverEvent* event)
 
 void CCurvePointItem::hoverLeaveEvent(QGraphicsSceneHoverEvent* event)
 {
-    std::cout  << "Hover leave" << std::endl;
 }
 
 // Constructor
@@ -373,10 +369,6 @@ void CVolumeViewerWithCurve::mousePressEvent(QMouseEvent* event)
 // Handle mouse move event, currently only when we're editing
 void CVolumeViewerWithCurve::mouseMoveEvent(QMouseEvent* event)
 {
-    if (event->type() == QEvent::HoverEnter || event->type() == QEvent::GraphicsSceneHoverEnter) {
-        std::cout << "Hover enter filter " << std::endl;
-    }
-
     // If we have an active last pressed side button from the backwards/forwards move feature,
     // we cannot do any panning at the same time, nor do we want to move any curves.
     if (lastPressedSideButton) {
@@ -500,10 +492,6 @@ void CVolumeViewerWithCurve::mouseReleaseEvent(QMouseEvent* event)
 // capture mouse release
 bool CVolumeViewerWithCurve::eventFilter(QObject* watched, QEvent* event)
 {
-    if (event->type() == QEvent::HoverEnter || event->type() == QEvent::GraphicsSceneHoverEnter) {
-        std::cout << "Hover enter filter " << std::endl;
-    }
-
     // check for mouse release generic
     if (event->type() == QEvent::MouseButtonRelease) {
         QMouseEvent* mouseEvent = static_cast<QMouseEvent*>(event);

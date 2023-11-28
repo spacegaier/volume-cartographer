@@ -14,21 +14,20 @@
 namespace ChaoVis
 {
 
+class CVolumeViewer;
+
 class CVolumeViewerView : public QGraphicsView
 {
     Q_OBJECT
 
     public:
-        CVolumeViewerView(QWidget* parent = nullptr);
+        CVolumeViewerView(CVolumeViewer* viewer);
 
         void setup();
 
         void keyPressEvent(QKeyEvent* event) override;
         void keyReleaseEvent(QKeyEvent* event) override;
-
-        void mouseMoveEvent(QMouseEvent* pEvent) override;
-        void mousePressEvent(QMouseEvent* pEvent) override;
-        void mouseReleaseEvent(QMouseEvent* pEvent) override;
+        void wheelEvent(QWheelEvent* event) override;
 
         bool isRangeKeyPressed() { return rangeKeyPressed; }
         bool isCurvePanKeyPressed() { return curvePanKeyPressed; }
@@ -48,10 +47,14 @@ class CVolumeViewerView : public QGraphicsView
         QGraphicsTextItem* textAboveCursor;
         QGraphicsRectItem* backgroundBehindText;
         QTimer* timerTextAboveCursor;
+
+        CVolumeViewer* viewer;
 };
 
 class CVolumeViewer : public QWidget
 {
+    friend CVolumeViewerView;
+
     Q_OBJECT
 
 public:
@@ -78,9 +81,6 @@ public:
         UpdateButtons();
     }
     void setNumSlices(int num);
-
-protected:
-    bool eventFilter(QObject* watched, QEvent* event);
 
 public slots:
     void OnZoomInClicked(void);

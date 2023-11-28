@@ -10,8 +10,8 @@ using qga = QGuiApplication;
 #define DEFAULT_TEXT_COLOR QColor(255, 255, 120)
 
 // Constructor
-CVolumeViewerView::CVolumeViewerView(QWidget* parent)
-: QGraphicsView(parent)
+CVolumeViewerView::CVolumeViewerView(CVolumeViewer* viewer)
+: QGraphicsView(viewer), viewer(viewer)
 {
     timerTextAboveCursor = new QTimer(this);
     connect(timerTextAboveCursor, &QTimer::timeout, this, &CVolumeViewerView::hideTextAboveCursor);
@@ -62,23 +62,49 @@ void CVolumeViewerView::keyReleaseEvent(QKeyEvent* event)
     }
 }
 
-void CVolumeViewerView::mouseMoveEvent(QMouseEvent* pEvent)
+void CVolumeViewerView::wheelEvent(QWheelEvent* event)
 {
-    QGraphicsView::mouseMoveEvent(pEvent);
-}
+    // Range key pressed
+    if (isRangeKeyPressed()) {
+        int numDegrees = event->angleDelta().y() / 8;
 
-//////////////////////////////////////////////////////////////////////////
+        if (numDegrees > 0) {
+            viewer->SendSignalImpactRangeUp();
+        } else if (numDegrees < 0) {
+            viewer->SendSignalImpactRangeDown();
+        }
 
-void CVolumeViewerView::mousePressEvent(QMouseEvent* pEvent)
-{
-    QGraphicsView::mousePressEvent(pEvent);
-}
+        return;
+    }
+    // Ctrl = Zoom in/out
+    else if (QApplication::keyboardModifiers() == Qt::ControlModifier) {
+        int numDegrees = event->angleDelta().y() / 8;
 
-//////////////////////////////////////////////////////////////////////////
+        if (numDegrees > 0) {
+            viewer->OnZoomInClicked();
+        } else if (numDegrees < 0) {
+            viewer->OnZoomOutClicked();
+        }
 
-void CVolumeViewerView::mouseReleaseEvent(QMouseEvent* pEvent)
-{
-    QGraphicsView::mouseReleaseEvent(pEvent);
+        if (viewer->fCenterOnZoomEnabled) {
+            viewer->CenterOn(mapToScene(event->position().toPoint()));
+        }
+
+        return;
+    }
+    // Shift = Scan through slices
+    else if (QApplication::keyboardModifiers() == Qt::ShiftModifier) {
+        int numDegrees = event->angleDelta().y() / 8;
+
+        if (numDegrees > 0) {
+            viewer->SendSignalOnNextSliceShift(viewer->fScanRange);
+            showCurrentSliceIndex(viewer->fImageIndex, (viewer->GetViewState() == CVolumeViewer::EViewState::ViewStateEdit && viewer->fImageIndex == viewer->sliceIndexToolStart));
+        } else if (numDegrees < 0) {
+            viewer->SendSignalOnPrevSliceShift(viewer->fScanRange);
+            showCurrentSliceIndex(viewer->fImageIndex, (viewer->GetViewState() == CVolumeViewer::EViewState::ViewStateEdit && viewer->fImageIndex == viewer->sliceIndexToolStart));
+        }
+        return;
+    }
 }
 
 void CVolumeViewerView::showTextAboveCursor(const QString& value, const QString& label, const QColor& color)
@@ -170,7 +196,6 @@ CVolumeViewer::CVolumeViewer(QWidget* parent)
     // Create graphics view
     fGraphicsView = new CVolumeViewerView(this);
     fGraphicsView->setRenderHint(QPainter::Antialiasing);
-    fGraphicsView->setMouseTracking(true);
     setFocusProxy(fGraphicsView);
 
     // Create graphics scene
@@ -179,8 +204,6 @@ CVolumeViewer::CVolumeViewer(QWidget* parent)
     // Set the scene
     fGraphicsView->setScene(fScene);
     fGraphicsView->setup();
-
-    fGraphicsView->viewport()->installEventFilter(this);
 
     fButtonsLayout = new QHBoxLayout;
     fButtonsLayout->addWidget(fZoomInBtn);
@@ -259,62 +282,6 @@ void CVolumeViewer::SetImage(const QImage& nSrc)
 void CVolumeViewer::setNumSlices(int num)
 {
     fImageIndexEdit->setMaximum(num);
-}
-
-bool CVolumeViewer::eventFilter(QObject* watched, QEvent* event)
-{
-    if (event->type() == QEvent::HoverEnter || event->type() == QEvent::GraphicsSceneHoverEnter) {
-        std::cout << "Hover enter filter " << std::endl;
-    }
-
-    // Wheel events
-    if (watched == fGraphicsView || (fGraphicsView && watched == fGraphicsView->viewport()) && event->type() == QEvent::Wheel) {
-
-        QWheelEvent* wheelEvent = static_cast<QWheelEvent*>(event);
-
-        // Range key pressed
-        if (fGraphicsView->isRangeKeyPressed()) {
-            int numDegrees = wheelEvent->angleDelta().y() / 8;
-
-            if (numDegrees > 0) {
-                SendSignalImpactRangeUp();
-            } else if (numDegrees < 0) {
-                SendSignalImpactRangeDown();
-            }
-
-            return true;
-        }
-        // Ctrl = Zoom in/out
-        else if (QApplication::keyboardModifiers() == Qt::ControlModifier) {
-            int numDegrees = wheelEvent->angleDelta().y() / 8;
-
-            if (numDegrees > 0) {
-                OnZoomInClicked();
-            } else if (numDegrees < 0) {
-                OnZoomOutClicked();
-            }
-
-            if (fCenterOnZoomEnabled) {
-                CenterOn(fGraphicsView->mapToScene(wheelEvent->position().toPoint()));
-            }
-
-            return true;
-        }
-        // Shift = Scan through slices
-        else if (QApplication::keyboardModifiers() == Qt::ShiftModifier) {
-            int numDegrees = wheelEvent->angleDelta().y() / 8;
-
-            if (numDegrees > 0) {
-                SendSignalOnNextSliceShift(fScanRange);
-                fGraphicsView->showCurrentSliceIndex(fImageIndex, (GetViewState() == EViewState::ViewStateEdit && fImageIndex == sliceIndexToolStart));
-            } else if (numDegrees < 0) {
-                SendSignalOnPrevSliceShift(fScanRange);
-                fGraphicsView->showCurrentSliceIndex(fImageIndex, (GetViewState() == EViewState::ViewStateEdit && fImageIndex == sliceIndexToolStart));
-            }
-            return true;
-        }
-    }
-    return QWidget::eventFilter(watched, event);
 }
 
 void CVolumeViewer::ScaleImage(double nFactor)
