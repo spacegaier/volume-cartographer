@@ -74,14 +74,14 @@ auto tio::ReadTIFF(const volcart::filesystem::path& path) -> cv::Mat
 {
     // Make sure input file exists
     if (!fs::exists(path)) {
-        std::cout << "File does not exist" << path.string() << std::endl;
+        std::cout << "File does not exist " << path.string() << std::endl;
         throw std::runtime_error("File does not exist");
     }
 
     // Open the file read-only
     lt::TIFF* tif = lt::TIFFOpen(path.c_str(), "r");
     if (tif == nullptr) {
-        throw std::runtime_error("Failed to open tif");
+        throw std::runtime_error("Failed to open TIF");
     }
 
     // Get metadata
@@ -106,18 +106,18 @@ auto tio::ReadTIFF(const volcart::filesystem::path& path) -> cv::Mat
     // open and mmap tiff file
     int fd = open(path.c_str(), O_RDONLY);
     if (fd == -1) {
-        throw std::runtime_error("Failed to open tif open");
+        throw std::runtime_error("Failed to open TIF (open)");
     }
     struct stat sb;
     if (fstat(fd, &sb) == -1) {
-        throw std::runtime_error("Failed to open tif fstat");
+        throw std::runtime_error("Failed to open TIF (fstat)");
     }
 
     void* data = mmap(nullptr, sb.st_size, PROT_READ, MAP_SHARED, fd, 0);
     if (data == MAP_FAILED) {
         // print error code
         printf("errno: %d\n", errno);
-        throw std::runtime_error("Failed to open tif mmap");
+        throw std::runtime_error("Failed to open TIF (mmap)");
     }
     printf("Loading %s\n", path.c_str());
 
@@ -125,40 +125,6 @@ auto tio::ReadTIFF(const volcart::filesystem::path& path) -> cv::Mat
     // etc. As a fallback we might just want to keep the old code as well
     // but maybe warn when it is used
     cv::Mat img = cv::Mat(h, w, cvType, data + 8);
-
-    /* cv::Mat img = cv::Mat::zeros(h, w, cvType);
-
-    // Read the rows
-    auto bufferSize = static_cast<size_t>(lt::TIFFScanlineSize(tif));
-    std::vector<char> buffer(bufferSize + 4);
-    if (config == PLANARCONFIG_CONTIG) {
-        for (auto row = 0; row < height; row++) {
-            lt::TIFFReadScanline(tif, &buffer[0], row);
-            std::memcpy(img.ptr(row), &buffer[0], bufferSize);
-        }
-    } else if (config == PLANARCONFIG_SEPARATE) {
-        std::runtime_error(
-            "Unsupported TIFF planar configuration: PLANARCONFIG_SEPARATE");
-    }
-
-    // Do channel conversion
-    auto cvtNeeded = img.channels() == 3 or img.channels() == 4;
-    auto cvtSupported = img.depth() != CV_8S and img.depth() != CV_16S and
-                        img.depth() != CV_32S;
-    if (cvtNeeded) {
-        if (cvtSupported) {
-            if (img.channels() == 3) {
-                cv::cvtColor(img, img, cv::COLOR_RGB2BGR);
-            } else if (img.channels() == 4) {
-                cv::cvtColor(img, img, cv::COLOR_RGBA2BGRA);
-            }
-        } else {
-            vc::Logger()->warn(
-                "[TIFFIO] RGB->BGR conversion for signed 8-bit and 16-bit "
-                "images is not supported. Image will be loaded with RGB "
-                "element order.");
-        }
-    } */
 
     lt::TIFFClose(tif);
 
