@@ -40,9 +40,9 @@ public:
     // for editing mode
     void SetIntersectionCurve(CXCurve& nCurve);
     void SetImpactRange(int nImpactRange);
-    void SetScanRange(int nScanRange);
     void SetSliceIndexToolStart(int index) { sliceIndexToolStart = index; }
     void ReturnToSliceIndexToolStart();
+    bool ShouldHighlightImageIndex(const int imageIndex);
 
     void UpdateView();
     void SetShowCurve(bool b) { showCurve = b; }
@@ -67,8 +67,8 @@ private:
 
     std::pair<int, std::string> SelectPointOnCurves(const cv::Vec2f& nPt, bool rightClick, bool selectGlobally=false);
 
-    void DrawIntersectionCurve(QGraphicsScene* scene);
-    void DrawControlPoints(QGraphicsScene* scene);
+    void DrawIntersectionCurve();
+    void DrawControlPoints();
 
 signals:
     void SendSignalPathChanged(std::string, PathChangePointVector before, PathChangePointVector after);

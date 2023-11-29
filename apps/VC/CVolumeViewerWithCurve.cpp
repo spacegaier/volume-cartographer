@@ -158,17 +158,15 @@ void CVolumeViewerWithCurve::SetImpactRange(int nImpactRange)
     fGraphicsView->showCurrentImpactRange(nImpactRange);
 }
 
-// Set the scan range
-void CVolumeViewerWithCurve::SetScanRange(int nScanRange)
-{
-    fScanRange = nScanRange;
-    fGraphicsView->showCurrentScanRange(nScanRange);
-}
-
 // Return to the slice that the tool was started on
 void CVolumeViewerWithCurve::ReturnToSliceIndexToolStart()
 {
     SendSignalOnLoadAnyImage(sliceIndexToolStart);
+}
+
+bool CVolumeViewerWithCurve::ShouldHighlightImageIndex(const int imageIndex)
+{
+    return GetViewState() == EViewState::ViewStateEdit && imageIndex == sliceIndexToolStart;
 }
 
 // Update the B-spline curve
@@ -206,12 +204,11 @@ void CVolumeViewerWithCurve::UpdateView()
             // Assuming DrawOnImage now works on QImage or QGraphicsScene
            fSplineCurveRef->DrawOnImage(fScene, secondary);
         }
-        DrawControlPoints(fScene);
+        DrawControlPoints();
     }
 
     if (showCurve) {
-        // qDebug() << "showCurve";
-        DrawIntersectionCurve(fScene);
+        DrawIntersectionCurve();
     }
 
     // If we have an image, draw it
@@ -602,7 +599,7 @@ std::pair<int, std::string> CVolumeViewerWithCurve::SelectPointOnCurves(
 }
 
 // Draw intersection curve on the slice
-void CVolumeViewerWithCurve::DrawIntersectionCurve(QGraphicsScene* scene) {
+void CVolumeViewerWithCurve::DrawIntersectionCurve() {
     for (auto& seg : fSegStructMapRef) {
         auto& segStruct = seg.second;
         int r{0}, g{0}, b{0};
@@ -621,7 +618,7 @@ void CVolumeViewerWithCurve::DrawIntersectionCurve(QGraphicsScene* scene) {
         else {
             colorSelector->color().getRgb(&r, &g, &b);
         }
-        if (!scene || !segStruct.display || segStruct.fIntersectionCurve.GetPointsNum()==0 || !colorSelector) {
+        if (!fScene || !segStruct.display || segStruct.fIntersectionCurve.GetPointsNum()==0 || !colorSelector) {
             continue;  // Early continue if either object is null or the list is empty
         }
 
@@ -647,16 +644,16 @@ void CVolumeViewerWithCurve::DrawIntersectionCurve(QGraphicsScene* scene) {
                 brushColor = brushColor.darker(150);
             }
 
-            QGraphicsEllipseItem* newEllipse = scene->addEllipse(p0, p1, 2, 2, QPen(penColor), QBrush(brushColor));
+            QGraphicsEllipseItem* newEllipse = fScene->addEllipse(p0, p1, 2, 2, QPen(penColor), QBrush(brushColor));
             newEllipse->setVisible(true);
         }
     }
 }
 
-void CVolumeViewerWithCurve::DrawControlPoints(QGraphicsScene* scene) {
+void CVolumeViewerWithCurve::DrawControlPoints() {
     int r{0}, g{0}, b{0};
     colorSelector->color().getRgb(&r, &g, &b);
-    if (!scene || fControlPoints.empty() || !colorSelector) {
+    if (!fScene || fControlPoints.empty() || !colorSelector) {
         return;  // Early exit if either object is null or the list is empty
     }
 
@@ -664,7 +661,7 @@ void CVolumeViewerWithCurve::DrawControlPoints(QGraphicsScene* scene) {
         // Create new ellipse points
         auto p0 = fControlPoints[i][0] - 0.5;
         auto p1 = fControlPoints[i][1] - 0.5;
-        QGraphicsEllipseItem* newEllipse = scene->addEllipse(p0, p1, 2, 2, QPen(QColor(r, g, b)), QBrush(QColor(r, g, b)));
+        QGraphicsEllipseItem* newEllipse = fScene->addEllipse(p0, p1, 2, 2, QPen(QColor(r, g, b)), QBrush(QColor(r, g, b)));
     }
 }
 

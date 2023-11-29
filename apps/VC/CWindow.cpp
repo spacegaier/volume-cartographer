@@ -7,6 +7,7 @@
 #include <QSettings>
 #include <opencv2/imgproc.hpp>
 
+#include "CLayerViewer.hpp"
 #include "CVolumeViewerWithCurve.hpp"
 #include "UDataManipulateUtils.hpp"
 #include "SettingsDialog.hpp"
@@ -202,9 +203,9 @@ void CWindow::CreateWidgets(void)
 
     // add volume viewer
     fVolumeViewerWidget = new CVolumeViewerWithCurve(fSegStructMap);
-    connect(fVolumeViewerWidget, &CVolumeViewerWithCurve::SendSignalStatusMessageAvailable, this, &CWindow::onShowStatusMessage);
-    connect(fVolumeViewerWidget, &CVolumeViewerWithCurve::SendSignalImpactRangeUp, this, &CWindow::onImpactRangeUp);
-    connect(fVolumeViewerWidget, &CVolumeViewerWithCurve::SendSignalImpactRangeDown, this, &CWindow::onImpactRangeDown);
+    connect(fVolumeViewerWidget, &CImageViewer::SendSignalStatusMessageAvailable, this, &CWindow::onShowStatusMessage);
+    connect(fVolumeViewerWidget, &CImageViewer::SendSignalImpactRangeUp, this, &CWindow::onImpactRangeUp);
+    connect(fVolumeViewerWidget, &CImageViewer::SendSignalImpactRangeDown, this, &CWindow::onImpactRangeDown);
 
     auto aWidgetLayout = new QVBoxLayout;
     aWidgetLayout->addWidget(fVolumeViewerWidget);
@@ -216,32 +217,43 @@ void CWindow::CreateWidgets(void)
     fVolumeViewerWidget->SetIntersectionCurve(fSegStructMap[fSegmentationId].fIntersectionCurve);
 
     connect(
-        fVolumeViewerWidget, SIGNAL(SendSignalOnNextSliceShift(int)), this,
-        SLOT(OnLoadNextSliceShift(int)));
+        fVolumeViewerWidget, &CImageViewer::SendSignalOnNextImageShift, this,
+        &CWindow::OnLoadNextSliceShift);
     connect(
-        fVolumeViewerWidget, SIGNAL(SendSignalOnPrevSliceShift(int)), this,
-        SLOT(OnLoadPrevSliceShift(int)));
+        fVolumeViewerWidget, &CImageViewer::SendSignalOnPrevImageShift, this,
+        &CWindow::OnLoadPrevSliceShift);
     connect(
-        fVolumeViewerWidget, SIGNAL(SendSignalOnLoadAnyImage(int)), this,
-        SLOT(OnLoadAnySlice(int)));
+        fVolumeViewerWidget, &CImageViewer::SendSignalOnLoadAnyImage, this,
+        &CWindow::OnLoadAnySlice);
     connect(
-        fVolumeViewerWidget, SIGNAL(SendSignalPathChanged(std::string, PathChangePointVector, PathChangePointVector)), this,
-        SLOT(OnPathChanged(std::string, PathChangePointVector, PathChangePointVector)));
+        fVolumeViewerWidget, &CVolumeViewerWithCurve::SendSignalPathChanged, this,
+        &CWindow::OnPathChanged);
     connect(
-        fVolumeViewerWidget, SIGNAL(SendSignalAnnotationChanged()), this,
-        SLOT(OnAnnotationChanged()));
+        fVolumeViewerWidget, &CVolumeViewerWithCurve::SendSignalAnnotationChanged, this,
+        &CWindow::OnAnnotationChanged);
 
     // new and remove path buttons
     connect(ui.btnNewPath, SIGNAL(clicked()), this, SLOT(OnNewPathClicked()));
     connect(ui.btnRemovePath, SIGNAL(clicked()), this, SLOT(OnRemovePathClicked()));
 
-    fLayerViewerWidget = new CVolumeViewerWithCurve(fSegStructMap);
-    dockWidgetLayers = new QDockWidget(tr("Layers"), this);
+    fLayerViewerWidget = new CLayerViewer(this);
+    dockWidgetLayers = new QDockWidget(tr("Layer Viewer"), this);
     dockWidgetLayers->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetFloatable | QDockWidget::DockWidgetMovable);
     dockWidgetLayers->setFloating(true);
     dockWidgetLayers->hide();
     dockWidgetLayers->setMinimumHeight(300);
+    dockWidgetLayers->setWidget(fLayerViewerWidget);
     connect(dockWidgetLayers, &QDockWidget::visibilityChanged, this, [this](bool visible) { if (!visible) { this->fSegIdLayers.clear(); }});
+
+    connect(
+        fLayerViewerWidget, &CImageViewer::SendSignalOnNextImageShift, this,
+        &CWindow::OnLoadNextLayerShift);
+    connect(
+        fLayerViewerWidget, &CImageViewer::SendSignalOnPrevImageShift, this,
+        &CWindow::OnLoadPrevLayerShift);
+    connect(
+        fLayerViewerWidget, &CImageViewer::SendSignalOnLoadAnyImage, this,
+        &CWindow::OnLoadAnyLayer);
 
     // TODO CHANGE VOLUME LOADING; FIRST CHECK FOR OTHER VOLUMES IN THE STRUCTS
     volSelect = this->findChild<QComboBox*>("volSelect");
@@ -257,7 +269,7 @@ void CWindow::CreateWidgets(void)
             currentVolume = newVolume;
             OnLoadAnySlice(0);
             setDefaultWindowWidth(newVolume);
-            fVolumeViewerWidget->setNumSlices(currentVolume->numSlices());
+            fVolumeViewerWidget->SetNumImages(currentVolume->numSlices());
             ui.spinBackwardSlice->setMaximum(currentVolume->numSlices() - 1);
             ui.spinForwardSlice->setMaximum(currentVolume->numSlices() - 1);
         });
@@ -486,19 +498,16 @@ void CWindow::CreateWidgets(void)
 
     connect(
         slicePrev, &QShortcut::activated, fVolumeViewerWidget,
-        &CVolumeViewerWithCurve::OnPrevClicked);
+        &CImageViewer::OnPrevClicked);
     connect(
         sliceNext, &QShortcut::activated, fVolumeViewerWidget,
-        &CVolumeViewerWithCurve::OnNextClicked);
+        &CImageViewer::OnNextClicked);
     connect(
         sliceZoomIn, &QShortcut::activated, fVolumeViewerWidget,
-        &CVolumeViewerWithCurve::OnZoomInClicked);
+        &CImageViewer::OnZoomInClicked);
     connect(
         sliceZoomOut, &QShortcut::activated, fVolumeViewerWidget,
-        &CVolumeViewerWithCurve::OnZoomOutClicked);
-    connect(
-        displayCurves, &QShortcut::activated, fVolumeViewerWidget,
-        &CVolumeViewerWithCurve::toggleShowCurveBox);
+        &CImageViewer::OnZoomOutClicked);
     connect(
         displayCurves_C, &QShortcut::activated, fVolumeViewerWidget,
         &CVolumeViewerWithCurve::toggleShowCurveBox);
@@ -1357,7 +1366,7 @@ void CWindow::executeNextSegmentation()
         UpdateView();
 
         if (dockWidgetLayers->isVisible()) {
-                OnPathRunInkDetection(fSegIdLayers);
+            OnPathRunInkDetection(fSegIdLayers);
         }
 
         // Needs to be called here since there never might be an callback to onSegmentationFinished() if
@@ -1586,6 +1595,10 @@ void CWindow::SetCurrentCurve(int nCurrentSliceIndex)
         auto& segStruct = seg.second;
         segStruct.SetCurrentCurve(nCurrentSliceIndex);
     }
+
+    if (dockWidgetLayers->isVisible()) {
+        fLayerViewerWidget->showCurveForSlice(nCurrentSliceIndex);;
+    }
 }
 
 void CWindow::prefetchSlices(void) {
@@ -1674,6 +1687,25 @@ void CWindow::OpenSlice(void)
     auto aImgQImage = Mat2QImage(aImgMat);
     fVolumeViewerWidget->SetImage(aImgQImage);
     fVolumeViewerWidget->SetImageIndex(fPathOnSliceIndex);
+}
+
+// Open layer
+void CWindow::OpenLayer(void)
+{
+    std::stringstream ss;
+    ss << std::setw(2) << std::setfill('0') << fLayerViewerWidget->GetImageIndex() << ".tif";
+    auto path = fVpkg->segmentation(fSegIdLayers)->path().append("layers").append(ss.str());
+
+    if (fs::exists(path)) {
+        cv::Mat aImgMat = cv::imread(path, -1);
+        aImgMat.convertTo(aImgMat, CV_8UC1, 1.0 / 256.0);
+
+        auto aImgQImage = Mat2QImage(aImgMat);
+        fLayerViewerWidget->SetImage(aImgQImage);
+
+        fLayerViewerWidget->showCurveForSlice(fPathOnSliceIndex);
+        dockWidgetLayers->show();
+    }
 }
 
 // Initialize path list
@@ -2461,7 +2493,7 @@ void CWindow::annotationDoubleClicked(QTreeWidgetItem* item)
 
 // Show go to slice dialog and execute the jump
 void CWindow::ShowGoToSliceDlg() {
-    if (currentVolume == nullptr || !fVolumeViewerWidget->fNextBtn->isEnabled()) {
+    if (currentVolume == nullptr || !fVolumeViewerWidget->CanChangeImage()) {
         return;
     }
 
@@ -2850,7 +2882,7 @@ void CWindow::OnLoadNextSliceShift(int shift)
         shift = currentVolume->numSlices() - fPathOnSliceIndex - 1;
     }
 
-    if (!fVolumeViewerWidget->fNextBtn->isEnabled()) {
+    if (!fVolumeViewerWidget->CanChangeImage()) {
         statusBar->showMessage(
             tr("Changing slices is deactivated in the Pen Tool!"), 10000);
     } else if (shift != 0) {
@@ -2869,7 +2901,7 @@ void CWindow::OnLoadPrevSliceShift(int shift)
         shift = fPathOnSliceIndex;
     }
 
-    if (!fVolumeViewerWidget->fPrevBtn->isEnabled()) {
+    if (!fVolumeViewerWidget->CanChangeImage()) {
         statusBar->showMessage(
             tr("Changing slices is deactivated in the Pen Tool!"), 10000);
     } else if (shift != 0) {
@@ -2880,6 +2912,40 @@ void CWindow::OnLoadPrevSliceShift(int shift)
     } else {
         statusBar->showMessage(
             tr("Already at the beginning of the volume!"), 10000);
+    }
+}
+
+void CWindow::OnLoadAnyLayer(int layer)
+{
+    if (layer >= 0 && layer < fLayerViewerWidget->GetNumImages()) {
+        fLayerViewerWidget->SetImageIndex(layer);
+        OpenLayer();
+    }
+}
+
+void CWindow::OnLoadNextLayerShift(int shift)
+{
+    auto current = fLayerViewerWidget->GetImageIndex();
+    if (current + shift >= fLayerViewerWidget->GetNumImages()) {
+        shift = fLayerViewerWidget->GetNumImages() - current - 1;
+    }
+
+    if (shift != 0) {
+        fLayerViewerWidget->SetImageIndex(current + shift);
+        OpenLayer();
+    }
+}
+
+void CWindow::OnLoadPrevLayerShift(int shift)
+{
+    auto current = fLayerViewerWidget->GetImageIndex();
+    if (current - shift < 0) {
+        shift = current;
+    }
+
+    if (shift != 0) {
+        fLayerViewerWidget->SetImageIndex(current - shift);
+        OpenLayer();
     }
 }
 

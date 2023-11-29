@@ -1,6 +1,6 @@
-// CVolumeViewer.cpp
+// CImageViewer.cpp
 // Chao Du 2015 April
-#include "CVolumeViewer.hpp"
+#include "CImageViewer.hpp"
 #include "HBase.hpp"
 
 using namespace ChaoVis;
@@ -10,15 +10,15 @@ using qga = QGuiApplication;
 #define DEFAULT_TEXT_COLOR QColor(255, 255, 120)
 
 // Constructor
-CVolumeViewerView::CVolumeViewerView(QWidget* parent)
+CImageViewerView::CImageViewerView(QWidget* parent)
 : QGraphicsView(parent)
 {
     timerTextAboveCursor = new QTimer(this);
-    connect(timerTextAboveCursor, &QTimer::timeout, this, &CVolumeViewerView::hideTextAboveCursor);
+    connect(timerTextAboveCursor, &QTimer::timeout, this, &CImageViewerView::hideTextAboveCursor);
     timerTextAboveCursor->setSingleShot(true);
 }
 
-void CVolumeViewerView::setup()
+void CImageViewerView::setup()
 {
     textAboveCursor = new QGraphicsTextItem("", 0);
     textAboveCursor->setFlag(QGraphicsItem::ItemIgnoresTransformations);
@@ -38,7 +38,7 @@ void CVolumeViewerView::setup()
     scene()->addItem(backgroundBehindText);
 }
 
-void CVolumeViewerView::keyPressEvent(QKeyEvent* event)
+void CImageViewerView::keyPressEvent(QKeyEvent* event)
 {
     if (event->key() == Qt::Key_W) {
         rangeKeyPressed = true;
@@ -49,7 +49,7 @@ void CVolumeViewerView::keyPressEvent(QKeyEvent* event)
     }
 }
 
-void CVolumeViewerView::keyReleaseEvent(QKeyEvent* event)
+void CImageViewerView::keyReleaseEvent(QKeyEvent* event)
 {
     if (event->key() == Qt::Key_W)  {
         rangeKeyPressed = false;
@@ -60,7 +60,7 @@ void CVolumeViewerView::keyReleaseEvent(QKeyEvent* event)
     }
 }
 
-void CVolumeViewerView::showTextAboveCursor(const QString& value, const QString& label, const QColor& color)
+void CImageViewerView::showTextAboveCursor(const QString& value, const QString& label, const QColor& color)
 {
     // Without this check, when you start VC with auto-load the initial slice will not be in the center of
     // volume viewer, because during loading the initilization of the impact range slider and its callback slots
@@ -89,31 +89,30 @@ void CVolumeViewerView::showTextAboveCursor(const QString& value, const QString&
     200)));
 }
 
-void CVolumeViewerView::hideTextAboveCursor()
+void CImageViewerView::hideTextAboveCursor()
 {
     textAboveCursor->setVisible(false);
     backgroundBehindText->setVisible(false);
 }
 
-void CVolumeViewerView::showCurrentImpactRange(int range)
+void CImageViewerView::showCurrentImpactRange(int range)
 {
     showTextAboveCursor(QString::number(range), "", QColor(255, 120, 110)); // tr("Impact Range")
 }
 
-void CVolumeViewerView::showCurrentScanRange(int range)
+void CImageViewerView::showCurrentScanRange(int range)
 {
     showTextAboveCursor(QString::number(range), "", QColor(160, 180, 255)); // tr("Scan Range")
 }
 
-void CVolumeViewerView::showCurrentSliceIndex(int slice, bool highlight)
+void CImageViewerView::showCurrentImageIndex(int slice, bool highlight)
 {
     showTextAboveCursor(QString::number(slice), "", (highlight ? QColor(255, 50, 20) : QColor(255, 220, 30))); // tr("Slice")
 }
 
 // Constructor
-CVolumeViewer::CVolumeViewer(QWidget* parent)
+CImageViewer::CImageViewer(QWidget* parent)
     : QWidget(parent)
-    , fCanvas(nullptr)
     , fScrollArea(nullptr)
     , fGraphicsView(nullptr)
     , fZoomInBtn(nullptr)
@@ -121,7 +120,6 @@ CVolumeViewer::CVolumeViewer(QWidget* parent)
     , fResetBtn(nullptr)
     , fNextBtn(nullptr)
     , fPrevBtn(nullptr)
-    , fViewState(EViewState::ViewStateIdle)
     , fImgQImage(nullptr)
     , fBaseImageItem(nullptr)
     , fScaleFactor(1.0)
@@ -132,22 +130,20 @@ CVolumeViewer::CVolumeViewer(QWidget* parent)
     fZoomInBtn = new QPushButton(tr("Zoom In"), this);
     fZoomOutBtn = new QPushButton(tr("Zoom Out"), this);
     fResetBtn = new QPushButton(tr("Reset"), this);
-    fNextBtn = new QPushButton(tr("Next Slice"), this);
-    fPrevBtn = new QPushButton(tr("Previous Slice"), this);
+    fNextBtn = new QPushButton(tr("Next Image"), this);
+    fPrevBtn = new QPushButton(tr("Previous Image"), this);
 
     // slice index edit
     fImageIndexEdit = new QSpinBox(this);
     fImageIndexEdit->setMinimum(0);
     fImageIndexEdit->setEnabled(true);
     fImageIndexEdit->setMinimumWidth(100);
-    connect(
-        fImageIndexEdit, SIGNAL(editingFinished()), this,
-        SLOT(OnImageIndexEditTextChanged()));
+    connect(fImageIndexEdit, &QSpinBox::editingFinished, this, &CImageViewer::OnImageIndexEditTextChanged);
 
     fBaseImageItem = nullptr;
 
     // Create graphics view
-    fGraphicsView = new CVolumeViewerView(this);
+    fGraphicsView = new CImageViewerView(this);
     fGraphicsView->setRenderHint(QPainter::Antialiasing);
     setFocusProxy(fGraphicsView);
 
@@ -170,11 +166,11 @@ CVolumeViewer::CVolumeViewer(QWidget* parent)
     // Add some space between the slice spin box and the curve tools (color, checkboxes, ...)
     fButtonsLayout->addSpacerItem(new QSpacerItem(1, 0, QSizePolicy::Expanding, QSizePolicy::Fixed));
 
-    connect(fZoomInBtn, SIGNAL(clicked()), this, SLOT(OnZoomInClicked()));
-    connect(fZoomOutBtn, SIGNAL(clicked()), this, SLOT(OnZoomOutClicked()));
-    connect(fResetBtn, SIGNAL(clicked()), this, SLOT(OnResetClicked()));
-    connect(fNextBtn, SIGNAL(clicked()), this, SLOT(OnNextClicked()));
-    connect(fPrevBtn, SIGNAL(clicked()), this, SLOT(OnPrevClicked()));
+    connect(fZoomInBtn, &QPushButton::clicked, this, &CImageViewer::OnZoomInClicked);
+    connect(fZoomOutBtn, &QPushButton::clicked, this, &CImageViewer::OnZoomOutClicked);
+    connect(fResetBtn, &QPushButton::clicked, this, &CImageViewer::OnResetClicked);
+    connect(fNextBtn, &QPushButton::clicked, this, &CImageViewer::OnNextClicked);
+    connect(fPrevBtn, &QPushButton::clicked, this, &CImageViewer::OnPrevClicked);
 
     QSettings settings("VC.ini", QSettings::IniFormat);
     fCenterOnZoomEnabled = settings.value("viewer/center_on_zoom", false).toInt() != 0;
@@ -189,7 +185,7 @@ CVolumeViewer::CVolumeViewer(QWidget* parent)
 }
 
 // Destructor
-CVolumeViewer::~CVolumeViewer(void)
+CImageViewer::~CImageViewer(void)
 {
     deleteNULL(fGraphicsView);
     deleteNULL(fScene);
@@ -202,7 +198,7 @@ CVolumeViewer::~CVolumeViewer(void)
     deleteNULL(fImageIndexEdit);
 }
 
-void CVolumeViewer::setButtonsEnabled(bool state)
+void CImageViewer::setButtonsEnabled(bool state)
 {
     fZoomOutBtn->setEnabled(state);
     fZoomInBtn->setEnabled(state);
@@ -211,7 +207,7 @@ void CVolumeViewer::setButtonsEnabled(bool state)
     fImageIndexEdit->setEnabled(state);
 }
 
-void CVolumeViewer::SetImage(const QImage& nSrc)
+void CImageViewer::SetImage(const QImage& nSrc)
 {
     if (fImgQImage == nullptr) {
         fImgQImage = new QImage(nSrc);
@@ -234,12 +230,19 @@ void CVolumeViewer::SetImage(const QImage& nSrc)
     update();
 }
 
-void CVolumeViewer::setNumSlices(int num)
+void CImageViewer::SetNumImages(int num)
 {
     fImageIndexEdit->setMaximum(num);
 }
 
-bool CVolumeViewer::eventFilter(QObject* watched, QEvent* event)
+// Set the scan range
+void CImageViewer::SetScanRange(int scanRange)
+{
+    fScanRange = scanRange;
+    fGraphicsView->showCurrentScanRange(scanRange);
+}
+
+bool CImageViewer::eventFilter(QObject* watched, QEvent* event)
 {
     // Wheel events
     if (watched == fGraphicsView || (fGraphicsView && watched == fGraphicsView->viewport()) && event->type() == QEvent::Wheel) {
@@ -279,11 +282,11 @@ bool CVolumeViewer::eventFilter(QObject* watched, QEvent* event)
             int numDegrees = wheelEvent->angleDelta().y() / 8;
 
             if (numDegrees > 0) {
-                SendSignalOnNextSliceShift(fScanRange);
-                fGraphicsView->showCurrentSliceIndex(fImageIndex, (GetViewState() == EViewState::ViewStateEdit && fImageIndex == sliceIndexToolStart));
+                SendSignalOnNextImageShift(fScanRange);
+                fGraphicsView->showCurrentImageIndex(fImageIndex, ShouldHighlightImageIndex(fImageIndex));
             } else if (numDegrees < 0) {
-                SendSignalOnPrevSliceShift(fScanRange);
-                fGraphicsView->showCurrentSliceIndex(fImageIndex, (GetViewState() == EViewState::ViewStateEdit && fImageIndex == sliceIndexToolStart));
+                SendSignalOnPrevImageShift(fScanRange);
+                fGraphicsView->showCurrentImageIndex(fImageIndex, ShouldHighlightImageIndex(fImageIndex));
             }
             return true;
         }
@@ -291,13 +294,7 @@ bool CVolumeViewer::eventFilter(QObject* watched, QEvent* event)
     return QWidget::eventFilter(watched, event);
 }
 
-// Handle paint event
-void CVolumeViewer::paintEvent(QPaintEvent* /*event*/)
-{
-    // REVISIT - FILL ME HERE
-}
-
-void CVolumeViewer::ScaleImage(double nFactor)
+void CImageViewer::ScaleImage(double nFactor)
 {
     fScaleFactor *= nFactor;
     fGraphicsView->scale(nFactor, nFactor);
@@ -305,13 +302,13 @@ void CVolumeViewer::ScaleImage(double nFactor)
     UpdateButtons();
 }
 
-void CVolumeViewer::CenterOn(const QPointF& point)
+void CImageViewer::CenterOn(const QPointF& point)
 {
     fGraphicsView->centerOn(point);
 }
 
 // Handle zoom in click
-void CVolumeViewer::OnZoomInClicked(void)
+void CImageViewer::OnZoomInClicked(void)
 {
     if (fZoomInBtn->isEnabled()) {
         ScaleImage(1.15);
@@ -319,14 +316,14 @@ void CVolumeViewer::OnZoomInClicked(void)
 }
 
 // Handle zoom out click
-void CVolumeViewer::OnZoomOutClicked(void)
+void CImageViewer::OnZoomOutClicked(void)
 {
     if (fZoomOutBtn->isEnabled()) {
         ScaleImage(0.85);
     }
 }
 
-void CVolumeViewer::OnResetClicked(void)
+void CImageViewer::OnResetClicked(void)
 {
     fGraphicsView->resetTransform();
     fScaleFactor = 1.0;
@@ -335,40 +332,40 @@ void CVolumeViewer::OnResetClicked(void)
 }
 
 // Handle next image click
-void CVolumeViewer::OnNextClicked(void)
+void CImageViewer::OnNextClicked(void)
 {
     // send signal to controller (MVC) in order to update the content
     if (fNextBtn->isEnabled()) {
         // If the signal sender is the button, we check for Shift modifier for bigger jumps
         if (sender() == fNextBtn)
-            SendSignalOnNextSliceShift(qga::keyboardModifiers() == Qt::ShiftModifier ? 10 : 1);
+            SendSignalOnNextImageShift(qga::keyboardModifiers() == Qt::ShiftModifier ? 10 : 1);
         else
-            SendSignalOnNextSliceShift(1);
+            SendSignalOnNextImageShift(1);
     }
 }
 
 // Handle previous image click
-void CVolumeViewer::OnPrevClicked(void)
+void CImageViewer::OnPrevClicked(void)
 {
     // send signal to controller (MVC) in order to update the content
     if (fPrevBtn->isEnabled()) {
         // If the signal sender is the button, we check for Shift modifier for bigger jumps
         if (sender() == fPrevBtn)
-            SendSignalOnPrevSliceShift(qga::keyboardModifiers() == Qt::ShiftModifier ? 10 : 1);
+            SendSignalOnPrevImageShift(qga::keyboardModifiers() == Qt::ShiftModifier ? 10 : 1);
         else
-            SendSignalOnPrevSliceShift(1);
+            SendSignalOnPrevImageShift(1);
     }
 }
 
 // Handle image index change
-void CVolumeViewer::OnImageIndexEditTextChanged(void)
+void CImageViewer::OnImageIndexEditTextChanged(void)
 {
     // send signal to controller in order to update the content
     SendSignalOnLoadAnyImage(fImageIndexEdit->value());
 }
 
 // Update the status of the buttons
-void CVolumeViewer::UpdateButtons(void)
+void CImageViewer::UpdateButtons(void)
 {
     fZoomInBtn->setEnabled(fImgQImage != nullptr && fScaleFactor < 10.0);
     fZoomOutBtn->setEnabled(fImgQImage != nullptr && fScaleFactor > 0.05);
@@ -379,14 +376,14 @@ void CVolumeViewer::UpdateButtons(void)
 }
 
 // Adjust scroll bar of scroll area
-void CVolumeViewer::AdjustScrollBar(QScrollBar* nScrollBar, double nFactor)
+void CImageViewer::AdjustScrollBar(QScrollBar* nScrollBar, double nFactor)
 {
     nScrollBar->setValue(
         int(nFactor * nScrollBar->value() +
             ((nFactor - 1) * nScrollBar->pageStep() / 2)));
 }
 
-cv::Vec2f CVolumeViewer::CleanScrollPosition(cv::Vec2f pos) const
+cv::Vec2f CImageViewer::CleanScrollPosition(cv::Vec2f pos) const
 {
     int x = pos[0];
     int y = pos[1];
@@ -414,7 +411,7 @@ cv::Vec2f CVolumeViewer::CleanScrollPosition(cv::Vec2f pos) const
     return cv::Vec2f(horizontalPos + viewportWidth / 2, verticalPos + viewportHeight / 2);
 }
 
-void CVolumeViewer::ScrollToCenter(cv::Vec2f pos)
+void CImageViewer::ScrollToCenter(cv::Vec2f pos)
 {
     pos = CleanScrollPosition(pos);
 
@@ -431,7 +428,7 @@ void CVolumeViewer::ScrollToCenter(cv::Vec2f pos)
     fGraphicsView->verticalScrollBar()->setValue(verticalPos);
 }
 
-cv::Vec2f CVolumeViewer::GetScrollPosition() const
+cv::Vec2f CImageViewer::GetScrollPosition() const
 {
     // Get the positions of the scroll bars
     float horizontalPos = static_cast<float>(fGraphicsView->horizontalScrollBar()->value() + fGraphicsView->viewport()->width() / 2);

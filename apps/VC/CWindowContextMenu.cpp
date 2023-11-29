@@ -3,7 +3,8 @@
 #include "CWindow.hpp"
 #include <opencv2/imgproc.hpp>
 
-#include "CVolumeViewerWithCurve.hpp"
+#include "CXCurve.hpp"
+#include "CLayerViewer.hpp"
 #include "UDataManipulateUtils.hpp"
 
 #include "vc/core/util/Iteration.hpp"
@@ -13,6 +14,7 @@
 #include "vc/core/io/ImageIO.hpp"
 #include "vc/core/util/MeshMath.hpp"
 #include "vc/core/util/String.hpp"
+#include "vc/core/types/UVMap.hpp"
 #include "vc/meshing/ACVD.hpp"
 #include "vc/meshing/ITK2VTK.hpp"
 #include "vc/meshing/OrderedPointSetMesher.hpp"
@@ -35,7 +37,7 @@ void CWindow::OnPathCustomContextMenu(const QPoint& point)
         std::string segID = fPathListWidget->itemFromIndex(index)->text(0).toStdString();
         connect(actVcRender, &QAction::triggered, this, [segID, this](){ OnPathRunVcRender(segID); });
 
-        QAction* actInkDetect = new QAction(tr("Run vc_layers"), this);
+        QAction* actInkDetect = new QAction(tr("Run Layer Generation"), this);
         connect(actInkDetect, &QAction::triggered, this, [segID, this](){ OnPathRunInkDetection(segID); });
 
         QMenu menu(this);
@@ -130,12 +132,16 @@ void CWindow::OnPathRunInkDetection(std::string segmentID) {
     auto width = static_cast<size_t>(std::ceil(uvMap->ratio().width));
     auto height = static_cast<size_t>(std::ceil(uvMap->ratio().height));
 
+    vc::UVMap::AlignToAxis(*uvMap, itkACVD, vc::UVMap::AlignmentAxis::ZPos);
+
     auto folder = fVpkg->segmentation(segmentID)->path().native() + "/layers";
     if (!fs::exists(folder)) {
         fs::create_directory(folder);
     }
     auto outputPath = fs::canonical(folder);
-    auto outputPathMask = fs::canonical(fVpkg->segmentation(segmentID)->path().native() + "/" + segmentID + "_mask.png");
+    auto outputPathMask = fVpkg->segmentation(segmentID)->path().native() + "/" + segmentID + "_mask.png";
+    auto outputPathUV = fVpkg->segmentation(segmentID)->path().native() + "/" + segmentID + "_uv.png";
+    auto outputPathPPM = fVpkg->segmentation(segmentID)->path().native() + "/" + segmentID + ".ppm";
 
     // Generate the PPM
     std::cout << "Generating PPM..." << std::endl;
@@ -144,15 +150,15 @@ void CWindow::OnPathRunInkDetection(std::string segmentID) {
     ppmGen.setUVMap(uvMap);
     ppmGen.setDimensions(height, width);
     auto ppm = ppmGen.compute();
-    //vc::PerPixelMap::WritePPM(outputPathMask, *ppm);
+    vc::PerPixelMap::WritePPM(outputPathPPM, *ppm);
 
     double radius = fVpkg->materialThickness() / currentVolume->voxelSize();
 
     // Setup line generator
     auto line = vc::LineGenerator::New();
     line->setSamplingRadius(radius);
-    line->setSamplingInterval(2);
-    // line->setSamplingDirection(direction);
+    line->setSamplingInterval(1);
+    // line->setSamplingDirection(vc::Bidirectional);
 
     // Layer texture
     std::cout << "Generating layers..." << std::endl;
@@ -181,27 +187,12 @@ void CWindow::OnPathRunInkDetection(std::string segmentID) {
         vc::WriteImage(filepath, image, writeOpts);
     }
 
-    cv::Mat aImgMat = cv::imread(filepath.string(), -1);
-    aImgMat.convertTo(aImgMat, CV_8UC1, 1.0 / 256.0);
+    vc::WriteImage(outputPathUV, vc::UVMap::Plot(*uvMap, abf.getMesh()));
 
-    // if (aImgMat.empty()) {
-    //     auto h = currentVolume->sliceHeight();
-    //     auto w = currentVolume->sliceWidth();
-    //     aImgMat = cv::Mat::zeros(h, w, CV_8UC3);
-    //     aImgMat = vc::color::RED;
-    //     const std::string msg{"FILE MISSING"};
-    //     auto params = CalculateOptimalTextParams(msg, w, h);
-    //     auto originX = (w - params.size.width) / 2;
-    //     auto originY = params.size.height + (h - params.size.height) / 2;
-    //     cv::Point origin{originX, originY};
-    //     cv::putText(
-    //         aImgMat, msg, origin, params.font, params.scale, vc::color::WHITE,
-    //         params.thickness, params.baseline);
-    // }
+    fLayerViewerWidget->SetNumImages(texture.size());
+    fLayerViewerWidget->SetImageIndex(0);
+    fLayerViewerWidget->setPPM(*ppm);
 
-    auto aImgQImage = Mat2QImage(aImgMat);
-    fLayerViewerWidget->SetImage(aImgQImage);
-
-    dockWidgetLayers->setWidget(fLayerViewerWidget);
+    OpenLayer();
     dockWidgetLayers->show();
 }

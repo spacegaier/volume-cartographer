@@ -9,6 +9,8 @@ set(srcs
     CWindowContextMenu.cpp
     CXCurve.cpp
     UDataManipulateUtils.cpp
+    CImageViewer.cpp
+    CLayerViewer.cpp
     CVolumeViewer.cpp
     CVolumeViewerWithCurve.cpp
     CBSpline.cpp

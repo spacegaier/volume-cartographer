@@ -1,5 +1,5 @@
-// CVolumeViewer.h
-// Chao Du 2015 April
+// CImageViewer.hpp
+// Philip Allgaier 2023 November
 #pragma once
 
 #include <QtWidgets>
@@ -14,12 +14,12 @@
 namespace ChaoVis
 {
 
-class CVolumeViewerView : public QGraphicsView
+class CImageViewerView : public QGraphicsView
 {
     Q_OBJECT
 
     public:
-        CVolumeViewerView(QWidget* parent = nullptr);
+        CImageViewerView(QWidget* parent = nullptr);
 
         void setup();
 
@@ -35,7 +35,7 @@ class CVolumeViewerView : public QGraphicsView
     public slots:
         void showCurrentImpactRange(int range);
         void showCurrentScanRange(int range);
-        void showCurrentSliceIndex(int slice, bool highlight);
+        void showCurrentImageIndex(int slice, bool highlight);
 
     protected:
         bool rangeKeyPressed{false};
@@ -46,38 +46,32 @@ class CVolumeViewerView : public QGraphicsView
         QTimer* timerTextAboveCursor;
 };
 
-class CVolumeViewer : public QWidget
+class CImageViewer : public QWidget
 {
     Q_OBJECT
 
 public:
-    enum EViewState {
-        ViewStateEdit,  // edit mode
-        ViewStateDraw,  // draw mode
-        ViewStateIdle   // idle mode
-    };
-
-    QPushButton* fNextBtn;
-    QPushButton* fPrevBtn;
-    CVolumeViewer(QWidget* parent = 0);
-    ~CVolumeViewer(void);
+    CImageViewer(QWidget* parent = 0);
+    ~CImageViewer(void);
     virtual void setButtonsEnabled(bool state);
 
-    void SetViewState(EViewState nViewState) { fViewState = nViewState; }
-    EViewState GetViewState(void) { return fViewState; }
-
     virtual void SetImage(const QImage& nSrc);
-    void SetImageIndex(int nImageIndex)
+    void SetImageIndex(int imageIndex)
     {
-        fImageIndex = nImageIndex;
-        fImageIndexEdit->setValue(nImageIndex);
+        fImageIndex = imageIndex;
+        fImageIndexEdit->setValue(imageIndex);
         UpdateButtons();
     }
-    void setNumSlices(int num);
+    int GetImageIndex() const { return fImageIndex; }
+    void SetNumImages(int num);
+    int GetNumImages() const { return fImageIndexEdit->maximum(); }
+    void SetScanRange(int scanRange);
+
+    virtual bool CanChangeImage() const { return fPrevBtn->isEnabled(); }
+    virtual bool ShouldHighlightImageIndex(const int imageIndex) { return false; }
 
 protected:
     bool eventFilter(QObject* watched, QEvent* event);
-    void paintEvent(QPaintEvent* event);
 
 public slots:
     void OnZoomInClicked(void);
@@ -88,8 +82,8 @@ public slots:
     void OnImageIndexEditTextChanged(void);
 
 signals:
-    void SendSignalOnNextSliceShift(int shift);
-    void SendSignalOnPrevSliceShift(int shift);
+    void SendSignalOnNextImageShift(int shift);
+    void SendSignalOnPrevImageShift(int shift);
     void SendSignalOnLoadAnyImage(int nImageIndex);
     void SendSignalStatusMessageAvailable(QString text, int timeout);
     void SendSignalImpactRangeUp(void);
@@ -106,10 +100,11 @@ protected:
 
 protected:
     // widget components
-    CVolumeViewerView* fGraphicsView;
+    CImageViewerView* fGraphicsView;
     QGraphicsScene* fScene;
 
-    QLabel* fCanvas;
+    QPushButton* fNextBtn;
+    QPushButton* fPrevBtn;
     QScrollArea* fScrollArea;
     QPushButton* fZoomInBtn;
     QPushButton* fZoomOutBtn;
@@ -118,16 +113,14 @@ protected:
     QHBoxLayout* fButtonsLayout;
 
     // data
-    EViewState fViewState;
     QImage* fImgQImage;
     double fScaleFactor;
     int fImageIndex;
-    int sliceIndexToolStart{-1};
     int fScanRange;  // how many slices a mouse wheel step will jump
 
     bool fCenterOnZoomEnabled;
 
     QGraphicsPixmapItem* fBaseImageItem;
-};  // class CVolumeViewer
+};  // class CImageViewer
 
 }  // namespace ChaoVis

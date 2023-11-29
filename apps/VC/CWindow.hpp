@@ -9,7 +9,6 @@
 #include <QSpinBox>
 #include <QThread>
 #include <QTimer>
-#include <QtWidgets>
 
 #include "BlockingDialog.hpp"
 #include "CBSpline.hpp"
@@ -39,6 +38,7 @@ namespace ChaoVis
 {
 
 class CVolumeViewerWithCurve;
+class CLayerViewer;
 
 class AnnotationTreeWidgetItem : public QTreeWidgetItem {
   public:
@@ -147,6 +147,7 @@ private:
     void prefetchSlices(void);
     void startPrefetching(int index);
     void OpenSlice(void);
+    void OpenLayer(void);
 
     void InitPathList(void);
     void UpdateAnnotationList(void);
@@ -217,6 +218,9 @@ private slots:
     void OnLoadAnySlice(int slice);
     void OnLoadNextSliceShift(int shift);
     void OnLoadPrevSliceShift(int shift);
+    void OnLoadAnyLayer(int layer);
+    void OnLoadPrevLayerShift(int shift);
+    void OnLoadNextLayerShift(int shift);
 
     void OnPathChanged(std::string segID, PathChangePointVector before, PathChangePointVector after);
     void OnAnnotationChanged(void);
@@ -281,7 +285,7 @@ private:
     QAction* fPrintDebugInfo;
 
     CVolumeViewerWithCurve* fVolumeViewerWidget;
-    CVolumeViewerWithCurve* fLayerViewerWidget;
+    CLayerViewer* fLayerViewerWidget;
     QCheckBox* fchkDisplayAll;
     QCheckBox* fchkComputeAll;
     QTreeWidget* fPathListWidget;
