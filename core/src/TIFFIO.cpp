@@ -120,6 +120,10 @@ auto tio::ReadTIFF(const volcart::filesystem::path& path) -> cv::Mat
         throw std::runtime_error("Failed to open tif mmap");
     }
     printf("Loading %s\n", path.c_str());
+
+    // FIXME: make sure, there's only a single stride which starts at 8
+    // etc. As a fallback we might just want to keep the old code as well
+    // but maybe warn when it is used
     cv::Mat img = cv::Mat(h, w, cvType, data + 8);
 
     /* cv::Mat img = cv::Mat::zeros(h, w, cvType);
