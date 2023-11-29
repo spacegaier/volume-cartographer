@@ -25,6 +25,8 @@ Volume::Volume(fs::path path) : DiskBasedObjectBaseClass(std::move(path))
     numSliceCharacters_ = std::to_string(slices_).size();
 
     std::vector<std::mutex> init_mutexes(slices_);
+    is_cached_.resize(slices_);
+    cache_.resize(slices_);
 
     slice_mutexes_.swap(init_mutexes);
 }
@@ -238,8 +240,8 @@ cv::Mat Volume::cache_slice_(int index) const
         /* if (cache_->contains(index)) {
             return cache_->get(index);
         } */
-        if (cache_[index] != nullptr) {
-            return *cache_[index];
+        if (is_cached_[index]) {
+            return cache_[index];
         }
     }
 
@@ -254,15 +256,16 @@ cv::Mat Volume::cache_slice_(int index) const
         // waiting for the lock.
         {
             std::shared_lock<std::shared_mutex> lock(cache_mutex_);
-            if (cache_[index] != nullptr) {
-                return *cache_[index];
+            if (is_cached_[index]) {
+                return cache_[index];
             }
         }
         // Load the slice and add it to the cache.
         {
             auto slice = load_slice_(index);
             std::unique_lock<std::shared_mutex> lock(cache_mutex_);
-            cache_[index] = &slice;
+            cache_[index] = slice;
+            is_cached_[index] = true;
             return slice;
         }
     }

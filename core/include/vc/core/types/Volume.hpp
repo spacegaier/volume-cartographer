@@ -225,7 +225,8 @@ protected:
     bool cacheSlices_{true};
     /** Slice cache */
     // mutable SliceCache::Pointer cache_{DefaultCache::New(DEFAULT_CAPACITY)};
-    mutable cv::Mat* cache_[10000];
+    mutable std::vector<bool> is_cached_;
+    mutable std::vector<cv::Mat> cache_;
 
     /** Cache mutex for thread-safe access */
     mutable std::mutex cacheMutex_;
