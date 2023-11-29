@@ -98,6 +98,10 @@ protected:
     cv::Vec2f GetScrollPosition() const;
     cv::Vec2f CleanScrollPosition(cv::Vec2f pos) const;
 
+    virtual void mousePressEvent(QMouseEvent* event);
+    virtual void mouseMoveEvent(QMouseEvent* event);
+    virtual void mouseReleaseEvent(QMouseEvent* event);
+
 protected:
     // widget components
     CImageViewerView* fGraphicsView;
@@ -120,6 +124,12 @@ protected:
     int fScanRange;  // how many slices a mouse wheel step will jump
 
     bool fCenterOnZoomEnabled;
+
+    // pan handling
+    bool wantsPanning{false};
+    bool isPanning{false};
+    bool rightPressed{false};
+    int panStartX, panStartY;
 
     QGraphicsPixmapItem* fBaseImageItem;
 };  // class CImageViewer

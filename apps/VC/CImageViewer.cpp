@@ -245,6 +245,35 @@ void CImageViewer::SetScanRange(int scanRange)
 
 bool CImageViewer::eventFilter(QObject* watched, QEvent* event)
 {
+    // check for mouse release generic
+    if (event->type() == QEvent::MouseButtonRelease) {
+        QMouseEvent* mouseEvent = static_cast<QMouseEvent*>(event);
+        mouseReleaseEvent(mouseEvent);
+        event->accept();
+        return true;
+    }
+
+    if (event->type() == QEvent::MouseMove) {
+        QMouseEvent* mouseEvent = static_cast<QMouseEvent*>(event);
+
+        // Transform the global coordinates to local coordinates
+        QPointF localPoint = this->mapFromGlobal(mouseEvent->globalPosition());
+
+        // Create a new QMouseEvent with local coordinates
+        QMouseEvent localMouseEvent(QEvent::MouseMove,
+                                    localPoint,
+                                    mouseEvent->globalPosition(),
+                                    mouseEvent->button(),
+                                    mouseEvent->buttons(),
+                                    mouseEvent->modifiers());
+
+        // Manually call your mouseMoveEvent function
+        mouseMoveEvent(&localMouseEvent);
+
+        event->accept();
+        return true;
+    }
+
     // Wheel events
     if (watched == fGraphicsView || (fGraphicsView && watched == fGraphicsView->viewport()) && event->type() == QEvent::Wheel) {
 
@@ -437,4 +466,61 @@ cv::Vec2f CImageViewer::GetScrollPosition() const
 
     // Return as cv::Vec2f
     return cv::Vec2f(horizontalPos, verticalPos);
+}
+
+// Handle mouse press event
+void CImageViewer::mousePressEvent(QMouseEvent* event)
+{
+    // Return if not left or right click
+    if (!(event->buttons() & Qt::RightButton) && !(event->buttons() & Qt::LeftButton)) {
+        return;
+    }
+
+    if (event->button() == Qt::RightButton) {
+        // Attempt to start the panning. We only consider us in panning mode, if in the mouse move event
+        // we actually detect movement.
+
+        rightPressed = true;
+        wantsPanning = true;
+        isPanning = false;
+        panStartX = event->position().x();
+        panStartY = event->position().y();
+    }
+}
+
+// Handle mouse move event
+void CImageViewer::mouseMoveEvent(QMouseEvent* event)
+{
+    if (!wantsPanning && !rightPressed) {
+        return;
+    }
+
+    if (wantsPanning && rightPressed){
+        // We potentially want to start panning, and now check if the mouse actually moved
+        if (event->position().x() != panStartX || event->position().y() - panStartY)
+        {
+            isPanning = true;
+            setCursor(Qt::ClosedHandCursor);
+            fGraphicsView->horizontalScrollBar()->setValue(fGraphicsView->horizontalScrollBar()->value() - 2 * (event->position().x() - panStartX));
+            fGraphicsView->verticalScrollBar()->setValue(fGraphicsView->verticalScrollBar()->value() - 2 * (event->position().y() - panStartY));
+            panStartX = event->position().x();
+            panStartY = event->position().y();
+        } else {
+            wantsPanning = false;
+        }
+    }
+}
+
+// Handle mouse release event
+void CImageViewer::mouseReleaseEvent(QMouseEvent* event)
+{
+    // end panning
+    if (event->button() == Qt::RightButton) {
+        isPanning = wantsPanning = rightPressed = false;
+        setCursor(Qt::ArrowCursor);
+        event->accept();
+        return;
+    }
+
+    setCursor(Qt::ArrowCursor);
 }

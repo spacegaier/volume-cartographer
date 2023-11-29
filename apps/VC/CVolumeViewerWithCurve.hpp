@@ -52,10 +52,9 @@ public:
 
 protected:
     bool eventFilter(QObject* watched, QEvent* event);
-    void mousePressEvent(QMouseEvent* event);
-    void mouseMoveEvent(QMouseEvent* event);
-    void mouseReleaseEvent(QMouseEvent* event);
-    void paintEvent(QPaintEvent* event);
+    void mousePressEvent(QMouseEvent* event) override;
+    void mouseMoveEvent(QMouseEvent* event) override;
+    void mouseReleaseEvent(QMouseEvent* event) override;
     void UpdateButtons(void);
 
 private slots:
@@ -104,19 +103,9 @@ private:
     QPointF fLastPos;  // last mouse position on the image
     int fImpactRange;  // how many points a control point movement can affect
 
-    // pan handling
-    bool wantsPanning{false};
-    bool isPanning{false};
-    bool rightPressed{false};
-    int panStartX, panStartY;
-
     // image drawn
     cv::Mat fImgMat;
     cv::Mat fImgMatCache;
-
-    // Global or class-level storage for ellipse items
-    QList<QGraphicsEllipseItem*> ellipseItems;
-    QList<QGraphicsEllipseItem*> controlPointItems;
 };  // class CVolumeViewerWithCurve
 
 }  // namespace ChaoVis

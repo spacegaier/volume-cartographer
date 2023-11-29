@@ -343,7 +343,7 @@ void CVolumeViewerWithCurve::mousePressEvent(QMouseEvent* event)
     }
 }
 
-// Handle mouse move event, currently only when we're editing
+// Handle mouse move event
 void CVolumeViewerWithCurve::mouseMoveEvent(QMouseEvent* event)
 {
     // If we have an active last pressed side button from the backwards/forwards move feature,
@@ -469,35 +469,6 @@ void CVolumeViewerWithCurve::mouseReleaseEvent(QMouseEvent* event)
 // capture mouse release
 bool CVolumeViewerWithCurve::eventFilter(QObject* watched, QEvent* event)
 {
-    // check for mouse release generic
-    if (event->type() == QEvent::MouseButtonRelease) {
-        QMouseEvent* mouseEvent = static_cast<QMouseEvent*>(event);
-        mouseReleaseEvent(mouseEvent);
-        event->accept();
-        return true;
-    }
-
-    if (event->type() == QEvent::MouseMove) {
-        QMouseEvent* mouseEvent = static_cast<QMouseEvent*>(event);
-
-        // Transform the global coordinates to local coordinates
-        QPointF localPoint = this->mapFromGlobal(mouseEvent->globalPosition());
-
-        // Create a new QMouseEvent with local coordinates
-        QMouseEvent localMouseEvent(QEvent::MouseMove,
-                                    localPoint,
-                                    mouseEvent->globalPosition(),
-                                    mouseEvent->button(),
-                                    mouseEvent->buttons(),
-                                    mouseEvent->modifiers());
-
-        // Manually call your mouseMoveEvent function
-        mouseMoveEvent(&localMouseEvent);
-
-        event->accept();
-        return true;
-    }
-
     // Wheel events
     if (watched == fGraphicsView || (fGraphicsView && watched == fGraphicsView->viewport()) && event->type() == QEvent::Wheel) {
 
@@ -519,9 +490,6 @@ bool CVolumeViewerWithCurve::eventFilter(QObject* watched, QEvent* event)
     // also call parent class implementation
     return CVolumeViewer::eventFilter(watched, event);
 }
-
-// Handle paint event
-void CVolumeViewerWithCurve::paintEvent(QPaintEvent* /*event*/) {}
 
 void CVolumeViewerWithCurve::toggleShowCurveBox()
 {
