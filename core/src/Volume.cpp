@@ -32,8 +32,8 @@ Volume::Volume(fs::path path) : DiskBasedObjectBaseClass(std::move(path))
 // Setup a Volume from a folder of slices
 Volume::Volume(fs::path path, std::string uuid, std::string name)
     : DiskBasedObjectBaseClass(
-          std::move(path), std::move(uuid), std::move(name)),
-          slice_mutexes_(slices_)
+          std::move(path), std::move(uuid), std::move(name))
+    , slice_mutexes_(slices_)
 {
     metadata_.set("type", "vol");
     metadata_.set("width", width_);
@@ -226,7 +226,8 @@ cv::Mat Volume::load_slice_(int index) const
         std::cout << "Requested to load slice " << index << std::endl;
     }
     auto slicePath = getSlicePath(index);
-    return cv::imread(slicePath.string(), -1);
+    return tio::ReadTIFF(slicePath.string());
+    // return cv::imread(slicePath.string(), -1);
 }
 
 cv::Mat Volume::cache_slice_(int index) const

@@ -1,12 +1,20 @@
 #include "vc/core/io/TIFFIO.hpp"
 
 #include <cstring>
+#include <iostream>
 
 #include <opencv2/imgproc.hpp>
 
 #include "vc/core/Version.hpp"
 #include "vc/core/io/FileExtensionFilter.hpp"
 #include "vc/core/util/Logging.hpp"
+
+#include <fcntl.h>
+#include <stdio.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 // Wrapping in a namespace to avoid define collisions
 namespace lt
@@ -66,6 +74,7 @@ auto tio::ReadTIFF(const volcart::filesystem::path& path) -> cv::Mat
 {
     // Make sure input file exists
     if (!fs::exists(path)) {
+        std::cout << "File does not exist" << path.string() << std::endl;
         throw std::runtime_error("File does not exist");
     }
 
@@ -93,7 +102,27 @@ auto tio::ReadTIFF(const volcart::filesystem::path& path) -> cv::Mat
     // Construct the mat
     auto h = static_cast<int>(height);
     auto w = static_cast<int>(width);
-    cv::Mat img = cv::Mat::zeros(h, w, cvType);
+
+    // open and mmap tiff file
+    int fd = open(path.c_str(), O_RDONLY);
+    if (fd == -1) {
+        throw std::runtime_error("Failed to open tif open");
+    }
+    struct stat sb;
+    if (fstat(fd, &sb) == -1) {
+        throw std::runtime_error("Failed to open tif fstat");
+    }
+
+    void* data = mmap(nullptr, sb.st_size, PROT_READ, MAP_SHARED, fd, 0);
+    if (data == MAP_FAILED) {
+        // print error code
+        printf("errno: %d\n", errno);
+        throw std::runtime_error("Failed to open tif mmap");
+    }
+    printf("Loading %s\n", path.c_str());
+    cv::Mat img = cv::Mat(h, w, cvType, data + 8);
+
+    /* cv::Mat img = cv::Mat::zeros(h, w, cvType);
 
     // Read the rows
     auto bufferSize = static_cast<size_t>(lt::TIFFScanlineSize(tif));
@@ -125,7 +154,7 @@ auto tio::ReadTIFF(const volcart::filesystem::path& path) -> cv::Mat
                 "images is not supported. Image will be loaded with RGB "
                 "element order.");
         }
-    }
+    } */
 
     lt::TIFFClose(tif);
 
