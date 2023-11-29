@@ -186,12 +186,12 @@ public:
     void setCacheSlices(bool b) { cacheSlices_ = b; }
 
     /** @brief Set the slice cache */
-    void setCache(SliceCache::Pointer c) { cache_ = std::move(c); }
+    void setCache(SliceCache::Pointer c) {}  // cache_ = std::move(c); }
 
     /** @brief Set the maximum number of cached slices */
     void setCacheCapacity(size_t newCacheCapacity)
     {
-        cache_->setCapacity(newCacheCapacity);
+        // cache_->setCapacity(newCacheCapacity);
     }
 
     /** @brief Set the maximum size of the cache in bytes */
@@ -202,10 +202,10 @@ public:
     }
 
     /** @brief Get the maximum number of cached slices */
-    size_t getCacheCapacity() const { return cache_->capacity(); }
+    size_t getCacheCapacity() const { return 10000; }
 
     /** @brief Get the current number of cached slices */
-    size_t getCacheSize() const { return cache_->size(); }
+    size_t getCacheSize() const { return 0; }
 
     /** @brief Purge the slice cache */
     void cachePurge() const;
@@ -224,7 +224,9 @@ protected:
     /** Whether to use slice cache */
     bool cacheSlices_{true};
     /** Slice cache */
-    mutable SliceCache::Pointer cache_{DefaultCache::New(DEFAULT_CAPACITY)};
+    // mutable SliceCache::Pointer cache_{DefaultCache::New(DEFAULT_CAPACITY)};
+    mutable cv::Mat* cache_[10000];
+
     /** Cache mutex for thread-safe access */
     mutable std::mutex cacheMutex_;
     mutable std::vector<std::mutex> slice_mutexes_;

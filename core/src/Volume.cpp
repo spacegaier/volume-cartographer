@@ -235,8 +235,11 @@ cv::Mat Volume::cache_slice_(int index) const
     // Check if the slice is in the cache.
     {
         std::shared_lock<std::shared_mutex> lock(cache_mutex_);
-        if (cache_->contains(index)) {
+        /* if (cache_->contains(index)) {
             return cache_->get(index);
+        } */
+        if (cache_[index] != nullptr) {
+            return *cache_[index];
         }
     }
 
@@ -244,30 +247,29 @@ cv::Mat Volume::cache_slice_(int index) const
         // Get the lock for this slice.
         auto& mutex = slice_mutexes_[index];
 
-        // If the slice is not in the cache, get exclusive access to this slice's mutex.
+        // If the slice is not in the cache, get exclusive access to this
+        // slice's mutex.
         std::unique_lock<std::mutex> lock(mutex);
-        // Check again to ensure the slice has not been added to the cache while waiting for the lock.
+        // Check again to ensure the slice has not been added to the cache while
+        // waiting for the lock.
         {
             std::shared_lock<std::shared_mutex> lock(cache_mutex_);
-            if (cache_->contains(index)) {
-                return cache_->get(index);
+            if (cache_[index] != nullptr) {
+                return *cache_[index];
             }
         }
         // Load the slice and add it to the cache.
         {
             auto slice = load_slice_(index);
             std::unique_lock<std::shared_mutex> lock(cache_mutex_);
-            cache_->put(index, slice);
+            cache_[index] = &slice;
             return slice;
         }
     }
-
 }
 
-
-void Volume::cachePurge() const 
+void Volume::cachePurge() const
 {
-    std::unique_lock<std::shared_mutex> lock(cache_mutex_);
-    cache_->purge();
+    // std::unique_lock<std::shared_mutex> lock(cache_mutex_);
+    // cache_->purge();
 }
-
