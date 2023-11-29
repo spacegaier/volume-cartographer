@@ -10,6 +10,11 @@ CLayerViewer::CLayerViewer(QWidget* parent)
 {
     fNextBtn->setText(tr("Next Layer"));
     fPrevBtn->setText(tr("Previous Layer"));
+
+    progressBar = new QProgressBar(this);
+    progressBar->setMinimumWidth(200);
+    fButtonsLayout->addWidget(progressBar);
+    fButtonsLayout->removeItem(fSpacer);
 }
 
 void CLayerViewer::showCurveForSlice(int sliceIndex) {
@@ -25,7 +30,8 @@ void CLayerViewer::showCurveForSlice(int sliceIndex) {
 
     CXCurve curve;
     for (auto map : ppm.getMappings()) {
-        if (std::round(map.pos[2]) == sliceIndex) {
+        if (map.pos[2] > sliceIndex - 0.3 &&
+            map.pos[2] < sliceIndex + 0.3) {
             curve.InsertPoint(Vec2<double>(map.x, map.y));
         }
     }
@@ -33,4 +39,16 @@ void CLayerViewer::showCurveForSlice(int sliceIndex) {
     for (auto pt : curve.GetPoints()) {
         QGraphicsEllipseItem* newEllipse = fScene->addEllipse(pt[0], pt[1], 1, 1, QPen(Qt::red), QBrush(Qt::red));
     }
+}
+
+void CLayerViewer::setProgress(int progress) {
+    if(progress == 100) {
+        progressBar->setValue(0);
+    } else {
+        progressBar->setValue(progress);
+    }
+}
+
+void CLayerViewer::setProgressText(const QString& text) {
+    progressBar->setFormat(text);
 }

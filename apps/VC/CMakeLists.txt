@@ -73,6 +73,7 @@ target_link_libraries(${target}
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    Qt6::Concurrent
     ${OSXSecurity}
     OpenMP::OpenMP_CXX
     ${SDL2_LIBRARIES}

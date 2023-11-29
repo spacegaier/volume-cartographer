@@ -20,9 +20,15 @@ public:
     void setPPM(volcart::PerPixelMap input) { ppm = input; }
     void showCurveForSlice(int sliceIndex);
 
+    void setProgress(int progress);
+    void setProgressText(const QString& text);
+
 protected:
     std::string segID;
     volcart::PerPixelMap ppm;
+
+    // Progress info
+    QProgressBar* progressBar;
 };
 
 }  // namespace ChaoVis

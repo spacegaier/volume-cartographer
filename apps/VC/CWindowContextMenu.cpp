@@ -23,6 +23,9 @@
 #include "vc/texturing/LayerTexture.hpp"
 #include "vc/texturing/PPMGenerator.hpp"
 
+#include <QFutureWatcher>
+#include <QtConcurrent>
+
 namespace vc = volcart;
 namespace vcs = volcart::segmentation;
 namespace fs = volcart::filesystem;
@@ -93,18 +96,15 @@ static constexpr double UM_TO_MM = 0.001 * 0.001;
 // Min. number of points required to do flattening
 static constexpr size_t CLEANER_MIN_REQ_POINTS = 100;
 
-void CWindow::OnPathRunInkDetection(std::string segmentID) {
+void CWindow::GenerateLayers(QPromise<void> &promise) {
 
-    if (segmentID.empty()) {
-        return;
-    }
-
-    fSegIdLayers = segmentID;
+    promise.setProgressRange(0, 100);
+    promise.setProgressValue(0);
 
     ///// Resample the segmentation /////
     // Mesh the point cloud
     vc::meshing::OrderedPointSetMesher mesher;
-    mesher.setPointSet(fSegStructMap[segmentID].fMasterCloud);
+    mesher.setPointSet(fSegStructMap[fSegIdLayers].fMasterCloud);
     auto input = mesher.compute();
 
     // Calculate sampling density
@@ -116,6 +116,7 @@ void CWindow::OnPathRunInkDetection(std::string segmentID) {
 
     // Decimate using ACVD
     std::cout << "Resampling mesh..." << std::endl;
+    promise.setProgressValueAndText(10, tr("Resampling mesh... %p%"));
     vc::meshing::ACVD resampler;
     resampler.setInputMesh(input);
     resampler.setNumberOfClusters(vertCount);
@@ -134,23 +135,26 @@ void CWindow::OnPathRunInkDetection(std::string segmentID) {
 
     vc::UVMap::AlignToAxis(*uvMap, itkACVD, vc::UVMap::AlignmentAxis::ZPos);
 
-    auto folder = fVpkg->segmentation(segmentID)->path().native() + "/layers";
+    auto folder = fVpkg->segmentation(fSegIdLayers)->path().native() + "/layers";
     if (!fs::exists(folder)) {
         fs::create_directory(folder);
     }
     auto outputPath = fs::canonical(folder);
-    auto outputPathMask = fVpkg->segmentation(segmentID)->path().native() + "/" + segmentID + "_mask.png";
-    auto outputPathUV = fVpkg->segmentation(segmentID)->path().native() + "/" + segmentID + "_uv.png";
-    auto outputPathPPM = fVpkg->segmentation(segmentID)->path().native() + "/" + segmentID + ".ppm";
+    auto outputPathMask = fVpkg->segmentation(fSegIdLayers)->path().native() + "/" + fSegIdLayers + "_mask.png";
+    auto outputPathUV = fVpkg->segmentation(fSegIdLayers)->path().native() + "/" + fSegIdLayers + "_uv.png";
+    auto outputPathPPM = fVpkg->segmentation(fSegIdLayers)->path().native() + "/" + fSegIdLayers + ".ppm";
 
     // Generate the PPM
     std::cout << "Generating PPM..." << std::endl;
+    promise.setProgressValueAndText(25, tr("Generating PPM... %p%"));
     vc::texturing::PPMGenerator ppmGen;
     ppmGen.setMesh(itkACVD);
     ppmGen.setUVMap(uvMap);
     ppmGen.setDimensions(height, width);
     auto ppm = ppmGen.compute();
     vc::PerPixelMap::WritePPM(outputPathPPM, *ppm);
+
+    promise.setProgressValue(25);
 
     double radius = fVpkg->materialThickness() / currentVolume->voxelSize();
 
@@ -162,6 +166,7 @@ void CWindow::OnPathRunInkDetection(std::string segmentID) {
 
     // Layer texture
     std::cout << "Generating layers..." << std::endl;
+    promise.setProgressValueAndText(50, tr("Generating layers... %p%"));
     vc::texturing::LayerTexture s;
     s.setVolume(currentVolume);
     s.setPerPixelMap(ppm);
@@ -178,6 +183,7 @@ void CWindow::OnPathRunInkDetection(std::string segmentID) {
 
     // Write the layers
     std::cout << "Writing layers..." << std::endl;
+    promise.setProgressValueAndText(90, tr("Writing layers... %p%"));
     const int numChars =
         static_cast<int>(std::to_string(texture.size()).size());
     fs::path filepath;
@@ -190,9 +196,28 @@ void CWindow::OnPathRunInkDetection(std::string segmentID) {
     vc::WriteImage(outputPathUV, vc::UVMap::Plot(*uvMap, abf.getMesh()));
 
     fLayerViewerWidget->SetNumImages(texture.size());
-    fLayerViewerWidget->SetImageIndex(0);
     fLayerViewerWidget->setPPM(*ppm);
 
-    OpenLayer();
-    dockWidgetLayers->show();
+    promise.setProgressValueAndText(100, tr("Done"));
+}
+
+void CWindow::OnPathRunInkDetection(std::string segmentID) {
+
+    if (segmentID.empty()) {
+        return;
+    }
+
+    fSegIdLayers = segmentID;
+
+    QObject::connect(&watcherLayers, &QFutureWatcher<void>::progressValueChanged, [this](int progress){
+        this->fLayerViewerWidget->setProgress(progress);
+    });
+    QObject::connect(&watcherLayers, &QFutureWatcher<void>::progressTextChanged, [this](QString text){
+        this->fLayerViewerWidget->setProgressText(text);
+    });
+    QObject::connect(&watcherLayers, &QFutureWatcher<void>::finished, [this](){
+        this->OpenLayer();
+        this->dockWidgetLayers->show();
+    });
+    watcherLayers.setFuture(QtConcurrent::run(&CWindow::GenerateLayers, this));
 }

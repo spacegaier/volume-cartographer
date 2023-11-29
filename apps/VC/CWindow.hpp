@@ -168,6 +168,8 @@ private:
     static void audio_callback(void *user_data, Uint8 *raw_buffer, int bytes);
     void playPing();
 
+    void GenerateLayers(QPromise<void> &promise);
+
 private slots:
     void Open(void);
     void Open(const QString& path);
@@ -354,6 +356,7 @@ private:
     size_t progress_{0};
     QLabel* progressLabel_;
     QProgressBar* progressBar_;
+    QFutureWatcher<void> watcherLayers;
 
     // Undo / redo
     QUndoStack* undoStack;

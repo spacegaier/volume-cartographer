@@ -111,6 +111,7 @@ protected:
     QPushButton* fResetBtn;
     QSpinBox* fImageIndexEdit;
     QHBoxLayout* fButtonsLayout;
+    QSpacerItem* fSpacer;
 
     // data
     QImage* fImgQImage;

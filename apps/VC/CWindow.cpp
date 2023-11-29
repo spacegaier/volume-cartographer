@@ -1692,19 +1692,21 @@ void CWindow::OpenSlice(void)
 // Open layer
 void CWindow::OpenLayer(void)
 {
-    std::stringstream ss;
-    ss << std::setw(2) << std::setfill('0') << fLayerViewerWidget->GetImageIndex() << ".tif";
-    auto path = fVpkg->segmentation(fSegIdLayers)->path().append("layers").append(ss.str());
+    if (fVpkg != nullptr && !fSegIdLayers.empty()) {
+        std::stringstream ss;
+        ss << std::setw(2) << std::setfill('0') << fLayerViewerWidget->GetImageIndex() << ".tif";
+        auto path = fVpkg->segmentation(fSegIdLayers)->path().append("layers").append(ss.str());
 
-    if (fs::exists(path)) {
-        cv::Mat aImgMat = cv::imread(path, -1);
-        aImgMat.convertTo(aImgMat, CV_8UC1, 1.0 / 256.0);
+        if (fs::exists(path)) {
+            cv::Mat aImgMat = cv::imread(path, -1);
+            aImgMat.convertTo(aImgMat, CV_8UC1, 1.0 / 256.0);
 
-        auto aImgQImage = Mat2QImage(aImgMat);
-        fLayerViewerWidget->SetImage(aImgQImage);
+            auto aImgQImage = Mat2QImage(aImgMat);
+            fLayerViewerWidget->SetImage(aImgQImage);
 
-        fLayerViewerWidget->showCurveForSlice(fPathOnSliceIndex);
-        dockWidgetLayers->show();
+            fLayerViewerWidget->showCurveForSlice(fPathOnSliceIndex);
+            dockWidgetLayers->show();
+        }
     }
 }
 
@@ -2917,35 +2919,41 @@ void CWindow::OnLoadPrevSliceShift(int shift)
 
 void CWindow::OnLoadAnyLayer(int layer)
 {
-    if (layer >= 0 && layer < fLayerViewerWidget->GetNumImages()) {
-        fLayerViewerWidget->SetImageIndex(layer);
-        OpenLayer();
+    if (fVpkg != nullptr && !fSegIdLayers.empty()) {
+        if (layer >= 0 && layer < fLayerViewerWidget->GetNumImages()) {
+            fLayerViewerWidget->SetImageIndex(layer);
+            OpenLayer();
+        }
     }
 }
 
 void CWindow::OnLoadNextLayerShift(int shift)
 {
-    auto current = fLayerViewerWidget->GetImageIndex();
-    if (current + shift >= fLayerViewerWidget->GetNumImages()) {
-        shift = fLayerViewerWidget->GetNumImages() - current - 1;
-    }
+    if (fVpkg != nullptr && !fSegIdLayers.empty()) {
+        auto current = fLayerViewerWidget->GetImageIndex();
+        if (current + shift >= fLayerViewerWidget->GetNumImages()) {
+            shift = fLayerViewerWidget->GetNumImages() - current - 1;
+        }
 
-    if (shift != 0) {
-        fLayerViewerWidget->SetImageIndex(current + shift);
-        OpenLayer();
+        if (shift != 0) {
+            fLayerViewerWidget->SetImageIndex(current + shift);
+            OpenLayer();
+        }
     }
 }
 
 void CWindow::OnLoadPrevLayerShift(int shift)
 {
-    auto current = fLayerViewerWidget->GetImageIndex();
-    if (current - shift < 0) {
-        shift = current;
-    }
+    if (fVpkg != nullptr && !fSegIdLayers.empty()) {
+        auto current = fLayerViewerWidget->GetImageIndex();
+        if (current - shift < 0) {
+            shift = current;
+        }
 
-    if (shift != 0) {
-        fLayerViewerWidget->SetImageIndex(current - shift);
-        OpenLayer();
+        if (shift != 0) {
+            fLayerViewerWidget->SetImageIndex(current - shift);
+            OpenLayer();
+        }
     }
 }
 

@@ -163,8 +163,9 @@ CImageViewer::CImageViewer(QWidget* parent)
     fButtonsLayout->addWidget(fPrevBtn);
     fButtonsLayout->addWidget(fNextBtn);
     fButtonsLayout->addWidget(fImageIndexEdit);
-    // Add some space between the slice spin box and the curve tools (color, checkboxes, ...)
-    fButtonsLayout->addSpacerItem(new QSpacerItem(1, 0, QSizePolicy::Expanding, QSizePolicy::Fixed));
+    // Add some space between the image spin box and the curve tools (color, checkboxes, ...)
+    fSpacer = new QSpacerItem(1, 0, QSizePolicy::Expanding, QSizePolicy::Fixed);
+    fButtonsLayout->addSpacerItem(fSpacer);
 
     connect(fZoomInBtn, &QPushButton::clicked, this, &CImageViewer::OnZoomInClicked);
     connect(fZoomOutBtn, &QPushButton::clicked, this, &CImageViewer::OnZoomOutClicked);
