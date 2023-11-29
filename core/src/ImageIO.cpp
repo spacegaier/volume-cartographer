@@ -15,6 +15,7 @@ namespace tio = volcart::tiffio;
 
 auto vc::ReadImage(const fs::path& path) -> cv::Mat
 {
+    printf("Reading %s\n", path.string().c_str());
     return cv::imread(path.string(), cv::IMREAD_UNCHANGED);
 }
 
