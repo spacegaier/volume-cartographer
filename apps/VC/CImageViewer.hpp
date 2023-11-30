@@ -3,13 +3,12 @@
 #pragma once
 
 #include <QtWidgets>
+#include <QGraphicsView>
+#include <QGraphicsScene>
+
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/opencv.hpp>
-
-#include <QGraphicsView>
-#include <QGraphicsScene>
-#include <QDebug>
 
 namespace ChaoVis
 {

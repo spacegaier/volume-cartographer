@@ -186,6 +186,8 @@ CWindow::CWindow()
 // Destructor
 CWindow::~CWindow(void)
 {
+    watcherLayers.cancel();
+    watcherLayers.waitForFinished();
     stopPrefetching.store(true);
     cv.notify_one();  // Wake up the thread if it's waitings
     if (prefetchWorker.joinable()) {
@@ -254,6 +256,10 @@ void CWindow::CreateWidgets(void)
     connect(
         fLayerViewerWidget, &CImageViewer::SendSignalOnLoadAnyImage, this,
         &CWindow::OnLoadAnyLayer);
+    connect(
+        fLayerViewerWidget, &CLayerViewer::SendSignalCancelLayerGeneration, [this]() {
+            this->watcherLayers.cancel();
+        });
 
     // TODO CHANGE VOLUME LOADING; FIRST CHECK FOR OTHER VOLUMES IN THE STRUCTS
     volSelect = this->findChild<QComboBox*>("volSelect");
@@ -1366,7 +1372,7 @@ void CWindow::executeNextSegmentation()
         UpdateView();
 
         if (dockWidgetLayers->isVisible()) {
-            OnPathRunInkDetection(fSegIdLayers);
+            OnPathGenerateLayers(fSegIdLayers);
         }
 
         // Needs to be called here since there never might be an callback to onSegmentationFinished() if
@@ -1695,7 +1701,7 @@ void CWindow::OpenLayer(void)
     if (fVpkg != nullptr && !fSegIdLayers.empty()) {
         std::stringstream ss;
         ss << std::setw(2) << std::setfill('0') << fLayerViewerWidget->GetImageIndex() << ".tif";
-        auto path = fVpkg->segmentation(fSegIdLayers)->path().append("layers").append(ss.str());
+        auto path = fs::canonical(fLayerViewerWidget->getTempPath().toStdString()).append("layers").append(ss.str());
 
         if (fs::exists(path)) {
             cv::Mat aImgMat = cv::imread(path, -1);

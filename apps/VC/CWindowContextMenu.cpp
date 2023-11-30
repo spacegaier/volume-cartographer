@@ -1,24 +1,19 @@
 // CWindowContextMenu.cpp
-// Philip Allgaier 2023 Nov
+// Philip Allgaier 2023 November
 #include "CWindow.hpp"
-#include <opencv2/imgproc.hpp>
 
-#include "CXCurve.hpp"
 #include "CLayerViewer.hpp"
 #include "UDataManipulateUtils.hpp"
-
-#include "vc/core/util/Iteration.hpp"
-#include "vc/core/util/Logging.hpp"
-#include "vc/meshing/OrderedPointSetMesher.hpp"
 
 #include "vc/core/io/ImageIO.hpp"
 #include "vc/core/util/MeshMath.hpp"
 #include "vc/core/util/String.hpp"
+#include "vc/core/util/Iteration.hpp"
+#include "vc/core/util/Logging.hpp"
 #include "vc/core/types/UVMap.hpp"
 #include "vc/meshing/ACVD.hpp"
 #include "vc/meshing/ITK2VTK.hpp"
 #include "vc/meshing/OrderedPointSetMesher.hpp"
-#include "vc/meshing/SmoothNormals.hpp"
 #include "vc/texturing/AngleBasedFlattening.hpp"
 #include "vc/texturing/LayerTexture.hpp"
 #include "vc/texturing/PPMGenerator.hpp"
@@ -27,7 +22,6 @@
 #include <QtConcurrent>
 
 namespace vc = volcart;
-namespace vcs = volcart::segmentation;
 namespace fs = volcart::filesystem;
 
 using namespace ChaoVis;
@@ -36,58 +30,20 @@ void CWindow::OnPathCustomContextMenu(const QPoint& point)
 {
     QModelIndex index = fPathListWidget->indexAt(point);
     if (index.isValid()) {
-        QAction* actVcRender = new QAction(tr("Run vc_render"), this);
         std::string segID = fPathListWidget->itemFromIndex(index)->text(0).toStdString();
-        connect(actVcRender, &QAction::triggered, this, [segID, this](){ OnPathRunVcRender(segID); });
 
-        QAction* actInkDetect = new QAction(tr("Run Layer Generation"), this);
-        connect(actInkDetect, &QAction::triggered, this, [segID, this](){ OnPathRunInkDetection(segID); });
+        QAction* actGenLayers = new QAction(tr("Generate Layers"), this);
+        connect(actGenLayers, &QAction::triggered, this, [segID, this](){ OnPathGenerateLayers(segID); });
+
+        if (!fSegStructMap[segID].display && !fSegStructMap[segID].compute) {
+            actGenLayers->setDisabled(true);
+        }
 
         QMenu menu(this);
-        menu.addAction(actVcRender);
-        menu.addAction(actInkDetect);
+        menu.addAction(actGenLayers);
 
         menu.exec(fPathListWidget->viewport()->mapToGlobal(point));
     }
-}
-
-void CWindow::OnPathRunVcRender(std::string segmentID)
-{
-    auto folder = fVpkg->segmentation(segmentID)->path().native();
-    // if (!fs::exists(folder)) {
-    //     fs::create_directory(folder);
-    // }
-    // auto outputPath = fs::canonical(folder);
-
-    QString program = "./vc_render";
-    QStringList arguments;
-    arguments << "-v" << fVpkgPath << "-s" << QString::fromStdString(segmentID) << "-o" << QString("%1/%2.obj").arg(QString::fromStdString(folder)).arg(QString::fromStdString(segmentID))
-        << "--uv-plot" << QString("%1/uv_%2.tif").arg(QString::fromStdString(folder)).arg(QString::fromStdString(segmentID)) << "--mesh-resample-smoothing" << "3"
-        << "--output-ppm" << QString("%1/%2.ppm").arg(QString::fromStdString(folder)).arg(QString::fromStdString(segmentID));
-
-    //vc_render -v my-project.volpkg -s 20230503225234 -o test_20230503225234.obj
-
-    std::cout << "Starting vc_render for segment " << segmentID << std::endl;
-
-    //std::cout << QDir::tempPath().toStdString() << std::endl;
-
-    std::cout << "Used arguments: ";
-    for(auto arg : arguments) {
-        std::cout << arg.toStdString() << " ";
-    }
-    std::cout << std::endl;
-
-    QProcess *myProcess = new QProcess(this);
-    QString name = "vc_render";
-    connect(myProcess, &QProcess::finished, this, [this, segmentID, name](){
-        std::cout << "Finished: " << segmentID << ": " << name.toStdString() << std::endl;
-        auto vc_layers = new QProcess(this);
-        QStringList arguments;
-        arguments << "-p"  << QString("1.ppm").arg(QString::fromStdString(segmentID)) << "--output-dir" << "layers/";
-        vc_layers->start("vc_layers_from_ppm", arguments);
-    });
-    connect(myProcess, &QProcess::errorOccurred, this, [this, segmentID, name](){ std::cout << "Error: " << segmentID << ": " << name.toStdString() << std::endl; });
-    myProcess->start(program, arguments);
 }
 
 static constexpr double SAMPLING_DENSITY_FACTOR = 50;
@@ -100,6 +56,14 @@ void CWindow::GenerateLayers(QPromise<void> &promise) {
 
     promise.setProgressRange(0, 100);
     promise.setProgressValue(0);
+
+    auto outputPath = fs::canonical(fLayerViewerWidget->getTempPath().toStdString());
+    if (fs::exists(outputPath)) {
+        // Clear old content
+        for (const auto& entry : std::filesystem::directory_iterator(outputPath)) {
+            std::filesystem::remove_all(entry.path());
+        }
+    }
 
     ///// Resample the segmentation /////
     // Mesh the point cloud
@@ -115,6 +79,9 @@ void CWindow::GenerateLayers(QPromise<void> &promise) {
                                                      : vertCount;
 
     // Decimate using ACVD
+    if (promise.isCanceled()) {
+        return;
+    }
     std::cout << "Resampling mesh..." << std::endl;
     promise.setProgressValueAndText(10, tr("Resampling mesh... %p%"));
     vc::meshing::ACVD resampler;
@@ -123,7 +90,11 @@ void CWindow::GenerateLayers(QPromise<void> &promise) {
     auto itkACVD = resampler.compute();
 
     ///// ABF flattening /////
+    if (promise.isCanceled()) {
+        return;
+    }
     std::cout << "Computing parameterization..." << std::endl;
+    promise.setProgressValueAndText(20, tr("Parameterization... %p%"));
     vc::texturing::AngleBasedFlattening abf;
     abf.setMesh(itkACVD);
     abf.compute();
@@ -135,26 +106,26 @@ void CWindow::GenerateLayers(QPromise<void> &promise) {
 
     vc::UVMap::AlignToAxis(*uvMap, itkACVD, vc::UVMap::AlignmentAxis::ZPos);
 
-    auto folder = fVpkg->segmentation(fSegIdLayers)->path().native() + "/layers";
-    if (!fs::exists(folder)) {
-        fs::create_directory(folder);
+    auto outputPathLayers = fs::path(outputPath.native() + "/layers");
+    if (!fs::exists(outputPathLayers)) {
+        fs::create_directory(outputPathLayers);
     }
-    auto outputPath = fs::canonical(folder);
-    auto outputPathMask = fVpkg->segmentation(fSegIdLayers)->path().native() + "/" + fSegIdLayers + "_mask.png";
-    auto outputPathUV = fVpkg->segmentation(fSegIdLayers)->path().native() + "/" + fSegIdLayers + "_uv.png";
-    auto outputPathPPM = fVpkg->segmentation(fSegIdLayers)->path().native() + "/" + fSegIdLayers + ".ppm";
+    auto outputPathMask = outputPath.native() + "/" + fSegIdLayers + "_mask.png";
+    auto outputPathUV = outputPath.native() + "/" + fSegIdLayers + "_uv.png";
+    auto outputPathPPM = outputPath.native() + "/" + fSegIdLayers + ".ppm";
 
     // Generate the PPM
+    if (promise.isCanceled()) {
+        return;
+    }
     std::cout << "Generating PPM..." << std::endl;
-    promise.setProgressValueAndText(25, tr("Generating PPM... %p%"));
+    promise.setProgressValueAndText(30, tr("Generating PPM... %p%"));
     vc::texturing::PPMGenerator ppmGen;
     ppmGen.setMesh(itkACVD);
     ppmGen.setUVMap(uvMap);
     ppmGen.setDimensions(height, width);
     auto ppm = ppmGen.compute();
     vc::PerPixelMap::WritePPM(outputPathPPM, *ppm);
-
-    promise.setProgressValue(25);
 
     double radius = fVpkg->materialThickness() / currentVolume->voxelSize();
 
@@ -165,8 +136,11 @@ void CWindow::GenerateLayers(QPromise<void> &promise) {
     // line->setSamplingDirection(vc::Bidirectional);
 
     // Layer texture
+    if (promise.isCanceled()) {
+        return;
+    }
     std::cout << "Generating layers..." << std::endl;
-    promise.setProgressValueAndText(50, tr("Generating layers... %p%"));
+    promise.setProgressValueAndText(55, tr("Generating layers... %p%"));
     vc::texturing::LayerTexture s;
     s.setVolume(currentVolume);
     s.setPerPixelMap(ppm);
@@ -182,6 +156,9 @@ void CWindow::GenerateLayers(QPromise<void> &promise) {
     }
 
     // Write the layers
+    if (promise.isCanceled()) {
+        return;
+    }
     std::cout << "Writing layers..." << std::endl;
     promise.setProgressValueAndText(90, tr("Writing layers... %p%"));
     const int numChars =
@@ -189,7 +166,7 @@ void CWindow::GenerateLayers(QPromise<void> &promise) {
     fs::path filepath;
     for (const auto [i, image] : vc::enumerate(texture)) {
         auto fileName = vc::to_padded_string(i, numChars) + "." + imgFmt;
-        filepath = outputPath / fileName;
+        filepath = outputPathLayers / fileName;
         vc::WriteImage(filepath, image, writeOpts);
     }
 
@@ -197,11 +174,9 @@ void CWindow::GenerateLayers(QPromise<void> &promise) {
 
     fLayerViewerWidget->SetNumImages(texture.size());
     fLayerViewerWidget->setPPM(*ppm);
-
-    promise.setProgressValueAndText(100, tr("Done"));
 }
 
-void CWindow::OnPathRunInkDetection(std::string segmentID) {
+void CWindow::OnPathGenerateLayers(std::string segmentID) {
 
     if (segmentID.empty()) {
         return;
@@ -218,6 +193,8 @@ void CWindow::OnPathRunInkDetection(std::string segmentID) {
     QObject::connect(&watcherLayers, &QFutureWatcher<void>::finished, [this](){
         this->OpenLayer();
         this->dockWidgetLayers->show();
+        this->fLayerViewerWidget->setProgress(0);
+        this->fLayerViewerWidget->setProgressText(tr("Done"));
     });
     watcherLayers.setFuture(QtConcurrent::run(&CWindow::GenerateLayers, this));
 }

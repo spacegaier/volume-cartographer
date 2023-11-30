@@ -3,7 +3,6 @@
 #pragma once
 
 #include "CImageViewer.hpp"
-#include "CXCurve.hpp"
 
 #include "vc/core/types/PerPixelMap.hpp"
 
@@ -23,12 +22,18 @@ public:
     void setProgress(int progress);
     void setProgressText(const QString& text);
 
+    QString getTempPath() const { return tempDir.path(); }
+
+signals:
+    void SendSignalCancelLayerGeneration();
+
 protected:
     std::string segID;
     volcart::PerPixelMap ppm;
 
-    // Progress info
+    QTemporaryDir tempDir{};
     QProgressBar* progressBar;
+    QPushButton* btnCancel;
 };
 
 }  // namespace ChaoVis
