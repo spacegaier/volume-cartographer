@@ -25,8 +25,6 @@ CLayerViewer::CLayerViewer(QWidget* parent)
     });
     fButtonsLayout->addWidget(btnCancel);
     btnCancel->setEnabled(false);
-
-    tempDir = QTemporaryDir();
 }
 
 void CLayerViewer::showCurveForSlice(int sliceIndex) {
