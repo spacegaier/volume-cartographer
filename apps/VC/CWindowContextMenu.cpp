@@ -3,9 +3,11 @@
 #include "CWindow.hpp"
 
 #include "CLayerViewer.hpp"
+#include "C3DViewer.hpp"
 #include "UDataManipulateUtils.hpp"
 
 #include "vc/core/io/ImageIO.hpp"
+#include "vc/core/io/MeshIO.hpp"
 #include "vc/core/util/MeshMath.hpp"
 #include "vc/core/util/String.hpp"
 #include "vc/core/util/Iteration.hpp"
@@ -39,8 +41,16 @@ void CWindow::OnPathCustomContextMenu(const QPoint& point)
             actGenLayers->setDisabled(true);
         }
 
+        QAction* actRender3D = new QAction(tr("Render 3D"), this);
+        connect(actRender3D, &QAction::triggered, this, [segID, this](){ OnPathRender3D(segID); });
+
+        if (!fSegStructMap[segID].display && !fSegStructMap[segID].compute) {
+            actRender3D->setDisabled(true);
+        }
+
         QMenu menu(this);
         menu.addAction(actGenLayers);
+        menu.addAction(actRender3D);
 
         menu.exec(fPathListWidget->viewport()->mapToGlobal(point));
     }
@@ -103,6 +113,8 @@ void CWindow::GenerateLayers(QPromise<void> &promise) {
     auto uvMap = abf.getUVMap();
     auto width = static_cast<size_t>(std::ceil(uvMap->ratio().width));
     auto height = static_cast<size_t>(std::ceil(uvMap->ratio().height));
+
+    vc::WriteMesh(outputPath.native() + "/" + fSegIdLayers + ".obj", itkACVD, uvMap);
 
     vc::UVMap::AlignToAxis(*uvMap, itkACVD, vc::UVMap::AlignmentAxis::ZPos);
 
@@ -195,6 +207,23 @@ void CWindow::OnPathGenerateLayers(std::string segmentID) {
         this->dockWidgetLayers->show();
         this->fLayerViewerWidget->setProgress(0);
         this->fLayerViewerWidget->setProgressText(tr("Done"));
+    });
+    watcherLayers.setFuture(QtConcurrent::run(&CWindow::GenerateLayers, this));
+}
+
+void CWindow::OnPathRender3D(std::string segmentID) {
+
+    if (segmentID.empty()) {
+        return;
+    }
+
+    fSegIdLayers = segmentID;
+
+    QObject::connect(&watcherLayers, &QFutureWatcher<void>::progressValueChanged, [this, segmentID](int progress){
+        if (progress == 30) {
+            this->f3DViewerWidget->renderSegment(segmentID);
+            this->dockWidget3D->show();
+        }
     });
     watcherLayers.setFuture(QtConcurrent::run(&CWindow::GenerateLayers, this));
 }

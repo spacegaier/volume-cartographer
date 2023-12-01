@@ -13,6 +13,7 @@ set(srcs
     CLayerViewer.cpp
     CVolumeViewer.cpp
     CVolumeViewerWithCurve.cpp
+    C3DViewer.cpp
     CBSpline.cpp
     CBezierCurve.cpp
     BlockingDialog.hpp
@@ -74,6 +75,10 @@ target_link_libraries(${target}
     Qt6::Gui
     Qt6::Widgets
     Qt6::Concurrent
+    Qt6::3DCore
+    Qt6::3DExtras
+    Qt6::3DRender
+    Qt6::3DInput
     ${OSXSecurity}
     OpenMP::OpenMP_CXX
     ${SDL2_LIBRARIES}

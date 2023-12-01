@@ -39,6 +39,7 @@ namespace ChaoVis
 
 class CVolumeViewerWithCurve;
 class CLayerViewer;
+class C3DViewer;
 
 class AnnotationTreeWidgetItem : public QTreeWidgetItem {
   public:
@@ -186,6 +187,7 @@ private slots:
     void OnPathItemSelectionChanged();
     void OnPathCustomContextMenu(const QPoint& point);
     void OnPathGenerateLayers(std::string segmentID);
+    void OnPathRender3D(std::string segmentID);
 
     void PreviousSelectedId();
     void NextSelectedId();
@@ -287,6 +289,7 @@ private:
 
     CVolumeViewerWithCurve* fVolumeViewerWidget;
     CLayerViewer* fLayerViewerWidget;
+    C3DViewer* f3DViewerWidget;
     QCheckBox* fchkDisplayAll;
     QCheckBox* fchkComputeAll;
     QTreeWidget* fPathListWidget;
@@ -296,6 +299,7 @@ private:
     QComboBox* volSelect;
     QPushButton* assignVol;
     QDockWidget* dockWidgetLayers;
+    QDockWidget* dockWidget3D;
 
     QSpinBox* fEdtWindowWidth;
     QLineEdit* fEdtDistanceWeight;

@@ -28,7 +28,7 @@ list(APPEND VC_CUSTOM_MODULES "${CMAKE_MODULE_PATH}/FindFilesystem.cmake")
 
 ### Qt6 ###
 if((VC_BUILD_APPS OR VC_BUILD_UTILS) AND VC_BUILD_GUI)
-    find_package(Qt6 6.3 QUIET REQUIRED COMPONENTS Widgets Gui Core Network Concurrent)
+    find_package(Qt6 6.3 QUIET REQUIRED COMPONENTS Widgets Gui Core Network Concurrent 3DCore 3DExtras 3DRender 3DInput)
     qt_standard_project_setup()
 endif()
 

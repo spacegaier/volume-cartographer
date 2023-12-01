@@ -7,7 +7,15 @@
 #include <QSettings>
 #include <opencv2/imgproc.hpp>
 
+#include <QtWidgets/QApplication>
+#include <QtWidgets/QWidget>
+#include <QtWidgets/QHBoxLayout>
+#include <QtWidgets/QCheckBox>
+#include <QtWidgets/QCommandLinkButton>
+#include <QtGui/QScreen>
+
 #include "CLayerViewer.hpp"
+#include "C3DViewer.hpp"
 #include "CVolumeViewerWithCurve.hpp"
 #include "UDataManipulateUtils.hpp"
 #include "SettingsDialog.hpp"
@@ -246,6 +254,14 @@ void CWindow::CreateWidgets(void)
     dockWidgetLayers->setMinimumHeight(300);
     dockWidgetLayers->setWidget(fLayerViewerWidget);
     connect(dockWidgetLayers, &QDockWidget::visibilityChanged, this, [this](bool visible) { if (!visible) { this->fSegIdLayers.clear(); }});
+
+    f3DViewerWidget = new C3DViewer(this);
+    dockWidget3D = new QDockWidget(tr("3D Viewer"), this);
+    dockWidget3D->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetFloatable | QDockWidget::DockWidgetMovable);
+    dockWidget3D->setFloating(true);
+    dockWidget3D->hide();
+    dockWidget3D->setMinimumHeight(300);
+    dockWidget3D->setWidget(f3DViewerWidget);
 
     connect(
         fLayerViewerWidget, &CImageViewer::SendSignalOnNextImageShift, this,
@@ -602,6 +618,7 @@ void CWindow::CreateMenus(void)
     fViewMenu->addAction(ui.dockWidgetSegmentation->toggleViewAction());
     fViewMenu->addAction(ui.dockWidgetAnnotations->toggleViewAction());
     fViewMenu->addAction(dockWidgetLayers->toggleViewAction());
+    fViewMenu->addAction(dockWidget3D->toggleViewAction());
 
     fHelpMenu = new QMenu(tr("&Help"), this);
     fHelpMenu->addAction(fKeybinds);
