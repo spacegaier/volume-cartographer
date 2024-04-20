@@ -620,7 +620,8 @@ void CVolumeViewerWithCurve::DrawIntersectionCurve(QGraphicsScene* scene) {
         }
         else {
             colorSelector->color().getRgb(&r, &g, &b);
-            a = 100;
+            QSettings settings("VC.ini", QSettings::IniFormat);
+            a = settings.value("viewer/display_segment_opacity").toFloat() / 100.f * 255;
         }
         if (!scene || !segStruct.display || segStruct.fIntersectionCurve.GetPointsNum()==0 || !colorSelector) {
             continue;  // Early continue if either object is null or the list is empty
