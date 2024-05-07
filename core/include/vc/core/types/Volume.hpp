@@ -11,8 +11,18 @@
 #include "vc/core/types/LRUCache.hpp"
 #include "vc/core/types/Reslice.hpp"
 
+#include "z5/types/types.hxx"
+#include "xtensor/xarray.hpp"
+
 namespace volcart
 {
+
+enum VolumeFormat
+{
+    TIFF = 0,
+    ZARR = 1
+};
+
 /**
  * @class Volume
  * @author Sean Karlage
@@ -212,6 +222,8 @@ public:
     /**@}*/
 
 protected:
+    /** Volume format */
+    VolumeFormat format_{TIFF};
     /** Slice width */
     int width_{0};
     /** Slice height */
@@ -228,6 +240,9 @@ protected:
     /** Cache mutex for thread-safe access */
     mutable std::mutex cacheMutex_;
     mutable std::vector<std::mutex> slice_mutexes_;
+
+    /** Loaded chunks */
+    mutable std::map<z5::types::ShapeType, xt::xarray<uint16_t>*> loadedChunks_;
 
     /** Load slice from disk */
     cv::Mat load_slice_(int index) const;

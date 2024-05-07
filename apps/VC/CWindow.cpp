@@ -20,6 +20,19 @@
 #include "vc/segmentation/LocalResliceParticleSim.hpp"
 #include "vc/segmentation/OpticalFlowSegmentation.hpp"
 
+#include "xtensor/xarray.hpp"
+#include "xtensor/xmanipulation.hpp"
+
+// factory functions to create files, groups and datasets
+#include "z5/factory.hxx"
+// handles for z5 filesystem objects
+#include "z5/filesystem/handle.hxx"
+// io for xtensor multi-arrays
+#include "z5/multiarray/xtensor_access.hxx"
+// attribute functionality
+#include "z5/attributes.hxx"
+
+
 namespace vc = volcart;
 namespace vcs = volcart::segmentation;
 using namespace ChaoVis;
@@ -559,6 +572,7 @@ void CWindow::CreateMenus(void)
 
     fFileMenu = new QMenu(tr("&File"), this);
     fFileMenu->addAction(fOpenVolAct);
+    fFileMenu->addAction(fOpenZarrAct);
     fFileMenu->addMenu(fRecentVolpkgMenu);
     fFileMenu->addSeparator();
     fFileMenu->addAction(fSavePointCloudAct);
@@ -600,6 +614,9 @@ void CWindow::CreateActions(void)
     fOpenVolAct = new QAction(style()->standardIcon(QStyle::SP_DialogOpenButton), tr("&Open volpkg..."), this);
     connect(fOpenVolAct, SIGNAL(triggered()), this, SLOT(Open()));
     fOpenVolAct->setShortcut(QKeySequence::Open);
+
+    fOpenZarrAct = new QAction(style()->standardIcon(QStyle::SP_DialogOpenButton), tr("Open zarr..."), this);
+    connect(fOpenZarrAct, SIGNAL(triggered()), this, SLOT(OpenZarr()));
 
     for (auto& action : fOpenRecentVolpkg)
     {
@@ -1859,6 +1876,106 @@ void CWindow::Open(const QString& path)
     CloseVolume();
     OpenVolume(path);
     OpenSlice();
+    InitPathList();
+    UpdateView();  // update the panel when volume package is loaded
+}
+
+// Handle open request
+void CWindow::OpenZarr(void)
+{
+    OpenZarr(QString());
+}
+
+// Handle open request
+void CWindow::OpenZarr(const QString& path)
+{
+    if (SaveDialog() == SaveResponse::Cancelled)
+        return;
+
+    CloseVolume();
+
+    QString aVpkgPath = path;
+    QSettings settings("VC.ini", QSettings::IniFormat);
+
+    if (aVpkgPath.isEmpty()) {
+        aVpkgPath = QFileDialog::getExistingDirectory(
+            this, tr("Open Directory"), settings.value("volpkg/default_path").toString(),
+            QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks | QFileDialog::ReadOnly | QFileDialog::DontUseNativeDialog);
+        // Dialog box cancelled
+        if (aVpkgPath.length() == 0) {
+            vc::Logger()->info("Open .zarr canceled");
+            return;
+        }
+    }
+
+    z5::filesystem::handle::File f(aVpkgPath.toStdString());
+    auto check = f.isZarr();
+    std::vector<std::string> keys;
+    f.keys(keys);
+
+    z5::filesystem::handle::Dataset ds(
+        // fs::path(aVpkgPath.toStdString() + "/" + keys[3]),
+        fs::path(aVpkgPath.toStdString() + "/" + "2"),
+        z5::FileMode::FileMode::r);
+    auto res = z5::filesystem::openDataset(ds);
+
+    z5::types::ShapeType index = {16, 5, 5};
+
+    auto size = res->size();
+    z5::types::ShapeType chunkShape;
+    res->getChunkShape(index, chunkShape);
+    chunkShape.size();
+    auto chunkSize = res->getChunkSize(index);
+    uint16_t chunkData[chunkSize];
+    res->readChunk(index, chunkData);
+
+    typedef typename xt::xarray<uint16_t>::shape_type ArrayShape;
+    const auto& shape = res->shape();
+    ArrayShape arrayShape(shape.begin(), shape.end());
+
+    z5::types::ShapeType offset(index);
+    ArrayShape subShape({20, 20, 20});
+    // types::ShapeType subShape({10, 10, 10});
+    xt::xarray<uint16_t> data(chunkShape);
+    z5::multiarray::readSubarray<uint16_t>(res, data, offset.begin());
+
+    data.reshape({data.shape()[2], data.shape()[0], data.shape()[1]});
+
+    auto test = xt::rot90(data);
+
+    // OpenVolume(path);
+    // OpenSlice();
+
+    QImage aImgQImage;
+    cv::Mat aImgMat(data.shape()[0], data.shape()[1], CV_16U, data.data(), 0);
+    // cv::Mat aImgMat(chunkShape[1], chunkShape[2], CV_16U, chunkData, 0);
+
+    if (aImgMat.empty()) {
+        auto h = currentVolume->sliceHeight();
+        auto w = currentVolume->sliceWidth();
+        aImgMat = cv::Mat::zeros(h, w, CV_8UC3);
+        aImgMat = vc::color::RED;
+        const std::string msg{"FILE MISSING"};
+        auto params = CalculateOptimalTextParams(msg, w, h);
+        auto originX = (w - params.size.width) / 2;
+        auto originY = params.size.height + (h - params.size.height) / 2;
+        cv::Point origin{originX, originY};
+        cv::putText(
+            aImgMat, msg, origin, params.font, params.scale, vc::color::WHITE,
+            params.thickness, params.baseline);
+    }
+
+    if (aImgMat.isContinuous() && aImgMat.type() == CV_16U) {
+        // create QImage directly backed by cv::Mat buffer
+        aImgQImage = QImage(
+            aImgMat.ptr(), aImgMat.cols, aImgMat.rows, aImgMat.step,
+            QImage::Format_Grayscale16);
+    } else
+        aImgQImage = Mat2QImage(aImgMat);
+
+    fVolumeViewerWidget->SetImage(aImgQImage);
+    fVolumeViewerWidget->SetImageIndex(fPathOnSliceIndex);
+
     InitPathList();
     UpdateView();  // update the panel when volume package is loaded
 }

@@ -84,6 +84,9 @@ target_include_directories(vc_core
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>
+        "/home/allgaier/git/xtensor-build/include/"
+        "/home/allgaier/git/xtl-build/include/"
+        "/home/allgaier/git/z5/include/"
 )
 target_link_libraries(vc_core
     PUBLIC

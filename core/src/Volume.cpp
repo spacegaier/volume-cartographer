@@ -7,6 +7,14 @@
 
 #include "vc/core/io/TIFFIO.hpp"
 
+#include "xtensor/xarray.hpp"
+#include "xtensor/xmanipulation.hpp"
+#include "xtensor/xview.hpp"
+#include "z5/factory.hxx"
+#include "z5/filesystem/handle.hxx"
+#include "z5/multiarray/xtensor_access.hxx"
+#include "z5/attributes.hxx"
+
 namespace fs = volcart::filesystem;
 namespace tio = volcart::tiffio;
 
@@ -17,6 +25,14 @@ Volume::Volume(fs::path path) : DiskBasedObjectBaseClass(std::move(path))
 {
     if (metadata_.get<std::string>("type") != "vol") {
         throw std::runtime_error("File not of type: vol");
+    }
+
+    // By default we assume TIFF
+    try {
+        if (metadata_.get<std::string>("format") == "zarr") {
+            format_ = ZARR;
+        }
+    } catch (std::runtime_error) {
     }
 
     width_ = metadata_.get<int>("width");
@@ -225,8 +241,49 @@ cv::Mat Volume::load_slice_(int index) const
         std::unique_lock<std::shared_mutex> lock(print_mutex_);
         std::cout << "Requested to load slice " << index << std::endl;
     }
-    auto slicePath = getSlicePath(index);
-    return cv::imread(slicePath.string(), -1);
+
+    if (format_ == TIFF) {
+        auto slicePath = getSlicePath(index);
+        return cv::imread(slicePath.string(), -1);
+    } else if (format_ == ZARR) {
+
+        z5::types::ShapeType chunkIndex = {0, 0, 0};
+        xt::xarray<uint16_t>* data = nullptr;
+
+        auto it = loadedChunks_.find(chunkIndex);
+        if (it == loadedChunks_.end())
+        {
+            z5::filesystem::handle::File f(path_);
+            z5::filesystem::handle::Dataset ds(
+                fs::path(path_ / "0"), z5::FileMode::FileMode::r);
+            auto res = z5::filesystem::openDataset(ds);
+
+            auto size = res->size();
+            z5::types::ShapeType chunkShape;
+            res->getChunkShape(chunkIndex, chunkShape);
+            auto chunkSize = res->getChunkSize(chunkIndex);
+            uint16_t chunkData[chunkSize];
+            res->readChunk(chunkIndex, chunkData);
+
+            z5::types::ShapeType offset(chunkIndex);
+            data = new xt::xarray<uint16_t>(chunkShape);
+            z5::multiarray::readSubarray<uint16_t>(res, *data, offset.begin());
+
+            data->reshape({data->shape()[2], data->shape()[0], data->shape()[1]});
+            loadedChunks_.emplace(chunkIndex, data);
+        } 
+        else 
+        {
+            data = it->second;
+        }
+
+        auto view = xt::view(*data, index);
+        return cv::Mat(view.shape()[0], view.shape()[1], CV_16U, view.data()+view.data_offset(), 0);
+    }
+    else 
+    {
+        return cv::Mat();
+    }
 }
 
 cv::Mat Volume::cache_slice_(int index) const
@@ -263,10 +320,8 @@ cv::Mat Volume::cache_slice_(int index) const
 
 }
 
-
 void Volume::cachePurge() const 
 {
     std::unique_lock<std::shared_mutex> lock(cache_mutex_);
     cache_->purge();
 }
-

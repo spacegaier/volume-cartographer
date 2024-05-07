@@ -56,6 +56,9 @@ target_include_directories(${target}
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
+        "/home/allgaier/git/xtensor-build/include/"
+        "/home/allgaier/git/xtl-build/include/"
+        "/home/allgaier/git/z5/include/"
 )
 find_package(OpenMP)
 find_package(SDL2 REQUIRED)
