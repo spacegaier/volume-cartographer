@@ -84,6 +84,7 @@ std::vector<std::string> Volume::zarrLevels() const
 { 
     std::vector<std::string> keys;
     zarrFile_.keys(keys);
+    std::sort(keys.begin(), keys.end());
     return keys;
 }
 
@@ -244,7 +245,7 @@ Reslice Volume::reslice(
     return Reslice(m, origin, xnorm, ynorm);
 }
 
-cv::Mat Volume::load_slice_(int index) const
+cv::Mat Volume::load_slice_(int index, VolumeAxis axis) const
 {
     {
         std::unique_lock<std::shared_mutex> lock(print_mutex_);
@@ -259,43 +260,61 @@ cv::Mat Volume::load_slice_(int index) const
             z5::types::ShapeType chunkIndex = {0, 0, 0};
             xt::xarray<uint16_t>* data = nullptr;
 
-            z5::types::ShapeType chunkShape;
-            zarrDs_->getChunkShape(chunkIndex, chunkShape);
+            if (axis == Z) {
 
-            if (index == 0) {
-                z5::types::ShapeType offset = {0, 0, 0};
-                auto shape = zarrDs_->shape();
-                // Control how many slices get loaded
-                shape.front() = 1;
-                data = new xt::xarray<uint16_t>(shape);
-                int threads = static_cast<int>(std::thread::hardware_concurrency());
-                z5::multiarray::readSubarray<uint16_t>(*zarrDs_, *data, offset.begin(), threads);
-            } else {
-                // Determine required Z chunk value
-                unsigned int zNum = index / chunkShape[0];
+                z5::types::ShapeType chunkShape;
+                zarrDs_->getChunkShape(chunkIndex, chunkShape);
 
-                auto it = loadedChunks_.find(zNum);
-                if (it == loadedChunks_.end()) {
-                    // auto chunkSize = res->getChunkSize(chunkIndex);
-                    // uint16_t chunkData[chunkSize];
-                    // res->readChunk(chunkIndex, chunkData);
-
-                    z5::types::ShapeType offset = {zNum * chunkShape[0], 0, 0};
+                if (index == 0) {
+                    // Initially load only 1 slice to quickly show something to the user
+                    z5::types::ShapeType offset = {0, 0, 0};
                     auto shape = zarrDs_->shape();
-                    // Control how many slices get loaded
-                    shape.front() = chunkShape[0];
+                    shape.front() = 1;
                     data = new xt::xarray<uint16_t>(shape);
                     int threads = static_cast<int>(std::thread::hardware_concurrency());
                     z5::multiarray::readSubarray<uint16_t>(*zarrDs_, *data, offset.begin(), threads);
-                    loadedChunks_.emplace(zNum, data);
                 } else {
-                    data = it->second;
-                }
-            }
+                    // Determine required Z chunk value
+                    unsigned int zNum = index / chunkShape[0];
 
-            auto view = xt::view(*data, index % chunkShape[0]);
-            return cv::Mat(view.shape()[0], view.shape()[1], CV_16U, view.data() + view.data_offset(), 0);
+                    auto it = loadedChunks_.find(zNum);
+                    if (it == loadedChunks_.end()) {
+                        // auto chunkSize = res->getChunkSize(chunkIndex);
+                        // uint16_t chunkData[chunkSize];
+                        // res->readChunk(chunkIndex, chunkData);
+
+                        z5::types::ShapeType offset = {zNum * chunkShape[0], 0, 0};
+                        auto shape = zarrDs_->shape();
+                        // Control how many slices get loaded
+                        shape.front() = chunkShape[0];
+                        data = new xt::xarray<uint16_t>(shape);
+                        int threads = static_cast<int>(std::thread::hardware_concurrency());
+                        z5::multiarray::readSubarray<uint16_t>(*zarrDs_, *data, offset.begin(), threads);
+                        loadedChunks_.emplace(zNum, data);
+                    } else {
+                        data = it->second;
+                    }
+                }
+
+                auto view = xt::view(*data, index % chunkShape[0]);
+                return cv::Mat(view.shape()[0], view.shape()[1], CV_16U, view.data() + view.data_offset(), 0);
+            } else if (axis == X) {
+                // Start in the middle
+                z5::types::ShapeType offset = {0, zarrDs_->shape()[1] / 2, 0};
+                auto shape = zarrDs_->shape();
+                // Load 30 X wide
+                shape.at(1) = 30;
+                data = new xt::xarray<uint16_t>(shape);
+                int threads = static_cast<int>(std::thread::hardware_concurrency());
+                z5::multiarray::readSubarray<uint16_t>(*zarrDs_, *data, offset.begin(), threads);
+                // std::cout << "Length: " << data->size() << std::endl;
+                // std::cout << "Dimmension: " << data->dimension() << std::endl;
+                // std::cout << "Shape Original: " << data->shape()[0] << ", " << data->shape()[1] << ", " << data->shape()[2] << std::endl;
+                *data = xt::view(xt::swapaxes(*data, 0, 1), index);
+                return cv::Mat(data->shape()[0], data->shape()[2], CV_16U, data->data(), 0);
+            }
         } else {
+            // No valid data set => return empty
             return cv::Mat();
         }
     } else {
@@ -303,7 +322,7 @@ cv::Mat Volume::load_slice_(int index) const
     }
 }
 
-cv::Mat Volume::cache_slice_(int index) const
+cv::Mat Volume::cache_slice_(int index, VolumeAxis axis) const
 {
     // Check if the slice is in the cache.
     {

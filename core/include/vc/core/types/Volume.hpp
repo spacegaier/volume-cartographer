@@ -19,10 +19,15 @@
 namespace volcart
 {
 
-enum VolumeFormat
-{
+enum VolumeFormat {
     TIFF = 0,
     ZARR = 1
+};
+
+enum VolumeAxis {
+    Z = 0,
+    Y = 1,
+    X = 2
 };
 
 /**
@@ -261,9 +266,9 @@ protected:
     int zarrLevel_{-1};
 
     /** Load slice from disk */
-    cv::Mat load_slice_(int index) const;
+    cv::Mat load_slice_(int index, VolumeAxis axis = Z) const;
     /** Load slice from cache */
-    cv::Mat cache_slice_(int index) const;
+    cv::Mat cache_slice_(int index, VolumeAxis axis = Z) const;
     /** Shared mutex for thread-safe access */
     mutable std::shared_mutex cache_mutex_;
     mutable std::shared_mutex print_mutex_;
