@@ -12,6 +12,8 @@
 #include "vc/core/types/Reslice.hpp"
 
 #include "z5/types/types.hxx"
+#include "z5/dataset.hxx"
+#include "z5/filesystem/handle.hxx"
 #include "xtensor/xarray.hpp"
 
 namespace volcart
@@ -86,6 +88,10 @@ public:
     double min() const;
     /** @brief Get the maximum intensity value in the Volume */
     double max() const;
+    /** @brief Get the format of the volume */
+    VolumeFormat format() const;
+    /** @brief Get ZARR file levels*/
+    std::vector<std::string> zarrLevels() const;
     /**@}*/
 
     /**@{*/
@@ -101,6 +107,8 @@ public:
     void setMin(double m);
     /** @brief Set the maximum value in the Volume */
     void setMax(double m);
+    /** @brief Set desired ZARR level */
+    void setZarrLevel(int level);
     /**@}*/
 
     /**@{*/
@@ -221,6 +229,8 @@ public:
     void cachePurge() const;
     /**@}*/
 
+    void openZarr();
+
 protected:
     /** Volume format */
     VolumeFormat format_{TIFF};
@@ -241,8 +251,14 @@ protected:
     mutable std::mutex cacheMutex_;
     mutable std::vector<std::mutex> slice_mutexes_;
 
+    /** ZARR file*/
+    z5::filesystem::handle::File zarrFile_;
+    /** ZARR data set*/
+    std::unique_ptr<z5::Dataset> zarrDs_{nullptr};
     /** Loaded chunks */
-    mutable std::map<z5::types::ShapeType, xt::xarray<uint16_t>*> loadedChunks_;
+    mutable std::map<unsigned int, xt::xarray<uint16_t>*> loadedChunks_;
+    /** Active ZARR level */
+    int zarrLevel_{-1};
 
     /** Load slice from disk */
     cv::Mat load_slice_(int index) const;

@@ -170,8 +170,6 @@ private:
 private slots:
     void Open(void);
     void Open(const QString& path);
-    void OpenZarr(void);
-    void OpenZarr(const QString& path);
     void OpenRecent();
     void Keybindings(void);
     void About(void);
@@ -270,7 +268,6 @@ private:
     QMenu* fRecentVolpkgMenu{};
 
     QAction* fOpenVolAct;
-    QAction* fOpenZarrAct;
     QAction* fOpenRecentVolpkg[MAX_RECENT_VOLPKG]{};
     QAction* fSavePointCloudAct;
     QAction* fSettingsAct;

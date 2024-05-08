@@ -11,7 +11,6 @@
 #include "xtensor/xmanipulation.hpp"
 #include "xtensor/xview.hpp"
 #include "z5/factory.hxx"
-#include "z5/filesystem/handle.hxx"
 #include "z5/multiarray/xtensor_access.hxx"
 #include "z5/attributes.hxx"
 
@@ -21,7 +20,7 @@ namespace tio = volcart::tiffio;
 using namespace volcart;
 
 // Load a Volume from disk
-Volume::Volume(fs::path path) : DiskBasedObjectBaseClass(std::move(path))
+Volume::Volume(fs::path path) : DiskBasedObjectBaseClass(std::move(path)), zarrFile_(path)
 {
     if (metadata_.get<std::string>("type") != "vol") {
         throw std::runtime_error("File not of type: vol");
@@ -31,6 +30,7 @@ Volume::Volume(fs::path path) : DiskBasedObjectBaseClass(std::move(path))
     try {
         if (metadata_.get<std::string>("format") == "zarr") {
             format_ = ZARR;
+            zarrFile_ = z5::filesystem::handle::File(path_);          
         }
     } catch (std::runtime_error) {
     }
@@ -49,7 +49,7 @@ Volume::Volume(fs::path path) : DiskBasedObjectBaseClass(std::move(path))
 Volume::Volume(fs::path path, std::string uuid, std::string name)
     : DiskBasedObjectBaseClass(
           std::move(path), std::move(uuid), std::move(name)),
-          slice_mutexes_(slices_)
+          slice_mutexes_(slices_), zarrFile_(path)
 {
     metadata_.set("type", "vol");
     metadata_.set("width", width_);
@@ -78,6 +78,14 @@ int Volume::numSlices() const { return slices_; }
 double Volume::voxelSize() const { return metadata_.get<double>("voxelsize"); }
 double Volume::min() const { return metadata_.get<double>("min"); }
 double Volume::max() const { return metadata_.get<double>("max"); }
+VolumeFormat Volume::format() const { return format_; }
+
+std::vector<std::string> Volume::zarrLevels() const 
+{ 
+    std::vector<std::string> keys;
+    zarrFile_.keys(keys);
+    return keys;
+}
 
 void Volume::setSliceWidth(int w)
 {
@@ -101,6 +109,7 @@ void Volume::setNumberOfSlices(size_t numSlices)
 void Volume::setVoxelSize(double s) { metadata_.set("voxelsize", s); }
 void Volume::setMin(double m) { metadata_.set("min", m); }
 void Volume::setMax(double m) { metadata_.set("max", m); }
+void Volume::setZarrLevel(int level) { zarrLevel_ = level; openZarr(); }
 
 Volume::Bounds Volume::bounds() const
 {
@@ -246,42 +255,50 @@ cv::Mat Volume::load_slice_(int index) const
         auto slicePath = getSlicePath(index);
         return cv::imread(slicePath.string(), -1);
     } else if (format_ == ZARR) {
+        if (zarrDs_) {
+            z5::types::ShapeType chunkIndex = {0, 0, 0};
+            xt::xarray<uint16_t>* data = nullptr;
 
-        z5::types::ShapeType chunkIndex = {0, 0, 0};
-        xt::xarray<uint16_t>* data = nullptr;
-
-        auto it = loadedChunks_.find(chunkIndex);
-        if (it == loadedChunks_.end())
-        {
-            z5::filesystem::handle::File f(path_);
-            z5::filesystem::handle::Dataset ds(
-                fs::path(path_ / "0"), z5::FileMode::FileMode::r);
-            auto res = z5::filesystem::openDataset(ds);
-
-            auto size = res->size();
             z5::types::ShapeType chunkShape;
-            res->getChunkShape(chunkIndex, chunkShape);
-            auto chunkSize = res->getChunkSize(chunkIndex);
-            uint16_t chunkData[chunkSize];
-            res->readChunk(chunkIndex, chunkData);
+            zarrDs_->getChunkShape(chunkIndex, chunkShape);
 
-            z5::types::ShapeType offset(chunkIndex);
-            data = new xt::xarray<uint16_t>(chunkShape);
-            z5::multiarray::readSubarray<uint16_t>(res, *data, offset.begin());
+            if (index == 0) {
+                z5::types::ShapeType offset = {0, 0, 0};
+                auto shape = zarrDs_->shape();
+                // Control how many slices get loaded
+                shape.front() = 1;
+                data = new xt::xarray<uint16_t>(shape);
+                int threads = static_cast<int>(std::thread::hardware_concurrency());
+                z5::multiarray::readSubarray<uint16_t>(*zarrDs_, *data, offset.begin(), threads);
+            } else {
+                // Determine required Z chunk value
+                unsigned int zNum = index / chunkShape[0];
 
-            data->reshape({data->shape()[2], data->shape()[0], data->shape()[1]});
-            loadedChunks_.emplace(chunkIndex, data);
-        } 
-        else 
-        {
-            data = it->second;
+                auto it = loadedChunks_.find(zNum);
+                if (it == loadedChunks_.end()) {
+                    // auto chunkSize = res->getChunkSize(chunkIndex);
+                    // uint16_t chunkData[chunkSize];
+                    // res->readChunk(chunkIndex, chunkData);
+
+                    z5::types::ShapeType offset = {zNum * chunkShape[0], 0, 0};
+                    auto shape = zarrDs_->shape();
+                    // Control how many slices get loaded
+                    shape.front() = chunkShape[0];
+                    data = new xt::xarray<uint16_t>(shape);
+                    int threads = static_cast<int>(std::thread::hardware_concurrency());
+                    z5::multiarray::readSubarray<uint16_t>(*zarrDs_, *data, offset.begin(), threads);
+                    loadedChunks_.emplace(zNum, data);
+                } else {
+                    data = it->second;
+                }
+            }
+
+            auto view = xt::view(*data, index % chunkShape[0]);
+            return cv::Mat(view.shape()[0], view.shape()[1], CV_16U, view.data() + view.data_offset(), 0);
+        } else {
+            return cv::Mat();
         }
-
-        auto view = xt::view(*data, index);
-        return cv::Mat(view.shape()[0], view.shape()[1], CV_16U, view.data()+view.data_offset(), 0);
-    }
-    else 
-    {
+    } else {
         return cv::Mat();
     }
 }
@@ -324,4 +341,20 @@ void Volume::cachePurge() const
 {
     std::unique_lock<std::shared_mutex> lock(cache_mutex_);
     cache_->purge();
+}
+
+void Volume::openZarr()
+{
+    if (!zarrDs_ && format_ == ZARR && zarrLevel_ >= 0) 
+    {
+        // Check that we have a valid level (>= 0 and in keys list)
+        std::vector<std::string> keys;
+        zarrFile_.keys(keys);
+        if (std::find(keys.begin(), keys.end(), std::to_string(zarrLevel_)) != keys.end())
+        {
+            z5::filesystem::handle::Dataset hndl(
+                fs::path(path_ / std::to_string(zarrLevel_)), z5::FileMode::FileMode::r);
+            zarrDs_ = z5::filesystem::openDataset(hndl);  
+        }
+    }
 }
