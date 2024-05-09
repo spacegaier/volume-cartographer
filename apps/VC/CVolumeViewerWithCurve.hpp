@@ -31,8 +31,6 @@ public:
     CVolumeViewerWithCurve(std::unordered_map<std::string, SegmentationStruct>& nSegStructMapRef);
     ~CVolumeViewerWithCurve();
 
-    virtual void SetImage(const QImage& nSrc);
-
     // for drawing mode
     void SetSplineCurve(CBSpline& nCurve);
     void UpdateSplineCurve(void);
@@ -43,6 +41,8 @@ public:
     void SetSliceIndexToolStart(int index) { sliceIndexToolStart = index; }
     void ReturnToSliceIndexToolStart();
     bool ShouldHighlightImageIndex(const int imageIndex);
+    void SetcrossSectionIndexSide(const int index) { crossSectionIndexSide = index; DrawCrossSectionMarkers(); }
+    void SetcrossSectionIndexFront(const int index) { crossSectionIndexFront = index; DrawCrossSectionMarkers(); }
 
     void UpdateView();
     void SetShowCurve(bool b) { showCurve = b; }
@@ -68,6 +68,7 @@ private:
 
     void DrawIntersectionCurve();
     void DrawControlPoints();
+    void DrawCrossSectionMarkers();
 
 signals:
     void SendSignalPathChanged(std::string, PathChangePointVector before, PathChangePointVector after);
@@ -103,9 +104,12 @@ private:
     QPointF fLastPos;  // last mouse position on the image
     int fImpactRange;  // how many points a control point movement can affect
 
-    // image drawn
-    cv::Mat fImgMat;
-    cv::Mat fImgMatCache;
+    // cross section integration
+    int crossSectionIndexSide;
+    int crossSectionIndexFront;
+    QGraphicsRectItem* crossSectionMarkerRectSide{nullptr};
+    QGraphicsRectItem* crossSectionMarkerRectFront{nullptr};
+
 };  // class CVolumeViewerWithCurve
 
 }  // namespace ChaoVis

@@ -126,14 +126,14 @@ CImageViewer::CImageViewer(QWidget* parent)
     , fImageIndex(0)
     , fScanRange(1)
 {
-    // buttons
+    // Buttons
     fZoomInBtn = new QPushButton(tr("Zoom In"), this);
     fZoomOutBtn = new QPushButton(tr("Zoom Out"), this);
     fResetBtn = new QPushButton(tr("Reset"), this);
     fNextBtn = new QPushButton(tr("Next Image"), this);
     fPrevBtn = new QPushButton(tr("Previous Image"), this);
 
-    // slice index edit
+    // Image index edit
     fImageIndexEdit = new QSpinBox(this);
     fImageIndexEdit->setMinimum(0);
     fImageIndexEdit->setEnabled(true);
@@ -226,6 +226,7 @@ void CImageViewer::SetImage(const QImage& nSrc)
         delete fBaseImageItem; // Delete the old item
     }
     fBaseImageItem = fScene->addPixmap(pixmap);
+    fGraphicsView->centerOn(fBaseImageItem);
 
     UpdateButtons();
     update();
@@ -415,7 +416,7 @@ void CImageViewer::AdjustScrollBar(QScrollBar* nScrollBar, double nFactor)
             ((nFactor - 1) * nScrollBar->pageStep() / 2)));
 }
 
-cv::Vec2f CImageViewer::CleanScrollPosition(cv::Vec2f pos) const
+auto CImageViewer::CleanScrollPosition(cv::Vec2f pos) const -> cv::Vec2f 
 {
     int x = pos[0];
     int y = pos[1];
@@ -460,7 +461,7 @@ void CImageViewer::ScrollToCenter(cv::Vec2f pos)
     fGraphicsView->verticalScrollBar()->setValue(verticalPos);
 }
 
-cv::Vec2f CImageViewer::GetScrollPosition() const
+auto CImageViewer::GetScrollPosition() const -> cv::Vec2f
 {
     // Get the positions of the scroll bars
     float horizontalPos = static_cast<float>(fGraphicsView->horizontalScrollBar()->value() + fGraphicsView->viewport()->width() / 2);
@@ -468,6 +469,11 @@ cv::Vec2f CImageViewer::GetScrollPosition() const
 
     // Return as cv::Vec2f
     return cv::Vec2f(horizontalPos, verticalPos);
+}
+
+void CImageViewer::ResetView()
+{
+    fScene->clear();
 }
 
 // Handle mouse press event

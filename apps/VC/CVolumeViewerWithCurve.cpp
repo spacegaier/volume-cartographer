@@ -7,6 +7,7 @@
 #include <opencv2/imgproc.hpp>
 
 #include "ColorFrame.hpp"
+#include "CVolumeCrossSectionViewer.hpp"
 
 #include <QCoreApplication> // To use QCoreApplication::sendEvent()
 
@@ -116,30 +117,6 @@ CVolumeViewerWithCurve::~CVolumeViewerWithCurve()
     delete timer;
 }
 
-
-void CVolumeViewerWithCurve::SetImage(const QImage& nSrc)
-{
-    if (fImgQImage == nullptr) {
-        fImgQImage = new QImage(nSrc);
-    } else {
-        *fImgQImage = nSrc;
-    }
-
-    // Create a QPixmap from the QImage
-    QPixmap pixmap = QPixmap::fromImage(*fImgQImage);
-
-    // Add the QPixmap to the scene as a QGraphicsPixmapItem
-    if (fBaseImageItem) {
-        // If the item already exists, remove it from the scene
-        fScene->removeItem(fBaseImageItem);
-        delete fBaseImageItem; // Delete the old item
-    }
-    fBaseImageItem = fScene->addPixmap(pixmap);
-
-    UpdateButtons();
-    update();
-}
-
 // Set the curve, we only hold a pointer to the original one so the data can be
 // synchronized
 void CVolumeViewerWithCurve::SetSplineCurve(CBSpline& nCurve)
@@ -181,11 +158,12 @@ void CVolumeViewerWithCurve::UpdateSplineCurve(void)
 
 void CVolumeViewerWithCurve::UpdateView()
 {
-    // Remove all existing ellipses and lines
+    // Remove all existing ellipses, lines and rects
     QList<QGraphicsItem*> allItems = fScene->items();
     for(QGraphicsItem *item : allItems)
     {
-        if (dynamic_cast<QGraphicsEllipseItem*>(item) || dynamic_cast<QGraphicsLineItem*>(item))
+        if (dynamic_cast<QGraphicsEllipseItem*>(item) || 
+            dynamic_cast<QGraphicsLineItem*>(item))
         {
             fScene->removeItem(item);
             delete item;
@@ -213,7 +191,7 @@ void CVolumeViewerWithCurve::UpdateView()
         DrawIntersectionCurve();
     }
 
-    // If we have an image, draw it
+    // If we have an image, update the buttons
     if (fImgQImage != nullptr) {
         CVolumeViewerWithCurve::UpdateButtons();
     }
@@ -639,6 +617,25 @@ void CVolumeViewerWithCurve::DrawControlPoints() {
         auto p1 = fControlPoints[i][1] - 0.5;
         fScene->addEllipse(p0, p1, 2, 2, QPen(QColor(r, g, b)), QBrush(QColor(r, g, b)));
     }
+}
+
+void CVolumeViewerWithCurve::DrawCrossSectionMarkers()
+{
+    static const int width = 6;
+
+    if (!crossSectionMarkerRectSide) {
+        auto color = QColor(CROSS_SECTION_COLOR_SIDE);
+        crossSectionMarkerRectSide = fScene->addRect(crossSectionIndexSide - (width / 2), 0, width, fImgQImage->size().height(), QPen(color), QBrush(color));
+        crossSectionMarkerRectSide->setZValue(999);
+        color = QColor(CROSS_SECTION_COLOR_FRONT);
+        crossSectionMarkerRectFront = fScene->addRect(0, crossSectionIndexFront - (width / 2), fImgQImage->size().width(), width, QPen(color), QBrush(color));
+        crossSectionMarkerRectFront->setZValue(999);
+    } else {
+        crossSectionMarkerRectSide->setRect(crossSectionIndexSide - (width / 2), 0, width, fImgQImage->size().height());
+        crossSectionMarkerRectFront->setRect(0, crossSectionIndexFront - (width / 2), fImgQImage->size().width(), width);
+    }
+
+    setStyleSheet(QString("QGraphicsView { border: 3px solid %1; }").arg(QColor(CROSS_SECTION_COLOR_TOP).name()));
 }
 
 // Update the status of the buttons

@@ -322,10 +322,34 @@ auto Volume::load_slice_(int index, VolumeAxis axis) const -> cv::Mat
                 data = new xt::xarray<std::uint16_t>(shape);
                 int threads = static_cast<int>(std::thread::hardware_concurrency());
                 z5::multiarray::readSubarray<std::uint16_t>(*zarrDs_, *data, offset.begin(), threads);
+                // std::cout << "Length: " << data->size() << std::endl;
+                // std::cout << "Dimmension: " << data->dimension() << std::endl;
+                // std::cout << "Shape Original: " << data->shape()[0] << ", " << data->shape()[1] << ", " << data->shape()[2] << std::endl;
+                *data = xt::view(xt::swapaxes(*data, 0, 1), 1);
+                return cv::Mat(data->shape()[0], data->shape()[2], CV_16U, data->data(), 0);
+            } else if (axis == Y) {
+                // This axis does not work with xtensor
+                xt::xarray<std::uint16_t>* data = nullptr;
+                
+                // Start in the middle
+                // z5::types::ShapeType offset = {0, zarrDs_->shape()[1] / 2, 0};
+
+                z5::types::ShapeType offset = {0, 0, (std::size_t)index};
+                auto shape = zarrDs_->shape();
+                shape.back() = 1;
+                data = new xt::xarray<std::uint16_t>(shape);
+                int threads = static_cast<int>(std::thread::hardware_concurrency());
+                z5::multiarray::readSubarray<std::uint16_t>(*zarrDs_, *data, offset.begin(), threads);
                 std::cout << "Length: " << data->size() << std::endl;
                 std::cout << "Dimmension: " << data->dimension() << std::endl;
                 std::cout << "Shape Original: " << data->shape()[0] << ", " << data->shape()[1] << ", " << data->shape()[2] << std::endl;
-                *data = xt::view(xt::swapaxes(*data, 0, 1), 1);
+                *data = xt::swapaxes(*data, 1, 2);
+                std::cout << "Shape Between: " << data->shape()[0] << ", " << data->shape()[1] << ", " << data->shape()[2] << std::endl;
+                *data = xt::swapaxes(*data, 0, 1);
+                std::cout << "Shape Swapped: " << data->shape()[0] << ", " << data->shape()[1] << ", " << data->shape()[2] << std::endl;
+                *data = xt::view(*data, 1);
+                std::cout << "Shape View: " << data->shape()[0] << ", " << data->shape()[1] << ", " << data->shape()[2] << std::endl;
+
                 return cv::Mat(data->shape()[0], data->shape()[2], CV_16U, data->data(), 0);
             }
         }

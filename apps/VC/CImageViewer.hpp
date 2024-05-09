@@ -61,10 +61,16 @@ public:
         fImageIndexEdit->setValue(imageIndex);
         UpdateButtons();
     }
-    int GetImageIndex() const { return fImageIndex; }
+    auto GetImageIndex() const -> int { return fImageIndex; }
     void SetNumImages(int num);
-    int GetNumImages() const { return fImageIndexEdit->maximum(); }
+    auto GetNumImages() const -> int { return fImageIndexEdit->maximum(); }
     void SetScanRange(int scanRange);
+    auto GetImageSize() const -> QSize { return fBaseImageItem->pixmap().size(); }
+    void ScaleImage(double nFactor);
+    auto GetScene() const -> QGraphicsScene* { return fScene; }
+    auto GetImage() const -> QImage* { return fImgQImage; }
+
+    void ResetView();
 
     virtual bool CanChangeImage() const { return fPrevBtn->isEnabled(); }
     virtual bool ShouldHighlightImageIndex(const int imageIndex) { return false; }
@@ -89,13 +95,12 @@ signals:
     void SendSignalImpactRangeDown(void);
 
 protected:
-    void ScaleImage(double nFactor);
     void CenterOn(const QPointF& point);
     virtual void UpdateButtons(void);
     void AdjustScrollBar(QScrollBar* nScrollBar, double nFactor);
     void ScrollToCenter(cv::Vec2f pos);
-    cv::Vec2f GetScrollPosition() const;
-    cv::Vec2f CleanScrollPosition(cv::Vec2f pos) const;
+    auto GetScrollPosition() const -> cv::Vec2f;
+    auto CleanScrollPosition(cv::Vec2f pos) const -> cv::Vec2f;
 
     virtual void mousePressEvent(QMouseEvent* event);
     virtual void mouseMoveEvent(QMouseEvent* event);
@@ -130,7 +135,7 @@ protected:
     bool rightPressed{false};
     int panStartX, panStartY;
 
-    QGraphicsPixmapItem* fBaseImageItem;
+    QGraphicsPixmapItem* fBaseImageItem{nullptr};
 };  // class CImageViewer
 
 }  // namespace ChaoVis

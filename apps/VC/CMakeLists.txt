@@ -10,6 +10,7 @@ set(srcs
     UDataManipulateUtils.cpp
     CImageViewer.cpp
     CVolumeViewer.cpp
+    CVolumeCrossSectionViewer.cpp
     CVolumeViewerWithCurve.cpp
     CBSpline.cpp
     CBezierCurve.cpp

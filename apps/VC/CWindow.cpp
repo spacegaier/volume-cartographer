@@ -8,6 +8,7 @@
 #include <opencv2/imgproc.hpp>
 
 #include "CVolumeViewerWithCurve.hpp"
+#include "CVolumeCrossSectionViewer.hpp"
 #include "UDataManipulateUtils.hpp"
 #include "SettingsDialog.hpp"
 #include "UndoCommands.hpp"
@@ -233,63 +234,62 @@ void CWindow::CreateWidgets(void)
     connect(ui.btnNewPath, SIGNAL(clicked()), this, SLOT(OnNewPathClicked()));
     connect(ui.btnRemovePath, SIGNAL(clicked()), this, SLOT(OnRemovePathClicked()));
 
-    fVolumeViewerCrossSide = new CImageViewer(this);
-    fVolumeViewerCrossSide->setButtonsEnabled(true);
-    dockWidgetVolumeCrossSide = new QDockWidget(tr("Volume Side Viewer"), this);
-    dockWidgetVolumeCrossSide->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetFloatable | QDockWidget::DockWidgetMovable);
-    dockWidgetVolumeCrossSide->setFloating(true);
-    dockWidgetVolumeCrossSide->hide();
-    dockWidgetVolumeCrossSide->setMinimumHeight(300);
-    dockWidgetVolumeCrossSide->setWidget(fVolumeViewerCrossSide);
-    connect(dockWidgetVolumeCrossSide, &QDockWidget::visibilityChanged, this, [this](bool visible) { if (visible) { OpenSliceCrossSide(); }});
-
-    connect(
-        fVolumeViewerCrossSide, &CImageViewer::SendSignalOnNextImageShift, this,
-        &CWindow::OnLoadNextSliceSideShift);
-    connect(
-        fVolumeViewerCrossSide, &CImageViewer::SendSignalOnPrevImageShift, this,
-        &CWindow::OnLoadPrevSliceSideShift);
-    connect(
-        fVolumeViewerCrossSide, &CImageViewer::SendSignalOnLoadAnyImage, this,
-        &CWindow::OnLoadAnySliceSide);
+    fVolumeCrossSectionViewer = new CVolumeCrossSectionViewer(fVolumeViewerWidget, this);
+    dockWidgetVolumeCross = new QDockWidget(tr("Volume Cross Sections"), this);
+    dockWidgetVolumeCross->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetFloatable | QDockWidget::DockWidgetMovable);
+    dockWidgetVolumeCross->setAllowedAreas(Qt::AllDockWidgetAreas);
+    dockWidgetVolumeCross->setFloating(true);
+    dockWidgetVolumeCross->hide();
+    dockWidgetVolumeCross->setWidget(fVolumeCrossSectionViewer);
+    connect(dockWidgetVolumeCross, &QDockWidget::visibilityChanged, this, [this](bool visible) { if (visible) { 
+        fVolumeCrossSectionViewer->initViewer();
+        fVolumeCrossSectionViewer->setVolume(currentVolume);
+        dockWidgetVolumeCross->setMinimumSize({200, 800});
+    }});    
 
     // TODO CHANGE VOLUME LOADING; FIRST CHECK FOR OTHER VOLUMES IN THE STRUCTS
     volSelect = this->findChild<QComboBox*>("volSelect");
-    connect(
-        volSelect, &QComboBox::currentIndexChanged, [this](const int& index) {
-            vc::Volume::Pointer newVolume;
-            try {
-                newVolume = fVpkg->volume(volSelect->currentData().toString().toStdString());
-            } catch (const std::out_of_range& e) {
-                QMessageBox::warning(this, "Error", "Could not load volume.");
+    connect(volSelect, &QComboBox::currentIndexChanged, [this](const int& index) {
+        vc::Volume::Pointer newVolume;
+        try {
+            newVolume = fVpkg->volume(volSelect->currentData().toString().toStdString());
+        } catch (const std::out_of_range& e) {
+            QMessageBox::warning(this, "Error", "Could not load volume.");
+            return;
+        }
+
+        QString zarrLevel;
+        if (newVolume->format() == vc::VolumeFormat::ZARR) {
+            QStringList list;
+            for (auto level : newVolume->zarrLevels()) {
+                list.append(QString::fromStdString(level));
+            }
+
+            QInputDialog* dialog = new QInputDialog();
+            bool accepted;
+            zarrLevel = dialog->getItem(0, "Select ZARR level", "ZARR Level:", list, 0, false, &accepted);
+            if (!accepted || zarrLevel.isEmpty()) {
+                // Process cancelled => stick with current volume
                 return;
             }
+        }
 
-            if (newVolume->format() == vc::VolumeFormat::ZARR)
-            {
-                QStringList list;
-                for (auto level : newVolume->zarrLevels()) 
-                {
-                    list.append(QString::fromStdString(level));
-                }
+        //fVolumeViewerWidget->ResetView();
 
-                QInputDialog* dialog = new QInputDialog();
-                bool accepted;
-                QString item = dialog->getItem(0, "Select ZARR level", "ZARR Level:", list, 0, false, &accepted);
-                if (accepted && !item.isEmpty()) 
-                {
-                    newVolume->setZarrLevel(item.toInt());
-                    fVolumeViewerWidget->SetNumImages(newVolume->numSlices());
-                    fVolumeViewerCrossSide->SetNumImages(newVolume->sliceWidth());
-                }
-            }
-            currentVolume = newVolume;
-            OnLoadAnySlice(0);
-            setDefaultWindowWidth(newVolume);
-            fVolumeViewerWidget->SetNumImages(currentVolume->numSlices());
-            ui.spinBackwardSlice->setMaximum(currentVolume->numSlices() - 1);
-            ui.spinForwardSlice->setMaximum(currentVolume->numSlices() - 1);
-        });
+        if (newVolume->format() == vc::VolumeFormat::ZARR) {
+            newVolume->setZarrLevel(zarrLevel.toInt());
+            fVolumeViewerWidget->SetcrossSectionIndexSide(newVolume->sliceWidth() / 2);
+            fVolumeViewerWidget->SetcrossSectionIndexFront(newVolume->sliceWidth() / 2);
+            fVolumeCrossSectionViewer->setVolume(newVolume);
+        }
+
+        currentVolume = newVolume;
+        OnLoadAnySlice(0);
+        setDefaultWindowWidth(newVolume);
+        fVolumeViewerWidget->SetNumImages(currentVolume->numSlices());
+        ui.spinBackwardSlice->setMaximum(currentVolume->numSlices() - 1);
+        ui.spinForwardSlice->setMaximum(currentVolume->numSlices() - 1);
+    });
 
     assignVol = this->findChild<QPushButton*>("assignVol");
     connect(assignVol, &QPushButton::clicked, [this](bool) {
@@ -612,7 +612,7 @@ void CWindow::CreateMenus(void)
     fViewMenu->addAction(ui.dockWidgetVolumes->toggleViewAction());
     fViewMenu->addAction(ui.dockWidgetSegmentation->toggleViewAction());
     fViewMenu->addAction(ui.dockWidgetAnnotations->toggleViewAction());
-    fViewMenu->addAction(dockWidgetVolumeCrossSide->toggleViewAction());
+    fViewMenu->addAction(dockWidgetVolumeCross->toggleViewAction());
 
     fHelpMenu = new QMenu(tr("&Help"), this);
     fHelpMenu->addAction(fKeybinds);
@@ -1707,34 +1707,7 @@ void CWindow::OpenSlice(void)
 
     fVolumeViewerWidget->SetImage(aImgQImage);
     fVolumeViewerWidget->SetImageIndex(fPathOnSliceIndex);
-}
-
-// Open volume cross side slice
-void CWindow::OpenSliceCrossSide(void)
-{
-    QImage aImgQImage;
-    cv::Mat aImgMat;
-    if (fVpkg != nullptr) {
-        // Stop prefetching
-        prefetchSliceIndex = -1;
-        cv.notify_one();
-
-        aImgMat = currentVolume->getSliceData(fVolumeViewerCrossSide->GetImageIndex(), vc::VolumeAxis::X);
-    } else {
-        aImgMat = cv::Mat::zeros(10, 10, CV_8UC1);
-    }
-
-    if (aImgMat.isContinuous() && aImgMat.type() == CV_16U) {
-        // create QImage directly backed by cv::Mat buffer
-        aImgQImage = QImage(aImgMat.ptr(), aImgMat.cols, aImgMat.rows, aImgMat.step, QImage::Format_Grayscale16);
-    } else {
-        aImgQImage = Mat2QImage(aImgMat);
-    }
-
-    fVolumeViewerCrossSide->SetImage(aImgQImage);
-
-    // fVolumeViewerCrossSide->showCurveForSlice(fPathOnSliceIndex);
-    dockWidgetVolumeCrossSide->show();
+    fVolumeCrossSectionViewer->setcrossSectionIndexTop(fPathOnSliceIndex);
 }
 
 // Initialize path list
@@ -2941,46 +2914,6 @@ void CWindow::OnLoadPrevSliceShift(int shift)
     } else {
         statusBar->showMessage(
             tr("Already at the beginning of the volume!"), 10000);
-    }
-}
-
-void CWindow::OnLoadAnySliceSide(int slice)
-{
-    if (fVpkg != nullptr) {
-        if (slice >= 0 && slice < fVolumeViewerCrossSide->GetNumImages()) {
-            fVolumeViewerCrossSide->SetImageIndex(slice);
-            OpenSliceCrossSide();
-        }
-    }
-}
-
-void CWindow::OnLoadNextSliceSideShift(int shift)
-{
-    if (fVpkg != nullptr) {
-        auto current = fVolumeViewerCrossSide->GetImageIndex();
-        if (current + shift >= fVolumeViewerCrossSide->GetNumImages()) {
-            shift = fVolumeViewerCrossSide->GetNumImages() - current - 1;
-        }
-
-        if (shift != 0) {
-            fVolumeViewerCrossSide->SetImageIndex(current + shift);
-            OpenSliceCrossSide();
-        }
-    }
-}
-
-void CWindow::OnLoadPrevSliceSideShift(int shift)
-{
-    if (fVpkg != nullptr ) {
-        auto current = fVolumeViewerCrossSide->GetImageIndex();
-        if (current - shift < 0) {
-            shift = current;
-        }
-
-        if (shift != 0) {
-            fVolumeViewerCrossSide->SetImageIndex(current - shift);
-            OpenSliceCrossSide();
-        }
     }
 }
 
