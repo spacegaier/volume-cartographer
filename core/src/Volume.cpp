@@ -64,26 +64,30 @@ Volume::Volume(fs::path path, std::string uuid, std::string name)
 }
 
 // Load a Volume from disk, return a pointer
-Volume::Pointer Volume::New(fs::path path)
+auto Volume::New(fs::path path) -> Volume::Pointer
 {
     return std::make_shared<Volume>(path);
 }
 
 // Set a Volume from a folder of slices, return a pointer
-Volume::Pointer Volume::New(fs::path path, std::string uuid, std::string name)
+auto Volume::New(fs::path path, std::string uuid, std::string name)
+    -> Volume::Pointer
 {
     return std::make_shared<Volume>(path, uuid, name);
 }
 
-int Volume::sliceWidth() const { return width_; }
-int Volume::sliceHeight() const { return height_; }
-int Volume::numSlices() const { return slices_; }
-double Volume::voxelSize() const { return metadata_.get<double>("voxelsize"); }
-double Volume::min() const { return metadata_.get<double>("min"); }
-double Volume::max() const { return metadata_.get<double>("max"); }
-VolumeFormat Volume::format() const { return format_; }
+auto Volume::sliceWidth() const -> int { return width_; }
+auto Volume::sliceHeight() const -> int { return height_; }
+auto Volume::numSlices() const -> int { return slices_; }
+auto Volume::voxelSize() const -> double
+{
+    return metadata_.get<double>("voxelsize");
+}
+auto Volume::min() const -> double { return metadata_.get<double>("min"); }
+auto Volume::max() const -> double { return metadata_.get<double>("max"); }
+auto Volume::format() const -> VolumeFormat { return format_; }
 
-std::vector<std::string> Volume::zarrLevels() const 
+auto Volume::zarrLevels() const -> std::vector<std::string>
 { 
     std::vector<std::string> keys;
     zarrFile_.keys(keys);
@@ -103,7 +107,7 @@ void Volume::setSliceHeight(int h)
     metadata_.set("height", h);
 }
 
-void Volume::setNumberOfSlices(size_t numSlices)
+void Volume::setNumberOfSlices(std::size_t numSlices)
 {
     slices_ = numSlices;
     numSliceCharacters_ = std::to_string(numSlices).size();
@@ -115,7 +119,7 @@ void Volume::setMin(double m) { metadata_.set("min", m); }
 void Volume::setMax(double m) { metadata_.set("max", m); }
 void Volume::setZarrLevel(int level) { zarrLevel_ = level; openZarr(); }
 
-Volume::Bounds Volume::bounds() const
+auto Volume::bounds() const -> Volume::Bounds
 {
     return {
         {0, 0, 0},
@@ -123,18 +127,18 @@ Volume::Bounds Volume::bounds() const
          static_cast<double>(slices_)}};
 }
 
-bool Volume::isInBounds(double x, double y, double z) const
+auto Volume::isInBounds(double x, double y, double z) const -> bool
 {
     return x >= 0 && x < width_ && y >= 0 && y < height_ && z >= 0 &&
            z < slices_;
 }
 
-bool Volume::isInBounds(const cv::Vec3d& v) const
+auto Volume::isInBounds(const cv::Vec3d& v) const -> bool
 {
     return isInBounds(v(0), v(1), v(2));
 }
 
-fs::path Volume::getSlicePath(int index) const
+auto Volume::getSlicePath(int index) const -> fs::path
 {
     std::stringstream ss;
     ss << std::setw(numSliceCharacters_) << std::setfill('0') << index
@@ -142,29 +146,28 @@ fs::path Volume::getSlicePath(int index) const
     return path_ / ss.str();
 }
 
-cv::Mat Volume::getSliceData(int index, VolumeAxis axis) const
+auto Volume::getSliceData(int index, VolumeAxis axis) const -> cv::Mat
 {
     // We only cache the main Z axis for now
     if (cacheSlices_ && axis == Z) {
         return cache_slice_(index, axis);
-    } else {
-        return load_slice_(index, axis);
     }
+    return load_slice_(index, axis);
 }
 
-cv::Mat Volume::getSliceDataCopy(int index, VolumeAxis axis) const
+auto Volume::getSliceDataCopy(int index, VolumeAxis axis) const -> cv::Mat
 {
     return getSliceData(index, axis).clone();
 }
 
-cv::Mat Volume::getSliceDataRect(int index, cv::Rect rect) const
+auto Volume::getSliceDataRect(int index, cv::Rect rect) const -> cv::Mat
 {
     auto whole_img = getSliceData(index);
     std::shared_lock<std::shared_mutex> lock(cache_mutex_);
     return whole_img(rect);
 }
 
-cv::Mat Volume::getSliceDataRectCopy(int index, cv::Rect rect) const
+auto Volume::getSliceDataRectCopy(int index, cv::Rect rect) const -> cv::Mat
 {
     auto whole_img = getSliceData(index);
     std::shared_lock<std::shared_mutex> lock(cache_mutex_);
@@ -179,7 +182,7 @@ void Volume::setSliceData(int index, const cv::Mat& slice, bool compress)
         (compress) ? tiffio::Compression::LZW : tiffio::Compression::NONE);
 }
 
-std::uint16_t Volume::intensityAt(int x, int y, int z) const
+auto Volume::intensityAt(int x, int y, int z) const -> std::uint16_t
 {
     // clang-format off
     if (x < 0 || x >= sliceWidth() ||
@@ -193,7 +196,7 @@ std::uint16_t Volume::intensityAt(int x, int y, int z) const
 
 // Trilinear Interpolation
 // From: https://en.wikipedia.org/wiki/Trilinear_interpolation
-std::uint16_t Volume::interpolateAt(double x, double y, double z) const
+auto Volume::interpolateAt(double x, double y, double z) const -> std::uint16_t
 {
     // insert safety net
     if (!isInBounds(x, y, z)) {
@@ -227,12 +230,12 @@ std::uint16_t Volume::interpolateAt(double x, double y, double z) const
     return static_cast<std::uint16_t>(cvRound(c));
 }
 
-Reslice Volume::reslice(
+auto Volume::reslice(
     const cv::Vec3d& center,
     const cv::Vec3d& xvec,
     const cv::Vec3d& yvec,
     int width,
-    int height) const
+    int height) const -> Reslice
 {
     auto xnorm = cv::normalize(xvec);
     auto ynorm = cv::normalize(yvec);
@@ -249,7 +252,7 @@ Reslice Volume::reslice(
     return Reslice(m, origin, xnorm, ynorm);
 }
 
-cv::Mat Volume::load_slice_(int index, VolumeAxis axis) const
+auto Volume::load_slice_(int index, VolumeAxis axis) const -> cv::Mat
 {
     {
         std::unique_lock<std::shared_mutex> lock(print_mutex_);
@@ -335,7 +338,7 @@ cv::Mat Volume::load_slice_(int index, VolumeAxis axis) const
     }
 }
 
-cv::Mat Volume::cache_slice_(int index, VolumeAxis axis) const
+auto Volume::cache_slice_(int index, VolumeAxis axis) const -> cv::Mat 
 {
     // Check if the slice is in the cache.
     {
