@@ -391,7 +391,9 @@ void CImageViewer::OnPrevClicked(void)
 void CImageViewer::OnImageIndexEditTextChanged(void)
 {
     // send signal to controller in order to update the content
-    SendSignalOnLoadAnyImage(fImageIndexEdit->value());
+    if (fImageIndexEdit->value() != fImageIndex) {
+        SendSignalOnLoadAnyImage(fImageIndexEdit->value());
+    }
 }
 
 // Update the status of the buttons

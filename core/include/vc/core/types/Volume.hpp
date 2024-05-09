@@ -14,7 +14,7 @@
 #include "z5/types/types.hxx"
 #include "z5/dataset.hxx"
 #include "z5/filesystem/handle.hxx"
-#include "xtensor/xarray.hpp"
+#include "xtensor/xtensor.hpp"
 
 namespace volcart
 {
@@ -261,7 +261,7 @@ protected:
     /** ZARR data set*/
     std::unique_ptr<z5::Dataset> zarrDs_{nullptr};
     /** Loaded chunks */
-    mutable std::map<unsigned int, xt::xarray<uint16_t>*> loadedChunks_;
+    mutable std::map<unsigned int, xt::xtensor<uint16_t, 3>*> loadedChunks_;
     /** Active ZARR level */
     int zarrLevel_{-1};
 

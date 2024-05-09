@@ -241,7 +241,7 @@ void CWindow::CreateWidgets(void)
     dockWidgetVolumeCrossSide->hide();
     dockWidgetVolumeCrossSide->setMinimumHeight(300);
     dockWidgetVolumeCrossSide->setWidget(fVolumeViewerCrossSide);
-    // connect(dockWidgetVolumeCrossSide, &QDockWidget::visibilityChanged, this, [this](bool visible) { if (!visible) { this->fSegIdLayers.clear(); }});
+    connect(dockWidgetVolumeCrossSide, &QDockWidget::visibilityChanged, this, [this](bool visible) { if (visible) { OpenSliceCrossSide(); }});
 
     connect(
         fVolumeViewerCrossSide, &CImageViewer::SendSignalOnNextImageShift, this,
@@ -1713,7 +1713,7 @@ void CWindow::OpenSlice(void)
 void CWindow::OpenSliceCrossSide(void)
 {
     QImage aImgQImage;
-       cv::Mat aImgMat;
+    cv::Mat aImgMat;
     if (fVpkg != nullptr) {
         // Stop prefetching
         prefetchSliceIndex = -1;
