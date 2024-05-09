@@ -21,7 +21,7 @@
 #include "vc/segmentation/OpticalFlowSegmentation.hpp"
 
 namespace vc = volcart;
-namespace vcs = volcart::segmentation;
+namespace vcs = vc::segmentation;
 using namespace ChaoVis;
 using qga = QGuiApplication;
 
@@ -41,7 +41,6 @@ auto CalculateOptimalTextParams(
     double bufferTB = 0.2,
     double bufferLR = 0.15) -> PutTextParams
 {
-
     // results
     PutTextParams p;
 
@@ -201,9 +200,9 @@ void CWindow::CreateWidgets(void)
 
     // add volume viewer
     fVolumeViewerWidget = new CVolumeViewerWithCurve(fSegStructMap);
-    connect(fVolumeViewerWidget, &CVolumeViewerWithCurve::SendSignalStatusMessageAvailable, this, &CWindow::onShowStatusMessage);
-    connect(fVolumeViewerWidget, &CVolumeViewerWithCurve::SendSignalImpactRangeUp, this, &CWindow::onImpactRangeUp);
-    connect(fVolumeViewerWidget, &CVolumeViewerWithCurve::SendSignalImpactRangeDown, this, &CWindow::onImpactRangeDown);
+    connect(fVolumeViewerWidget, &CImageViewer::SendSignalStatusMessageAvailable, this, &CWindow::onShowStatusMessage);
+    connect(fVolumeViewerWidget, &CImageViewer::SendSignalImpactRangeUp, this, &CWindow::onImpactRangeUp);
+    connect(fVolumeViewerWidget, &CImageViewer::SendSignalImpactRangeDown, this, &CWindow::onImpactRangeDown);
 
     auto aWidgetLayout = new QVBoxLayout;
     aWidgetLayout->addWidget(fVolumeViewerWidget);
@@ -215,24 +214,44 @@ void CWindow::CreateWidgets(void)
     fVolumeViewerWidget->SetIntersectionCurve(fSegStructMap[fSegmentationId].fIntersectionCurve);
 
     connect(
-        fVolumeViewerWidget, SIGNAL(SendSignalOnNextSliceShift(int)), this,
-        SLOT(OnLoadNextSliceShift(int)));
+        fVolumeViewerWidget, &CImageViewer::SendSignalOnNextImageShift, this,
+        &CWindow::OnLoadNextSliceShift);
     connect(
-        fVolumeViewerWidget, SIGNAL(SendSignalOnPrevSliceShift(int)), this,
-        SLOT(OnLoadPrevSliceShift(int)));
+        fVolumeViewerWidget, &CImageViewer::SendSignalOnPrevImageShift, this,
+        &CWindow::OnLoadPrevSliceShift);
     connect(
-        fVolumeViewerWidget, SIGNAL(SendSignalOnLoadAnyImage(int)), this,
-        SLOT(OnLoadAnySlice(int)));
+        fVolumeViewerWidget, &CImageViewer::SendSignalOnLoadAnyImage, this,
+        &CWindow::OnLoadAnySlice);
     connect(
-        fVolumeViewerWidget, SIGNAL(SendSignalPathChanged(std::string, PathChangePointVector, PathChangePointVector)), this,
-        SLOT(OnPathChanged(std::string, PathChangePointVector, PathChangePointVector)));
+        fVolumeViewerWidget, &CVolumeViewerWithCurve::SendSignalPathChanged, this,
+        &CWindow::OnPathChanged);
     connect(
-        fVolumeViewerWidget, SIGNAL(SendSignalAnnotationChanged()), this,
-        SLOT(OnAnnotationChanged()));
+        fVolumeViewerWidget, &CVolumeViewerWithCurve::SendSignalAnnotationChanged, this,
+        &CWindow::OnAnnotationChanged);
 
     // new and remove path buttons
     connect(ui.btnNewPath, SIGNAL(clicked()), this, SLOT(OnNewPathClicked()));
     connect(ui.btnRemovePath, SIGNAL(clicked()), this, SLOT(OnRemovePathClicked()));
+
+    fVolumeViewerCrossSide = new CImageViewer(this);
+    fVolumeViewerCrossSide->setButtonsEnabled(true);
+    dockWidgetVolumeCrossSide = new QDockWidget(tr("Volume Side Viewer"), this);
+    dockWidgetVolumeCrossSide->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetFloatable | QDockWidget::DockWidgetMovable);
+    dockWidgetVolumeCrossSide->setFloating(true);
+    dockWidgetVolumeCrossSide->hide();
+    dockWidgetVolumeCrossSide->setMinimumHeight(300);
+    dockWidgetVolumeCrossSide->setWidget(fVolumeViewerCrossSide);
+    // connect(dockWidgetVolumeCrossSide, &QDockWidget::visibilityChanged, this, [this](bool visible) { if (!visible) { this->fSegIdLayers.clear(); }});
+
+    connect(
+        fVolumeViewerCrossSide, &CImageViewer::SendSignalOnNextImageShift, this,
+        &CWindow::OnLoadNextSliceSideShift);
+    connect(
+        fVolumeViewerCrossSide, &CImageViewer::SendSignalOnPrevImageShift, this,
+        &CWindow::OnLoadPrevSliceSideShift);
+    connect(
+        fVolumeViewerCrossSide, &CImageViewer::SendSignalOnLoadAnyImage, this,
+        &CWindow::OnLoadAnySliceSide);
 
     // TODO CHANGE VOLUME LOADING; FIRST CHECK FOR OTHER VOLUMES IN THE STRUCTS
     volSelect = this->findChild<QComboBox*>("volSelect");
@@ -260,13 +279,14 @@ void CWindow::CreateWidgets(void)
                 if (accepted && !item.isEmpty()) 
                 {
                     newVolume->setZarrLevel(item.toInt());
+                    fVolumeViewerWidget->SetNumImages(newVolume->numSlices());
+                    fVolumeViewerCrossSide->SetNumImages(newVolume->sliceWidth());
                 }
             }
-
             currentVolume = newVolume;
             OnLoadAnySlice(0);
             setDefaultWindowWidth(newVolume);
-            fVolumeViewerWidget->setNumSlices(currentVolume->numSlices());
+            fVolumeViewerWidget->SetNumImages(currentVolume->numSlices());
             ui.spinBackwardSlice->setMaximum(currentVolume->numSlices() - 1);
             ui.spinForwardSlice->setMaximum(currentVolume->numSlices() - 1);
         });
@@ -303,6 +323,8 @@ void CWindow::CreateWidgets(void)
     fPathListWidget = this->findChild<QTreeWidget*>("treeWidgetPaths");
     connect(fPathListWidget, SIGNAL(itemClicked(QTreeWidgetItem*, int)), this, SLOT(OnPathItemClicked(QTreeWidgetItem*, int)));
     connect(fPathListWidget, &QTreeWidget::itemSelectionChanged, this, &CWindow::OnPathItemSelectionChanged);
+    fPathListWidget->setContextMenuPolicy(Qt::CustomContextMenu);
+    // connect(fPathListWidget, &QTreeWidget::customContextMenuRequested, this, &CWindow::OnPathCustomContextMenu);
 
     // list of annotations
     fAnnotationListWidget = this->findChild<QTreeWidget*>("treeWidgetAnnotations");
@@ -493,19 +515,16 @@ void CWindow::CreateWidgets(void)
 
     connect(
         slicePrev, &QShortcut::activated, fVolumeViewerWidget,
-        &CVolumeViewerWithCurve::OnPrevClicked);
+        &CImageViewer::OnPrevClicked);
     connect(
         sliceNext, &QShortcut::activated, fVolumeViewerWidget,
-        &CVolumeViewerWithCurve::OnNextClicked);
+        &CImageViewer::OnNextClicked);
     connect(
         sliceZoomIn, &QShortcut::activated, fVolumeViewerWidget,
-        &CVolumeViewerWithCurve::OnZoomInClicked);
+        &CImageViewer::OnZoomInClicked);
     connect(
         sliceZoomOut, &QShortcut::activated, fVolumeViewerWidget,
-        &CVolumeViewerWithCurve::OnZoomOutClicked);
-    connect(
-        displayCurves, &QShortcut::activated, fVolumeViewerWidget,
-        &CVolumeViewerWithCurve::toggleShowCurveBox);
+        &CImageViewer::OnZoomOutClicked);
     connect(
         displayCurves_C, &QShortcut::activated, fVolumeViewerWidget,
         &CVolumeViewerWithCurve::toggleShowCurveBox);
@@ -590,9 +609,10 @@ void CWindow::CreateMenus(void)
     fEditMenu->addAction(redoAction);
 
     fViewMenu = new QMenu(tr("&View"), this);
-    fViewMenu->addAction(findChild<QDockWidget*>("dockWidgetVolumes")->toggleViewAction());
-    fViewMenu->addAction(findChild<QDockWidget*>("dockWidgetSegmentation")->toggleViewAction());
-    fViewMenu->addAction(findChild<QDockWidget*>("dockWidgetAnnotations")->toggleViewAction());
+    fViewMenu->addAction(ui.dockWidgetVolumes->toggleViewAction());
+    fViewMenu->addAction(ui.dockWidgetSegmentation->toggleViewAction());
+    fViewMenu->addAction(ui.dockWidgetAnnotations->toggleViewAction());
+    fViewMenu->addAction(dockWidgetVolumeCrossSide->toggleViewAction());
 
     fHelpMenu = new QMenu(tr("&Help"), this);
     fHelpMenu->addAction(fKeybinds);
@@ -670,7 +690,7 @@ void CWindow::CreateBackend()
     connect(
         worker, &VolPkgBackend::segmentationFailed, this,
         &CWindow::onSegmentationFailed);
-    connect(worker, &VolPkgBackend::progressUpdated, [=](size_t p) {
+    connect(worker, &VolPkgBackend::progressUpdated, [=](std::size_t p) {
         progress_ = p;
     });
     worker_thread_.start();
@@ -683,7 +703,7 @@ void CWindow::CreateBackend()
     progressBar_ = new QProgressBar();
     layout->addWidget(progressBar_);
     progressBar_->setMinimum(0);
-    connect(worker, &VolPkgBackend::segmentationStarted, [=](size_t its) {
+    connect(worker, &VolPkgBackend::segmentationStarted, [=](std::size_t its) {
         progressBar_->setMaximum(its);
     });
 
@@ -793,7 +813,7 @@ void CWindow::setWidgetsEnabled(bool state)
     fVolumeViewerWidget->setButtonsEnabled(state);
 }
 
-bool CWindow::InitializeVolumePkg(const std::string& nVpkgPath)
+auto CWindow::InitializeVolumePkg(const std::string& nVpkgPath) -> bool
 {
     fVpkg = nullptr;
 
@@ -822,7 +842,7 @@ void CWindow::setDefaultWindowWidth(vc::Volume::Pointer volume)
     fEdtWindowWidth->setValue(static_cast<int>(winWidth));
 }
 
-CWindow::SaveResponse CWindow::SaveDialog(void)
+auto CWindow::SaveDialog(void) -> CWindow::SaveResponse
 {
     // First check the state of the segmentation tool
     if (fSegTool->isChecked() && SaveDialogSegTool() == SaveResponse::Cancelled) {
@@ -1178,7 +1198,7 @@ bool CWindow::prepareSegmentationOFS(std::string segID, bool forward, bool useAn
     int interpolationDistance = 0;
     int interpolationWindow  = 0;
     bool skipRun = false;
-    volcart::segmentation::ChainSegmentationAlgorithm::Chain reSegStartingChain;
+    vc::segmentation::ChainSegmentationAlgorithm::Chain reSegStartingChain;
 
     std::cout << "OFS: Step Size: " << fSegParams.step_size << std::endl;
 
@@ -1495,7 +1515,7 @@ void CWindow::CleanupSegmentation(void)
 }
 
 // Set up the parameters for doing segmentation
-bool CWindow::SetUpSegParams(void)
+auto CWindow::SetUpSegParams(void) -> bool
 {
     bool aIsOk;
 
@@ -1588,6 +1608,10 @@ void CWindow::SetCurrentCurve(int nCurrentSliceIndex)
         auto& segStruct = seg.second;
         segStruct.SetCurrentCurve(nCurrentSliceIndex);
     }
+
+    // if (dockWidgetLayers->isVisible()) {
+    //     fLayerViewerWidget->showCurveForSlice(nCurrentSliceIndex);;
+    // }
 }
 
 void CWindow::prefetchSlices(void) {
@@ -1614,11 +1638,11 @@ void CWindow::prefetchSlices(void) {
         for (int i = 0; i <= n; i++) {
             // Fetch the slice data on the right side
             if (currentSliceIndex + offset + i * stepSize <= end) {
-                threads.emplace_back(&volcart::Volume::getSliceData, currentVolume, currentSliceIndex + offset + i * stepSize);
+                threads.emplace_back(&vc::Volume::getSliceData, currentVolume, currentSliceIndex + offset + i * stepSize, vc::VolumeAxis::Z);
             }
             // Fetch the slice data on the left side
             if (currentSliceIndex - offset - i * stepSize >= start) {
-                threads.emplace_back(&volcart::Volume::getSliceData, currentVolume, currentSliceIndex - offset - i * stepSize);
+                threads.emplace_back(&vc::Volume::getSliceData, currentVolume, currentSliceIndex - offset - i * stepSize, vc::VolumeAxis::Z);
             }
         }
 
@@ -1677,11 +1701,40 @@ void CWindow::OpenSlice(void)
         aImgQImage = QImage(
             aImgMat.ptr(), aImgMat.cols, aImgMat.rows, aImgMat.step,
             QImage::Format_Grayscale16);
-    } else
+    } else {
         aImgQImage = Mat2QImage(aImgMat);
+    }
 
     fVolumeViewerWidget->SetImage(aImgQImage);
     fVolumeViewerWidget->SetImageIndex(fPathOnSliceIndex);
+}
+
+// Open volume cross side slice
+void CWindow::OpenSliceCrossSide(void)
+{
+    QImage aImgQImage;
+       cv::Mat aImgMat;
+    if (fVpkg != nullptr) {
+        // Stop prefetching
+        prefetchSliceIndex = -1;
+        cv.notify_one();
+
+        aImgMat = currentVolume->getSliceData(fVolumeViewerCrossSide->GetImageIndex(), vc::VolumeAxis::X);
+    } else {
+        aImgMat = cv::Mat::zeros(10, 10, CV_8UC1);
+    }
+
+    if (aImgMat.isContinuous() && aImgMat.type() == CV_16U) {
+        // create QImage directly backed by cv::Mat buffer
+        aImgQImage = QImage(aImgMat.ptr(), aImgMat.cols, aImgMat.rows, aImgMat.step, QImage::Format_Grayscale16);
+    } else {
+        aImgQImage = Mat2QImage(aImgMat);
+    }
+
+    fVolumeViewerCrossSide->SetImage(aImgQImage);
+
+    // fVolumeViewerCrossSide->showCurveForSlice(fPathOnSliceIndex);
+    dockWidgetVolumeCrossSide->show();
 }
 
 // Initialize path list
@@ -1760,16 +1813,16 @@ void CWindow::SetPathPointCloud(void)
     fSegStructMap[fSegmentationId].fMasterCloud.setWidth(aSamplePts.size());
     fSegStructMap[fSegmentationId].fAnnotationCloud.setWidth(aSamplePts.size());
     std::vector<cv::Vec3d> points;
-    std::vector<volcart::Segmentation::Annotation> annotations;
+    std::vector<vc::Segmentation::Annotation> annotations;
     double initialPos = 0;
 
     for (const auto& pt : aSamplePts) {
         points.emplace_back(pt[0], pt[1], fPathOnSliceIndex);
-        annotations.emplace_back(volcart::Segmentation::Annotation((long)fPathOnSliceIndex, (long)(AnnotationBits::ANO_ANCHOR | AnnotationBits::ANO_MANUAL), initialPos, initialPos));
+        annotations.emplace_back(vc::Segmentation::Annotation((long)fPathOnSliceIndex, (long)(AnnotationBits::ANO_ANCHOR | AnnotationBits::ANO_MANUAL), initialPos, initialPos));
     }
 
     /// Evenly space the points on the initial drawn curve
-    volcart::segmentation::FittedCurve evenlyStartingCurve(points, fPathOnSliceIndex);
+    vc::segmentation::FittedCurve evenlyStartingCurve(points, fPathOnSliceIndex);
     auto row = evenlyStartingCurve.evenlySpacePoints();
 
     fSegStructMap[fSegmentationId].fMasterCloud.pushRow(row);
@@ -1956,7 +2009,7 @@ void CWindow::PrintDebugInfo()
     // Add whatever should be printed via std::count via the action in the help menu.
     // Note: The menu entry is only visible with the matching INI entry.
 
-    volcart::debug::PrintPointCloud(fSegStructMap[fHighlightedSegmentationId].fMasterCloud, "Master Cloud", printCoordinates);
+    vc::debug::PrintPointCloud(fSegStructMap[fHighlightedSegmentationId].fMasterCloud, "Master Cloud", printCoordinates);
 
     // Print Annotation Point Cloud
     std::cout << "=== Annotation Point Cloud ===" << std::endl;
@@ -2035,7 +2088,7 @@ void CWindow::OnNewPathClicked(void)
     }
 
     // Make a new segmentation in the volpkg
-    volcart::DiskBasedObjectBaseClass::Identifier newSegmentationId;
+    vc::DiskBasedObjectBaseClass::Identifier newSegmentationId;
     try {
         auto seg = fVpkg->newSegmentation();
         seg->setVolumeID(currentVolume->id());
@@ -2469,7 +2522,7 @@ void CWindow::annotationDoubleClicked(QTreeWidgetItem* item)
 
 // Show go to slice dialog and execute the jump
 void CWindow::ShowGoToSliceDlg() {
-    if (currentVolume == nullptr || !fVolumeViewerWidget->fNextBtn->isEnabled()) {
+    if (currentVolume == nullptr || !fVolumeViewerWidget->CanChangeImage()) {
         return;
     }
 
@@ -2858,7 +2911,7 @@ void CWindow::OnLoadNextSliceShift(int shift)
         shift = currentVolume->numSlices() - fPathOnSliceIndex - 1;
     }
 
-    if (!fVolumeViewerWidget->fNextBtn->isEnabled()) {
+    if (!fVolumeViewerWidget->CanChangeImage()) {
         statusBar->showMessage(
             tr("Changing slices is deactivated in the Pen Tool!"), 10000);
     } else if (shift != 0) {
@@ -2877,7 +2930,7 @@ void CWindow::OnLoadPrevSliceShift(int shift)
         shift = fPathOnSliceIndex;
     }
 
-    if (!fVolumeViewerWidget->fPrevBtn->isEnabled()) {
+    if (!fVolumeViewerWidget->CanChangeImage()) {
         statusBar->showMessage(
             tr("Changing slices is deactivated in the Pen Tool!"), 10000);
     } else if (shift != 0) {
@@ -2888,6 +2941,46 @@ void CWindow::OnLoadPrevSliceShift(int shift)
     } else {
         statusBar->showMessage(
             tr("Already at the beginning of the volume!"), 10000);
+    }
+}
+
+void CWindow::OnLoadAnySliceSide(int slice)
+{
+    if (fVpkg != nullptr) {
+        if (slice >= 0 && slice < fVolumeViewerCrossSide->GetNumImages()) {
+            fVolumeViewerCrossSide->SetImageIndex(slice);
+            OpenSliceCrossSide();
+        }
+    }
+}
+
+void CWindow::OnLoadNextSliceSideShift(int shift)
+{
+    if (fVpkg != nullptr) {
+        auto current = fVolumeViewerCrossSide->GetImageIndex();
+        if (current + shift >= fVolumeViewerCrossSide->GetNumImages()) {
+            shift = fVolumeViewerCrossSide->GetNumImages() - current - 1;
+        }
+
+        if (shift != 0) {
+            fVolumeViewerCrossSide->SetImageIndex(current + shift);
+            OpenSliceCrossSide();
+        }
+    }
+}
+
+void CWindow::OnLoadPrevSliceSideShift(int shift)
+{
+    if (fVpkg != nullptr ) {
+        auto current = fVolumeViewerCrossSide->GetImageIndex();
+        if (current - shift < 0) {
+            shift = current;
+        }
+
+        if (shift != 0) {
+            fVolumeViewerCrossSide->SetImageIndex(current - shift);
+            OpenSliceCrossSide();
+        }
     }
 }
 
@@ -2912,7 +3005,7 @@ void CWindow::OnAnnotationChanged(void)
     UpdateAnnotationList();
 }
 
-bool CWindow::can_change_volume_()
+auto CWindow::can_change_volume_() -> bool
 {
     // return fVpkg != nullptr && fVpkg->numberOfVolumes() > 1 &&
     //        (fSegStructMap[fSegmentationId].fSegmentation == nullptr || !fSegStructMap[fSegmentationId].fSegmentation->hasPointSet() ||
@@ -2920,8 +3013,8 @@ bool CWindow::can_change_volume_()
 
     bool canChange = fVpkg != nullptr && fVpkg->numberOfVolumes() > 1;
     for (auto& seg : fSegStructMap) {
-        auto& segStruct = seg.second;
-        canChange = canChange && (segStruct.fSegmentation == nullptr || !segStruct.fSegmentation->hasPointSet() || !segStruct.fSegmentation->hasVolumeID());
+            auto& segStruct = seg.second;
+            canChange = canChange && (segStruct.fSegmentation == nullptr || !segStruct.fSegmentation->hasPointSet() || !segStruct.fSegmentation->hasVolumeID());
     }
     return canChange;
 }

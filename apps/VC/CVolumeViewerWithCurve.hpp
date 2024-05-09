@@ -40,9 +40,9 @@ public:
     // for editing mode
     void SetIntersectionCurve(CXCurve& nCurve);
     void SetImpactRange(int nImpactRange);
-    void SetScanRange(int nScanRange);
     void SetSliceIndexToolStart(int index) { sliceIndexToolStart = index; }
     void ReturnToSliceIndexToolStart();
+    bool ShouldHighlightImageIndex(const int imageIndex);
 
     void UpdateView();
     void SetShowCurve(bool b) { showCurve = b; }
@@ -52,10 +52,9 @@ public:
 
 protected:
     bool eventFilter(QObject* watched, QEvent* event);
-    void mousePressEvent(QMouseEvent* event);
-    void mouseMoveEvent(QMouseEvent* event);
-    void mouseReleaseEvent(QMouseEvent* event);
-    void paintEvent(QPaintEvent* event);
+    void mousePressEvent(QMouseEvent* event) override;
+    void mouseMoveEvent(QMouseEvent* event) override;
+    void mouseReleaseEvent(QMouseEvent* event) override;
     void UpdateButtons(void);
 
 private slots:
@@ -67,8 +66,8 @@ private:
 
     std::pair<int, std::string> SelectPointOnCurves(const cv::Vec2f& nPt, bool rightClick, bool selectGlobally=false);
 
-    void DrawIntersectionCurve(QGraphicsScene* scene);
-    void DrawControlPoints(QGraphicsScene* scene);
+    void DrawIntersectionCurve();
+    void DrawControlPoints();
 
 signals:
     void SendSignalPathChanged(std::string, PathChangePointVector before, PathChangePointVector after);
@@ -104,19 +103,9 @@ private:
     QPointF fLastPos;  // last mouse position on the image
     int fImpactRange;  // how many points a control point movement can affect
 
-    // pan handling
-    bool wantsPanning{false};
-    bool isPanning{false};
-    bool rightPressed{false};
-    int panStartX, panStartY;
-
     // image drawn
     cv::Mat fImgMat;
     cv::Mat fImgMatCache;
-
-    // Global or class-level storage for ellipse items
-    QList<QGraphicsEllipseItem*> ellipseItems;
-    QList<QGraphicsEllipseItem*> controlPointItems;
 };  // class CVolumeViewerWithCurve
 
 }  // namespace ChaoVis

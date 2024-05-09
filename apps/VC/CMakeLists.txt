@@ -8,6 +8,7 @@ set(srcs
     CWindow.cpp
     CXCurve.cpp
     UDataManipulateUtils.cpp
+    CImageViewer.cpp
     CVolumeViewer.cpp
     CVolumeViewerWithCurve.cpp
     CBSpline.cpp

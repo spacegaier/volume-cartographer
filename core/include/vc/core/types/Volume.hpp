@@ -133,10 +133,10 @@ public:
      * the slice returned by getSliceData() will modify the cached slice as
      * well. Use getSliceDataCopy() if the slice is to be modified.
      */
-    cv::Mat getSliceData(int index) const;
+    cv::Mat getSliceData(int index, VolumeAxis axis = Z) const;
 
     /** @copydoc getSliceData(int) const */
-    cv::Mat getSliceDataCopy(int index) const;
+    cv::Mat getSliceDataCopy(int index, VolumeAxis axis = Z) const;
 
     /** @brief Get slice by index and cut out a rect to return */
     cv::Mat getSliceDataRect(int index, cv::Rect rect) const;

@@ -39,6 +39,7 @@ namespace ChaoVis
 {
 
 class CVolumeViewerWithCurve;
+class CImageViewer;
 
 class AnnotationTreeWidgetItem : public QTreeWidgetItem {
   public:
@@ -147,6 +148,7 @@ private:
     void prefetchSlices(void);
     void startPrefetching(int index);
     void OpenSlice(void);
+    void OpenSliceCrossSide(void);
 
     void InitPathList(void);
     void UpdateAnnotationList(void);
@@ -214,6 +216,9 @@ private slots:
     void OnLoadAnySlice(int slice);
     void OnLoadNextSliceShift(int shift);
     void OnLoadPrevSliceShift(int shift);
+    void OnLoadAnySliceSide(int slice);
+    void OnLoadPrevSliceSideShift(int shift);
+    void OnLoadNextSliceSideShift(int shift);
 
     void OnPathChanged(std::string segID, PathChangePointVector before, PathChangePointVector after);
     void OnAnnotationChanged(void);
@@ -277,6 +282,7 @@ private:
     QAction* fPrintDebugInfo;
 
     CVolumeViewerWithCurve* fVolumeViewerWidget;
+    CImageViewer* fVolumeViewerCrossSide;
     QCheckBox* fchkDisplayAll;
     QCheckBox* fchkComputeAll;
     QTreeWidget* fPathListWidget;
@@ -285,6 +291,7 @@ private:
     QPushButton* fSegTool;
     QComboBox* volSelect;
     QPushButton* assignVol;
+    QDockWidget* dockWidgetVolumeCrossSide;
 
     QSpinBox* fEdtWindowWidth;
     QLineEdit* fEdtDistanceWeight;

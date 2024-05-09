@@ -35,14 +35,18 @@ Volume::Volume(fs::path path) : DiskBasedObjectBaseClass(std::move(path)), zarrF
     } catch (std::runtime_error) {
     }
 
-    width_ = metadata_.get<int>("width");
-    height_ = metadata_.get<int>("height");
-    slices_ = metadata_.get<int>("slices");
-    numSliceCharacters_ = std::to_string(slices_).size();
+    // We can only directly set those values for TIFF. For ZARR
+    // we only know once a detail level has been selected and its metadata read.
+    if (format_ == TIFF) {
+        width_ = metadata_.get<int>("width");
+        height_ = metadata_.get<int>("height");
+        slices_ = metadata_.get<int>("slices");
+        numSliceCharacters_ = std::to_string(slices_).size();
+    
+        std::vector<std::mutex> init_mutexes(slices_);
 
-    std::vector<std::mutex> init_mutexes(slices_);
-
-    slice_mutexes_.swap(init_mutexes);
+        slice_mutexes_.swap(init_mutexes);
+    }
 }
 
 // Setup a Volume from a folder of slices
@@ -139,18 +143,19 @@ fs::path Volume::getSlicePath(int index) const
     return path_ / ss.str();
 }
 
-cv::Mat Volume::getSliceData(int index) const
+cv::Mat Volume::getSliceData(int index, VolumeAxis axis) const
 {
-    if (cacheSlices_) {
-        return cache_slice_(index);
+    // We only cache the main Z axis for now
+    if (cacheSlices_ && axis == Z) {
+        return cache_slice_(index, axis);
     } else {
-        return load_slice_(index);
+        return load_slice_(index, axis);
     }
 }
 
-cv::Mat Volume::getSliceDataCopy(int index) const
+cv::Mat Volume::getSliceDataCopy(int index, VolumeAxis axis) const
 {
-    return getSliceData(index).clone();
+    return getSliceData(index, axis).clone();
 }
 
 cv::Mat Volume::getSliceDataRect(int index, cv::Rect rect) const
@@ -300,23 +305,24 @@ cv::Mat Volume::load_slice_(int index, VolumeAxis axis) const
                 return cv::Mat(view.shape()[0], view.shape()[1], CV_16U, view.data() + view.data_offset(), 0);
             } else if (axis == X) {
                 // Start in the middle
-                z5::types::ShapeType offset = {0, zarrDs_->shape()[1] / 2, 0};
+                // z5::types::ShapeType offset = {0, zarrDs_->shape()[1] / 2, 0};
+                z5::types::ShapeType offset = {0, (std::size_t)index, 0};
                 auto shape = zarrDs_->shape();
-                // Load 30 X wide
-                shape.at(1) = 30;
+                shape.at(1) = 1;
                 data = new xt::xarray<uint16_t>(shape);
                 int threads = static_cast<int>(std::thread::hardware_concurrency());
                 z5::multiarray::readSubarray<uint16_t>(*zarrDs_, *data, offset.begin(), threads);
                 // std::cout << "Length: " << data->size() << std::endl;
                 // std::cout << "Dimmension: " << data->dimension() << std::endl;
                 // std::cout << "Shape Original: " << data->shape()[0] << ", " << data->shape()[1] << ", " << data->shape()[2] << std::endl;
-                *data = xt::view(xt::swapaxes(*data, 0, 1), index);
+                *data = xt::view(xt::swapaxes(*data, 0, 1), 1);
                 return cv::Mat(data->shape()[0], data->shape()[2], CV_16U, data->data(), 0);
             }
-        } else {
-            // No valid data set => return empty
-            return cv::Mat();
         }
+            
+        // No valid data set or axis => return empty
+        return cv::Mat();
+        
     } else {
         return cv::Mat();
     }
@@ -373,7 +379,15 @@ void Volume::openZarr()
         {
             z5::filesystem::handle::Dataset hndl(
                 fs::path(path_ / std::to_string(zarrLevel_)), z5::FileMode::FileMode::r);
-            zarrDs_ = z5::filesystem::openDataset(hndl);  
+            zarrDs_ = z5::filesystem::openDataset(hndl);
+
+            width_ = zarrDs_->shape()[1];
+            height_ = zarrDs_->shape()[2];
+            slices_ = zarrDs_->shape()[0];
+
+            std::vector<std::mutex> init_mutexes(slices_);
+
+            slice_mutexes_.swap(init_mutexes);
         }
     }
 }
