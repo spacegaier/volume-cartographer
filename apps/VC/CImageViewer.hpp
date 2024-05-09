@@ -135,7 +135,7 @@ protected:
     bool rightPressed{false};
     int panStartX, panStartY;
 
-    QGraphicsPixmapItem* fBaseImageItem{nullptr};
+    QGraphicsPixmapItem* fBaseImageItem;
 };  // class CImageViewer
 
 }  // namespace ChaoVis

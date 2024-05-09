@@ -151,8 +151,8 @@ CWindow::CWindow()
         "QRadioButton:disabled { color: gray; }";
     setStyleSheet(style);
 
-    OpenSlice();
-    UpdateView();
+    // OpenSlice();
+    // UpdateView();
 
     // Restore geometry / sizes
     const QSettings geometry;

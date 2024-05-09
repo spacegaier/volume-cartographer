@@ -140,8 +140,6 @@ CImageViewer::CImageViewer(QWidget* parent)
     fImageIndexEdit->setMinimumWidth(100);
     connect(fImageIndexEdit, &QSpinBox::editingFinished, this, &CImageViewer::OnImageIndexEditTextChanged);
 
-    fBaseImageItem = nullptr;
-
     // Create graphics view
     fGraphicsView = new CImageViewerView(this);
     fGraphicsView->setRenderHint(QPainter::Antialiasing);
@@ -473,7 +471,12 @@ auto CImageViewer::GetScrollPosition() const -> cv::Vec2f
 
 void CImageViewer::ResetView()
 {
-    fScene->clear();
+    // Remove all existing items
+    QList<QGraphicsItem*> allItems = fScene->items();
+    for (QGraphicsItem* item : allItems) {
+        fScene->removeItem(item);
+        delete item;
+    }
 }
 
 // Handle mouse press event

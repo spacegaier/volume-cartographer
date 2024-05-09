@@ -625,9 +625,11 @@ void CVolumeViewerWithCurve::DrawCrossSectionMarkers()
 
     if (!crossSectionMarkerRectSide) {
         auto color = QColor(CROSS_SECTION_COLOR_SIDE);
+        color.setAlpha(128);
         crossSectionMarkerRectSide = fScene->addRect(crossSectionIndexSide - (width / 2), 0, width, fImgQImage->size().height(), QPen(color), QBrush(color));
         crossSectionMarkerRectSide->setZValue(999);
         color = QColor(CROSS_SECTION_COLOR_FRONT);
+        color.setAlpha(128);
         crossSectionMarkerRectFront = fScene->addRect(0, crossSectionIndexFront - (width / 2), fImgQImage->size().width(), width, QPen(color), QBrush(color));
         crossSectionMarkerRectFront->setZValue(999);
     } else {

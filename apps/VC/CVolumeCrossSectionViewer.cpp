@@ -190,17 +190,21 @@ void CVolumeCrossSectionViewer::drawCrossSectionMarkers()
     if (!crossSideViewTopMarker) {
         // Side view
         auto color = QColor(CROSS_SECTION_COLOR_TOP);
+        color.setAlpha(128);
         crossSideViewTopMarker = volumeViewerCrossSide->GetScene()->addRect(topMarkerRectForSide, QPen(color), QBrush(color));
         crossSideViewTopMarker->setZValue(999);
         color = QColor(CROSS_SECTION_COLOR_FRONT);
+        color.setAlpha(128);
         crossSideViewFrontMarker = volumeViewerCrossSide->GetScene()->addRect(frontMarkerRect, QPen(color), QBrush(color));
         crossSideViewFrontMarker->setZValue(999);
 
         // Front view
         color = QColor(CROSS_SECTION_COLOR_TOP);
+        color.setAlpha(128);
         crossFrontViewTopMarker = volumeViewerCrossFront->GetScene()->addRect(topMarkerRectForFront, QPen(color), QBrush(color));
         crossFrontViewTopMarker->setZValue(999);
         color = QColor(CROSS_SECTION_COLOR_SIDE);
+        color.setAlpha(128);
         crossFrontViewSideMarker = volumeViewerCrossFront->GetScene()->addRect(sideMarkerRect, QPen(color), QBrush(color));
         crossFrontViewSideMarker->setZValue(999);
     } else {
