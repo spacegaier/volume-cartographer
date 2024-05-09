@@ -2,6 +2,8 @@
 // Chao Du 2015 April
 #include "CVolumeViewerWithCurve.hpp"
 
+#include <cstddef>
+
 #include <opencv2/imgproc.hpp>
 
 #include "ColorFrame.hpp"
@@ -601,19 +603,25 @@ void CVolumeViewerWithCurve::DrawIntersectionCurve() {
             // Create new ellipse points
             auto p0 = segStruct.fIntersectionCurve.GetPoint(i)[0] - 0.5;
             auto p1 = segStruct.fIntersectionCurve.GetPoint(i)[1] - 0.5;
-            auto manualPoint = (hasAnnotations && (std::get<long>(segStruct.fAnnotationCloud[pointIndex + i][ANO_EL_FLAGS]) & AnnotationBits::ANO_MANUAL))
-                || (segStruct.fPathOnSliceIndex == sliceIndexToolStart && segStruct.fBufferedChangedPoints.find(i) != segStruct.fBufferedChangedPoints.end());
 
+            // We only want to highlight manually moved points if they are on the highlighted curve
+            bool manualPoint = false;
+            if (segStruct.highlighted) {
+                manualPoint = (hasAnnotations && (std::get<long>(segStruct.fAnnotationCloud[pointIndex + i][ANO_EL_FLAGS]) & AnnotationBits::ANO_MANUAL))
+                || (segStruct.fPathOnSliceIndex == sliceIndexToolStart && segStruct.fBufferedChangedPoints.find(i) != segStruct.fBufferedChangedPoints.end());
+            }
+
+            // Determine pen and brush colors
             auto penColor = manualPoint ? colorSelectorManual->color() : QColor(r, g, b);
             auto brushColor = QColor(r, g, b);
+            // Slightly mark every 10th point
             if (i % 20 == 0) {
                 brushColor = gray;
             } else if (i % 10 == 0) {
                 brushColor = brushColor.darker(150);
             }
 
-            QGraphicsEllipseItem* newEllipse = fScene->addEllipse(p0, p1, 2, 2, QPen(penColor), QBrush(brushColor));
-            newEllipse->setVisible(true);
+            fScene->addEllipse(p0, p1, 2, 2, QPen(penColor), QBrush(brushColor));
         }
     }
 }
@@ -629,7 +637,7 @@ void CVolumeViewerWithCurve::DrawControlPoints() {
         // Create new ellipse points
         auto p0 = fControlPoints[i][0] - 0.5;
         auto p1 = fControlPoints[i][1] - 0.5;
-        QGraphicsEllipseItem* newEllipse = fScene->addEllipse(p0, p1, 2, 2, QPen(QColor(r, g, b)), QBrush(QColor(r, g, b)));
+        fScene->addEllipse(p0, p1, 2, 2, QPen(QColor(r, g, b)), QBrush(QColor(r, g, b)));
     }
 }
 

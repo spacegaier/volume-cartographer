@@ -679,7 +679,7 @@ void CWindow::CreateBackend()
     connect(
         worker, &VolPkgBackend::segmentationFailed, this,
         &CWindow::onSegmentationFailed);
-    connect(worker, &VolPkgBackend::progressUpdated, [=](size_t p) {
+    connect(worker, &VolPkgBackend::progressUpdated, [=](std::size_t p) {
         progress_ = p;
     });
     worker_thread_.start();
@@ -692,7 +692,7 @@ void CWindow::CreateBackend()
     progressBar_ = new QProgressBar();
     layout->addWidget(progressBar_);
     progressBar_->setMinimum(0);
-    connect(worker, &VolPkgBackend::segmentationStarted, [=](size_t its) {
+    connect(worker, &VolPkgBackend::segmentationStarted, [=](std::size_t its) {
         progressBar_->setMaximum(its);
     });
 
@@ -802,7 +802,7 @@ void CWindow::setWidgetsEnabled(bool state)
     fVolumeViewerWidget->setButtonsEnabled(state);
 }
 
-bool CWindow::InitializeVolumePkg(const std::string& nVpkgPath)
+auto CWindow::InitializeVolumePkg(const std::string& nVpkgPath) -> bool
 {
     fVpkg = nullptr;
 
@@ -831,7 +831,7 @@ void CWindow::setDefaultWindowWidth(vc::Volume::Pointer volume)
     fEdtWindowWidth->setValue(static_cast<int>(winWidth));
 }
 
-CWindow::SaveResponse CWindow::SaveDialog(void)
+auto CWindow::SaveDialog(void) -> CWindow::SaveResponse
 {
     // First check the state of the segmentation tool
     if (fSegTool->isChecked() && SaveDialogSegTool() == SaveResponse::Cancelled) {
@@ -1508,7 +1508,7 @@ void CWindow::CleanupSegmentation(void)
 }
 
 // Set up the parameters for doing segmentation
-bool CWindow::SetUpSegParams(void)
+auto CWindow::SetUpSegParams(void) -> bool
 {
     bool aIsOk;
 
@@ -1662,15 +1662,14 @@ void CWindow::startPrefetching(int index) {
 // Open slice
 void CWindow::OpenSlice(void)
 {
+    QImage aImgQImage;
     cv::Mat aImgMat;
     if (fVpkg != nullptr) {
         // Stop prefetching
         prefetchSliceIndex = -1;
         cv.notify_one();
 
-        aImgMat = currentVolume->getSliceDataCopy(fPathOnSliceIndex);
-        aImgMat.convertTo(aImgMat, CV_8UC1, 1.0 / 256.0);
-        //        cvtColor(aImgMat, aImgMat, cv::COLOR_GRAY2BGR);
+        aImgMat = currentVolume->getSliceData(fPathOnSliceIndex);
     } else {
         aImgMat = cv::Mat::zeros(10, 10, CV_8UC1);
     }
@@ -1690,7 +1689,14 @@ void CWindow::OpenSlice(void)
             params.thickness, params.baseline);
     }
 
-    auto aImgQImage = Mat2QImage(aImgMat);
+    if (aImgMat.isContinuous() && aImgMat.type() == CV_16U) {
+        // create QImage directly backed by cv::Mat buffer
+        aImgQImage = QImage(
+            aImgMat.ptr(), aImgMat.cols, aImgMat.rows, aImgMat.step,
+            QImage::Format_Grayscale16);
+    } else
+        aImgQImage = Mat2QImage(aImgMat);
+
     fVolumeViewerWidget->SetImage(aImgQImage);
     fVolumeViewerWidget->SetImageIndex(fPathOnSliceIndex);
 }
@@ -2984,7 +2990,7 @@ void CWindow::OnAnnotationChanged(void)
     UpdateAnnotationList();
 }
 
-bool CWindow::can_change_volume_()
+auto CWindow::can_change_volume_() -> bool
 {
     // return fVpkg != nullptr && fVpkg->numberOfVolumes() > 1 &&
     //        (fSegStructMap[fSegmentationId].fSegmentation == nullptr || !fSegStructMap[fSegmentationId].fSegmentation->hasPointSet() ||
