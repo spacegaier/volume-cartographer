@@ -1,8 +1,7 @@
 name: Build Docker image
 on:
   push:
-    branches: ["develop"]
-    tags: ["v*"]
+    branches: ["develop", "latest"]
   workflow_dispatch:
 
 concurrency: docker
