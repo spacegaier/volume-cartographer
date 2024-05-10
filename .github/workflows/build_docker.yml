@@ -22,6 +22,8 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=edge,enable={{is_default_branch}}
+            # set latest tag for branch named "latest"
+            type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', 'latest') }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
