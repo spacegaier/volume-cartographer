@@ -103,7 +103,17 @@ void PLYReader::read_points_()
     for (int i = 0; i < numVertices_; i++) {
         SimpleMesh::Vertex curPoint;
         auto curLine = split(line_, ' ');
+        
         curPoint.x = std::stod(curLine[properties_["x"]]);
+         std::setprecision(5);
+        std::cout << curLine[properties_["x"]] << std::endl;
+         std::setprecision(5);
+        std::cout << std::cout.precision(6) << std::stod(curLine[properties_["x"]]) << std::endl;
+        std::setprecision(5);
+        double result = std::stod("4.56");
+        float result2 = std::stof("4.56");
+        std::cout << std::setprecision(5) << result << " - " << result2 << std::endl;
+
         curPoint.y = std::stod(curLine[properties_["y"]]);
         curPoint.z = std::stod(curLine[properties_["z"]]);
         if (properties_.find("nx") != properties_.end()) {
@@ -112,9 +122,9 @@ void PLYReader::read_points_()
             curPoint.nz = std::stod(curLine[properties_["nz"]]);
         }
         if (properties_.find("r") != properties_.end()) {
-            curPoint.r = stoi(curLine[properties_["r"]]);
-            curPoint.g = stoi(curLine[properties_["g"]]);
-            curPoint.b = stoi(curLine[properties_["b"]]);
+            curPoint.r = std::stoi(curLine[properties_["r"]]);
+            curPoint.g = std::stoi(curLine[properties_["g"]]);
+            curPoint.b = std::stoi(curLine[properties_["b"]]);
         }
         pointList_.push_back(curPoint);
         std::getline(plyFile_, line_);

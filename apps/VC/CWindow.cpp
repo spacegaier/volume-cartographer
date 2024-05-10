@@ -19,9 +19,11 @@
 #include "vc/meshing/OrderedPointSetMesher.hpp"
 #include "vc/segmentation/LocalResliceParticleSim.hpp"
 #include "vc/segmentation/OpticalFlowSegmentation.hpp"
+#include "vc/core/io/PLYReader.hpp"
 
 namespace vc = volcart;
 namespace vcs = volcart::segmentation;
+namespace fs = std::filesystem;
 using namespace ChaoVis;
 using qga = QGuiApplication;
 
@@ -574,6 +576,8 @@ void CWindow::CreateMenus(void)
     fFileMenu->addSeparator();
     fFileMenu->addAction(fSavePointCloudAct);
     fFileMenu->addSeparator();
+    fFileMenu->addAction(fAddOverlay);
+    fFileMenu->addSeparator();
     fFileMenu->addAction(fSettingsAct);
     fFileMenu->addSeparator();
     fFileMenu->addAction(fExitAct);
@@ -623,6 +627,9 @@ void CWindow::CreateActions(void)
     connect(
         fSavePointCloudAct, SIGNAL(triggered()), this, SLOT(SavePointCloud()));
     fSavePointCloudAct->setShortcut(QKeySequence::Save);
+
+    fAddOverlay = new QAction(style()->standardIcon(QStyle::SP_DialogOpenButton), tr("Add overlay..."), this);
+    connect(fAddOverlay, SIGNAL(triggered()), this, SLOT(AddOverlay()));
 
     fSettingsAct = new QAction(tr("Settings"), this);
     connect(fSettingsAct, SIGNAL(triggered()), this, SLOT(ShowSettings()));
@@ -1879,6 +1886,34 @@ void CWindow::OpenRecent()
     auto action = qobject_cast<QAction*>(sender());
     if (action)
         Open(action->data().toString());
+}
+
+void CWindow::AddOverlay(void)
+{
+    QSettings settings("VC.ini", QSettings::IniFormat);
+
+    auto overlayFileURL = QFileDialog::getOpenFileUrl(
+        this, tr("Open overlay file"),
+        settings.value("volpkg/default_path").toString(), "*.ply", nullptr,
+        QFileDialog::DontUseNativeDialog);
+    // Dialog box cancelled
+    if (overlayFileURL.isEmpty()) {
+        vc::Logger()->info("Adding overlay canceled");
+        return;
+    }
+
+    volcart::io::PLYReader reader(fs::path(overlayFileURL.path().toStdString()));
+    reader.read();
+    auto mesh = reader.getMesh();
+    auto numPoints = mesh->GetNumberOfPoints();
+
+    std::map<int, std::vector<cv::Vec2d>> ply;
+    for (std::uint64_t pnt_id = 0; pnt_id < mesh->GetNumberOfPoints(); pnt_id++) {
+        auto point = mesh->GetPoint(pnt_id);
+        double test = point[0];
+        ply[point[2]].push_back({point[0], point[1]});
+    }
+    fVolumeViewerWidget->setPLY(ply);
 }
 
 // Pop up about dialog

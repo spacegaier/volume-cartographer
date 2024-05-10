@@ -179,6 +179,8 @@ private slots:
     void SavePointCloud();
     void ShowSettings();
     void PrintDebugInfo();
+    
+    void AddOverlay();
 
     void OnNewPathClicked(void);
     void OnRemovePathClicked(void);
@@ -273,6 +275,7 @@ private:
     QAction* fOpenVolAct;
     QAction* fOpenRecentVolpkg[MAX_RECENT_VOLPKG]{};
     QAction* fSavePointCloudAct;
+    QAction* fAddOverlay;
     QAction* fSettingsAct;
     QAction* fExitAct;
     QAction* fKeybinds;

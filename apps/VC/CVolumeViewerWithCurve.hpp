@@ -50,6 +50,8 @@ public:
 
     void setButtonsEnabled(bool state);
 
+    void setPLY(std::map<int, std::vector<cv::Vec2d>> ply) { fPLY = ply; }
+
 protected:
     bool eventFilter(QObject* watched, QEvent* event);
     void mousePressEvent(QMouseEvent* event);
@@ -69,6 +71,7 @@ private:
 
     void DrawIntersectionCurve(QGraphicsScene* scene);
     void DrawControlPoints(QGraphicsScene* scene);
+    void DrawPLY();
 
 signals:
     void SendSignalPathChanged(std::string, PathChangePointVector before, PathChangePointVector after);
@@ -91,6 +94,8 @@ private:
     std::unordered_map<std::string, SegmentationStruct>& fSegStructMapRef;
     CBSpline* fSplineCurveRef;
     std::vector<cv::Vec2f> fControlPoints;
+
+    std::map<int, std::vector<cv::Vec2d>> fPLY;
 
     // for editing
     CXCurve* fIntersectionCurveRef;
