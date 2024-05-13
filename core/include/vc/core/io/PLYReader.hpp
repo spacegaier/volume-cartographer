@@ -47,6 +47,15 @@ public:
     auto read() -> ITKMesh::Pointer;
     /**@}*/
 
+    /**
+     * @brief Format of the PLY file
+    */
+    enum Format {
+        ASCII = 1,
+        BINARY_LITTLE_ENDIAN,
+        BINARY_BIG_ENDIAN
+    };
+
 private:
     /** Input file path */
     filesystem::path inputPath_;
@@ -56,6 +65,8 @@ private:
     ITKMesh::Pointer outMesh_;
     /** Line currently being parsed */
     std::string line_;
+    /** Format */
+    Format format_;
     /** Temporary face list */
     std::vector<SimpleMesh::Cell> faceList_;
     /** Temporary vertex list */

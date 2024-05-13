@@ -682,13 +682,35 @@ void CVolumeViewerWithCurve::DrawControlPoints(QGraphicsScene* scene)
 
 void CVolumeViewerWithCurve::DrawPLY()
 {
+    for (int i = 0; i < fPLY[fImageIndex-2].size(); ++i) {
+        // Create new ellipse points
+        auto p0 = fPLY[fImageIndex-2][i][0] - 2;
+        auto p1 = fPLY[fImageIndex-2][i][1] - 2;
+        fScene->addEllipse(p0, p1, 4, 4, QPen(QColor(110, 80, 255)), QBrush(QColor(110, 80, 25)));
+    }
+    for (int i = 0; i < fPLY[fImageIndex-1].size(); ++i) {
+        // Create new ellipse points
+        auto p0 = fPLY[fImageIndex-1][i][0] - 2;
+        auto p1 = fPLY[fImageIndex-1][i][1] - 2;
+        fScene->addEllipse(p0, p1, 4, 4, QPen(QColor(80, 50, 255)), QBrush(QColor(80, 50, 25)));
+    }
     for (int i = 0; i < fPLY[fImageIndex].size(); ++i) {
         // Create new ellipse points
-        auto p0 = fPLY[fImageIndex][i][0] - 0.5;
-        auto p1 = fPLY[fImageIndex][i][1] - 0.5;
-        fScene->addEllipse(
-            p0, p1, 2, 2, QPen(QColor(100, 255, 0)),
-            QBrush(QColor(100, 255, 0)));
+        auto p0 = fPLY[fImageIndex][i][0] - 2;
+        auto p1 = fPLY[fImageIndex][i][1] - 2;
+        fScene->addEllipse(p0, p1, 4, 4, QPen(QColor(100, 255, 0)), QBrush(QColor(100, 255, 0)));
+    }
+    for (int i = 0; i < fPLY[fImageIndex+1].size(); ++i) {
+        // Create new ellipse points
+        auto p0 = fPLY[fImageIndex+1][i][0] - 2;
+        auto p1 = fPLY[fImageIndex+1][i][1] - 2;
+        fScene->addEllipse(p0, p1, 4, 4, QPen(QColor(240, 80, 0)), QBrush(QColor(240, 80, 0)));
+    }
+        for (int i = 0; i < fPLY[fImageIndex+2].size(); ++i) {
+        // Create new ellipse points
+        auto p0 = fPLY[fImageIndex+2][i][0] - 2;
+        auto p1 = fPLY[fImageIndex+2][i][1] - 2;
+        fScene->addEllipse(p0, p1, 4, 4, QPen(QColor(240, 110, 40)), QBrush(QColor(240, 110, 40)));
     }
 }
 

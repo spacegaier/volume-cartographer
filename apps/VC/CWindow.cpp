@@ -1914,6 +1914,7 @@ void CWindow::AddOverlay(void)
         ply[point[2]].push_back({point[0], point[1]});
     }
     fVolumeViewerWidget->setPLY(ply);
+    fVolumeViewerWidget->UpdateView();
 }
 
 // Pop up about dialog

@@ -12,6 +12,8 @@ namespace fs = volcart::filesystem;
 
 auto PLYReader::read() -> ITKMesh::Pointer
 {
+    std::setlocale(LC_ALL, "C");
+
     if (inputPath_.empty() || !fs::exists(inputPath_)) {
         auto msg = "File not provided or does not exist.";
         throw volcart::IOException(msg);
@@ -59,9 +61,20 @@ void PLYReader::parse_header_()
 {
     std::getline(plyFile_, line_);
     while (line_ != "end_header") {
-        if (line_.find("element") != std::string::npos) {
+        if (line_.find("format") != std::string::npos) {
+            auto splitLine = split(line_, ' ');
+            if (splitLine[1] == "ascii") {
+                format_ = ASCII;
+            } else if (splitLine[1] == "binary_little_endian") {
+                format_ = BINARY_LITTLE_ENDIAN;
+            } else if (splitLine[1] == "binary_big_endian") {
+                format_ = BINARY_BIG_ENDIAN;
+            }
+            std::getline(plyFile_, line_);
+        } else if (line_.find("element") != std::string::npos) {
             auto splitLine = split(line_, ' ');
             elementsList_.push_back(splitLine[1]);
+
             if (splitLine[1] == "vertex") {
                 numVertices_ = std::stoi(splitLine[2]);
             } else if (splitLine[1] == "face") {
@@ -102,29 +115,38 @@ void PLYReader::read_points_()
 {
     for (int i = 0; i < numVertices_; i++) {
         SimpleMesh::Vertex curPoint;
-        auto curLine = split(line_, ' ');
         
-        curPoint.x = std::stod(curLine[properties_["x"]]);
-         std::setprecision(5);
-        std::cout << curLine[properties_["x"]] << std::endl;
-         std::setprecision(5);
-        std::cout << std::cout.precision(6) << std::stod(curLine[properties_["x"]]) << std::endl;
-        std::setprecision(5);
-        double result = std::stod("4.56");
-        float result2 = std::stof("4.56");
-        std::cout << std::setprecision(5) << result << " - " << result2 << std::endl;
+        if (format_ == ASCII) {
+            auto curLine = split(line_, ' ');
+            curPoint.x = std::stod(curLine[properties_["x"]]);
+            curPoint.y = std::stod(curLine[properties_["y"]]);
+            curPoint.z = std::stod(curLine[properties_["z"]]);
+            if (properties_.find("nx") != properties_.end()) {
+                curPoint.nx = std::stod(curLine[properties_["nx"]]);
+                curPoint.ny = std::stod(curLine[properties_["ny"]]);
+                curPoint.nz = std::stod(curLine[properties_["nz"]]);
+            }
+            if (properties_.find("r") != properties_.end()) {
+                curPoint.r = std::stoi(curLine[properties_["r"]]);
+                curPoint.g = std::stoi(curLine[properties_["g"]]);
+                curPoint.b = std::stoi(curLine[properties_["b"]]);
+            }
+        } else {
+            unsigned char buffer[51];
+            memcpy(buffer, line_.data(), 51);
+            curPoint.x = buffer[8];
 
-        curPoint.y = std::stod(curLine[properties_["y"]]);
-        curPoint.z = std::stod(curLine[properties_["z"]]);
-        if (properties_.find("nx") != properties_.end()) {
-            curPoint.nx = std::stod(curLine[properties_["nx"]]);
-            curPoint.ny = std::stod(curLine[properties_["ny"]]);
-            curPoint.nz = std::stod(curLine[properties_["nz"]]);
-        }
-        if (properties_.find("r") != properties_.end()) {
-            curPoint.r = std::stoi(curLine[properties_["r"]]);
-            curPoint.g = std::stoi(curLine[properties_["g"]]);
-            curPoint.b = std::stoi(curLine[properties_["b"]]);
+            short x = 0x1234;
+            switch (*(char*)&x) {
+                case 0x12:                                       // Big-Endian
+                    curPoint.y = (buffer[1] << 32) | buffer[2];  // Simulate t = (short)*(a+1) on BE
+                    break;
+                case 0x34:                                       // Little-Endian
+                    curPoint.y = (buffer[2] << 32) | buffer[1];  // Simulate t = (short)*(a+1) on LE
+                    break;
+            }
+
+            curPoint.z = buffer[8];
         }
         pointList_.push_back(curPoint);
         std::getline(plyFile_, line_);
