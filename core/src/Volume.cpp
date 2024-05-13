@@ -150,7 +150,7 @@ auto Volume::getSliceData(int index, VolumeAxis axis) const -> cv::Mat
 {
     // We only cache the main Z axis for now
     if (cacheSlices_ && axis == Z) {
-        return cache_slice_(index, axis);
+        return cache_slice_(index);
     }
     return load_slice_(index, axis);
 }
@@ -264,17 +264,13 @@ auto Volume::load_slice_(int index, VolumeAxis axis) const -> cv::Mat
         return cv::imread(slicePath.string(), -1);
     } else if (format_ == ZARR) {
         if (zarrDs_) {
-            z5::types::ShapeType chunkIndex = {0, 0, 0};            
+
+            xt::xtensor<std::uint16_t, 3>* data = nullptr;
 
             if (axis == Z) {
-                xt::xtensor<std::uint16_t, 3>* data = nullptr;
-
-                z5::types::ShapeType chunkShape;
-                zarrDs_->getChunkShape(chunkIndex, chunkShape);
-
                 if (index == 0) {
                     // Initially load only 1 slice to quickly show something to the user
-                    z5::types::ShapeType offset = {0, 0, 0};                    
+                    z5::types::ShapeType offset = {0, 0, 0};
                     auto shape = zarrDs_->shape();
                     shape.front() = 1;
                     xt::xtensor<std::uint16_t, 3>::shape_type tensorShape;
@@ -282,87 +278,108 @@ auto Volume::load_slice_(int index, VolumeAxis axis) const -> cv::Mat
                     data = new xt::xtensor<std::uint16_t, 3>(tensorShape);
                     int threads = static_cast<int>(std::thread::hardware_concurrency());
                     z5::multiarray::readSubarray<std::uint16_t>(*zarrDs_, *data, offset.begin(), threads);
+                    // std::cout << "Length: " << data->size() << std::endl;
+                    // std::cout << "Dimmension: " << data->dimension() << std::endl;
+                    // std::cout << "Shape Original: " << data->shape()[0] << ", " << data->shape()[1] << ", " << data->shape()[2] << std::endl;
+                    return cv::Mat(data->shape()[1], data->shape()[2], CV_16U, data->data(), 0);
                 } else {
-                    // Determine required Z chunk value
-                    unsigned int zNum = index / chunkShape[0];
 
-                    auto it = loadedChunks_.find(zNum);
-                    if (it == loadedChunks_.end()) {
+                    z5::types::ShapeType chunkShape;
+                    z5::types::ShapeType chunkIndex = {0, 0, 0};
+                    zarrDs_->getChunkShape(chunkIndex, chunkShape);
+                    // Determine required chunk number
+                    unsigned int chunkNum = index / chunkShape[(int)axis];
+                    unsigned int offset = chunkNum * chunkShape[(int)axis];
+
+                    std::cout << "Chunk Num: " << chunkNum << std::endl;
+
+                    xt::xtensor<std::uint16_t, 3>* data = nullptr;
+                    auto offsetShape = (axis == Z) ? z5::types::ShapeType({offset, 0, 0}) : (axis == X) ? z5::types::ShapeType({0, offset, 0}) : z5::types::ShapeType({0, 0, offset});
+                    std::cout << "Offset Shape: " << offsetShape[0] << ", " << offsetShape[1] << ", " << offsetShape[2] << std::endl;
+
+                    auto it = loadedChunks_[axis].find(chunkNum);
+                    if (it == loadedChunks_[axis].end()) {
                         // auto chunkSize = res->getChunkSize(chunkIndex);
                         // std::uint16_t chunkData[chunkSize];
                         // res->readChunk(chunkIndex, chunkData);
 
-                        z5::types::ShapeType offset = {zNum * chunkShape[0], 0, 0};
+                        // Prepare desired read shape to control how many slices get loaded
                         auto shape = zarrDs_->shape();
-                        // Control how many slices get loaded
-                        shape.front() = chunkShape[0];
+                        shape.at((axis == Z) ? 0 : (axis == Y) ? 2 : 1) = 1;  // chunkShape[(int)axis];  // load as many slices as there are in a single chunk
                         xt::xtensor<std::uint16_t, 3>::shape_type tensorShape;
                         tensorShape = {shape[0], shape[1], shape[2]};
+
+                        // Read data
                         data = new xt::xtensor<std::uint16_t, 3>(tensorShape);
                         int threads = static_cast<int>(std::thread::hardware_concurrency());
-                        z5::multiarray::readSubarray<std::uint16_t>(*zarrDs_, *data, offset.begin(), threads);
-                        loadedChunks_.emplace(zNum, data);
+                        z5::multiarray::readSubarray<std::uint16_t>(*zarrDs_, *data, offsetShape.begin(), threads);
+
+                        // // Adjust axis
+                        // if (axis == X) {
+                        //     std::cout << "Length: " << data->size() << std::endl;
+                        //     std::cout << "Dimmension: " << data->dimension() << std::endl;
+                        //     std::cout << "Shape Original: " << data->shape()[0] << ", " << data->shape()[1] << ", " << data->shape()[2] << std::endl;
+                        //     //*data = xt::view(xt::swapaxes(*data, 0, 1), 1);
+                        //     std::cout << "Length: " << data->size() << std::endl;
+                        //     std::cout << "Dimmension: " << data->dimension() << std::endl;
+                        //     std::cout << "Shape Original: " << data->shape()[0] << ", " << data->shape()[1] << ", " << data->shape()[2] << std::endl;
+                        //     return cv::Mat(data->shape()[0], data->shape()[2], CV_16U, data->data(), 0);
+                        // } else if (axis == Y) {
+                        //     std::cout << "Length: " << data->size() << std::endl;
+                        //     std::cout << "Dimmension: " << data->dimension() << std::endl;
+                        //     std::cout << "Shape Original: " << data->shape()[0] << ", " << data->shape()[1] << ", " << data->shape()[2] << std::endl;
+                        //     *data = xt::swapaxes(*data, 1, 2);
+                        //     *data = xt::swapaxes(*data, 0, 1);
+                        //     std::cout << "Length: " << data->size() << std::endl;
+                        //     std::cout << "Dimmension: " << data->dimension() << std::endl;
+                        //     std::cout << "Shape Original: " << data->shape()[0] << ", " << data->shape()[1] << ", " << data->shape()[2] << std::endl;
+                        //     *data = xt::view(*data, 1);
+                        //     std::cout << "Length: " << data->size() << std::endl;
+                        //     std::cout << "Dimmension: " << data->dimension() << std::endl;
+                        //     std::cout << "Shape Original: " << data->shape()[0] << ", " << data->shape()[1] << ", " << data->shape()[2] << std::endl;
+                        //     return cv::Mat(data->shape()[0], data->shape()[2], CV_16U, data->data(), 0);
+                        // }
+
+                        loadedChunks_[axis].emplace(chunkNum, data);
                     } else {
                         data = it->second;
                     }
+
+                    auto view = xt::view(*data, index % chunkShape[(int)axis]);
+                    return cv::Mat(view.shape()[0], view.shape()[1], CV_16U, view.data() + view.data_offset(), 0);
                 }
-
-                auto view = xt::view(*data, index % chunkShape[0]);
-                return cv::Mat(view.shape()[0], view.shape()[1], CV_16U, view.data() + view.data_offset(), 0);
-            } else if (axis == X) {
-                // This axis does not work with xtensor
+            } else {
                 xt::xarray<std::uint16_t>* data = nullptr;
-                
-                // Start in the middle
-                // z5::types::ShapeType offset = {0, zarrDs_->shape()[1] / 2, 0};
-
-                z5::types::ShapeType offset = {0, (std::size_t)index, 0};
+                auto offset = (axis == X) ? z5::types::ShapeType({0, (std::size_t)index, 0}) : z5::types::ShapeType({0, 0, (std::size_t)index});
                 auto shape = zarrDs_->shape();
-                shape.at(1) = 1;
+                shape.at((axis == X) ? 1 : 2) = 1;
                 data = new xt::xarray<std::uint16_t>(shape);
                 int threads = static_cast<int>(std::thread::hardware_concurrency());
                 z5::multiarray::readSubarray<std::uint16_t>(*zarrDs_, *data, offset.begin(), threads);
+                if (axis == X) {
+                    *data = xt::view(xt::swapaxes(*data, 0, 1), 1);
+                } else {
+                    *data = xt::swapaxes(*data, 1, 2);
+                    *data = xt::swapaxes(*data, 0, 1);
+                    *data = xt::view(*data, 1);
+                }
                 // std::cout << "Length: " << data->size() << std::endl;
                 // std::cout << "Dimmension: " << data->dimension() << std::endl;
                 // std::cout << "Shape Original: " << data->shape()[0] << ", " << data->shape()[1] << ", " << data->shape()[2] << std::endl;
-                *data = xt::view(xt::swapaxes(*data, 0, 1), 1);
-                return cv::Mat(data->shape()[0], data->shape()[2], CV_16U, data->data(), 0);
-            } else if (axis == Y) {
-                // This axis does not work with xtensor
-                xt::xarray<std::uint16_t>* data = nullptr;
-                
-                // Start in the middle
-                // z5::types::ShapeType offset = {0, zarrDs_->shape()[1] / 2, 0};
-
-                z5::types::ShapeType offset = {0, 0, (std::size_t)index};
-                auto shape = zarrDs_->shape();
-                shape.back() = 1;
-                data = new xt::xarray<std::uint16_t>(shape);
-                int threads = static_cast<int>(std::thread::hardware_concurrency());
-                z5::multiarray::readSubarray<std::uint16_t>(*zarrDs_, *data, offset.begin(), threads);
-                std::cout << "Length: " << data->size() << std::endl;
-                std::cout << "Dimmension: " << data->dimension() << std::endl;
-                std::cout << "Shape Original: " << data->shape()[0] << ", " << data->shape()[1] << ", " << data->shape()[2] << std::endl;
-                *data = xt::swapaxes(*data, 1, 2);
-                std::cout << "Shape Between: " << data->shape()[0] << ", " << data->shape()[1] << ", " << data->shape()[2] << std::endl;
-                *data = xt::swapaxes(*data, 0, 1);
-                std::cout << "Shape Swapped: " << data->shape()[0] << ", " << data->shape()[1] << ", " << data->shape()[2] << std::endl;
-                *data = xt::view(*data, 1);
-                std::cout << "Shape View: " << data->shape()[0] << ", " << data->shape()[1] << ", " << data->shape()[2] << std::endl;
 
                 return cv::Mat(data->shape()[0], data->shape()[2], CV_16U, data->data(), 0);
             }
+
+            // No valid data set or axis => return empty
+            return cv::Mat();
         }
-            
-        // No valid data set or axis => return empty
-        return cv::Mat();
-        
+
     } else {
         return cv::Mat();
     }
 }
 
-auto Volume::cache_slice_(int index, VolumeAxis axis) const -> cv::Mat 
+auto Volume::cache_slice_(int index) const -> cv::Mat 
 {
     // Check if the slice is in the cache.
     {

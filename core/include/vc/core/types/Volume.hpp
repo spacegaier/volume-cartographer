@@ -263,14 +263,14 @@ protected:
     /** ZARR data set*/
     std::unique_ptr<z5::Dataset> zarrDs_{nullptr};
     /** Loaded chunks */
-    mutable std::map<unsigned int, xt::xtensor<uint16_t, 3>*> loadedChunks_;
+    mutable std::map<VolumeAxis, std::map<unsigned int, xt::xtensor<uint16_t, 3>*>> loadedChunks_;
     /** Active ZARR level */
     int zarrLevel_{-1};
 
     /** Load slice from disk */
     cv::Mat load_slice_(int index, VolumeAxis axis = Z) const;
     /** Load slice from cache */
-    cv::Mat cache_slice_(int index, VolumeAxis axis = Z) const;
+    cv::Mat cache_slice_(int index) const;
     /** Shared mutex for thread-safe access */
     mutable std::shared_mutex cache_mutex_;
     mutable std::shared_mutex print_mutex_;
