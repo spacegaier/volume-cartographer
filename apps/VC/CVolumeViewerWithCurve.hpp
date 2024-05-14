@@ -50,7 +50,7 @@ public:
 
     void setButtonsEnabled(bool state);
 
-    void setPLY(std::map<int, std::vector<cv::Vec2d>> ply) { fPLY = ply; }
+    void setOverlay(std::map<int, std::vector<cv::Vec2d>> ply) { fPLY = ply; }
 
 protected:
     bool eventFilter(QObject* watched, QEvent* event);

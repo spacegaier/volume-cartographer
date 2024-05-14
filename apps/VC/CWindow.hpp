@@ -180,7 +180,7 @@ private slots:
     void ShowSettings();
     void PrintDebugInfo();
     
-    void AddOverlay();
+    void AddOverlay(const QString& path);
 
     void OnNewPathClicked(void);
     void OnRemovePathClicked(void);

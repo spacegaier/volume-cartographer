@@ -22,6 +22,8 @@
 #include "vc/core/io/OBJReader.hpp"
 #include "vc/core/io/PLYReader.hpp"
 
+#include "ui_VCOverlayImportDlg.h"
+
 namespace vc = volcart;
 namespace vcs = volcart::segmentation;
 namespace fs = std::filesystem;
@@ -180,6 +182,16 @@ CWindow::CWindow()
 
         if (!files.empty() && !files.at(0).isEmpty()) {
             Open(files[0]);
+        }
+    }
+
+    // If enabled, auto open the last used overlay
+    if (settings.value("overlay/auto_open", false).toInt() != 0) {
+
+        QStringList files = settings.value("overlay/recent").toStringList();
+
+        if (!files.empty() && !files.at(0).isEmpty()) {
+            AddOverlay(files[0]);
         }
     }
 }
@@ -1889,50 +1901,62 @@ void CWindow::OpenRecent()
         Open(action->data().toString());
 }
 
-void CWindow::AddOverlay(void)
+void CWindow::AddOverlay(const QString& path)
 {
     QSettings settings("VC.ini", QSettings::IniFormat);
+    auto overlayPath = path;
 
-    auto overlayFileURL = QFileDialog::getOpenFileUrl(
-        this, tr("Open overlay file"),
-        settings.value("volpkg/default_path").toString(), "*.ply *.obj", nullptr,
-        QFileDialog::DontUseNativeDialog);
-    // Dialog box cancelled
-    if (overlayFileURL.isEmpty()) {
-        vc::Logger()->info("Adding overlay canceled");
-        return;
+    if (overlayPath.isEmpty()) {
+        overlayPath = QFileDialog::getOpenFileUrl(
+            this, tr("Open overlay file"), settings.value("volpkg/default_path").toString(), "*.ply *.obj", nullptr,
+            QFileDialog::DontUseNativeDialog).path();
+        // Dialog box cancelled
+        if (overlayPath.isEmpty()) {
+            vc::Logger()->info("Adding overlay canceled");
+            return;
+        }
     }
 
-    std::map<int, std::vector<cv::Vec2d>> overlayCloud;
-    if (overlayFileURL.path().endsWith(".ply")) {
-        volcart::io::PLYReader reader(fs::path(overlayFileURL.path().toStdString()));
-        reader.read();
-        auto mesh = reader.getMesh();
+    auto dlg = new QDialog(this);
+    auto overlayImportDlg = new Ui::VCOverlayImportDlg();
+    overlayImportDlg->setupUi(dlg);
+    QObject::connect(overlayImportDlg->buttonBox, &QDialogButtonBox::accepted, this, [this, overlayPath, dlg, overlayImportDlg]() {
+        int xAxis = overlayImportDlg->comboBox1stAxis->currentText() == "X" ? 0 : overlayImportDlg->comboBox2ndAxis->currentText() == "X" ? 1 : 2;
+        int yAxis = overlayImportDlg->comboBox1stAxis->currentText() == "Y" ? 0 : overlayImportDlg->comboBox2ndAxis->currentText() == "Y" ? 1 : 2;
+        int zAxis = overlayImportDlg->comboBox1stAxis->currentText() == "Z" ? 0 : overlayImportDlg->comboBox2ndAxis->currentText() == "Z" ? 1 : 2;
+
+        std::map<int, std::vector<cv::Vec2d>> overlayCloud;
+        vc::ITKMesh::Pointer mesh;
+        if (overlayPath.endsWith(".ply")) {
+            volcart::io::PLYReader reader(fs::path(overlayPath.toStdString()));
+            reader.read();
+            mesh = reader.getMesh();
+        } else if (overlayPath.endsWith(".obj")) {
+            volcart::io::OBJReader reader;
+            reader.setPath(overlayPath.toStdString());
+            reader.read();
+            mesh = reader.getMesh();
+        }
+
         auto numPoints = mesh->GetNumberOfPoints();
 
         for (std::uint64_t pnt_id = 0; pnt_id < numPoints; pnt_id++) {
-            auto point = mesh->GetPoint(pnt_id);
-            // -500 is required for Thaumato
-            point[0] -= 500;
-            point[1] -= 500;
-            point[2] -= 500;
-            overlayCloud[point[1]].push_back({point[2], point[0]});
+            auto point = mesh->GetPoint(pnt_id);                
+            point[0] += overlayImportDlg->spinBoxOffset->value();
+            point[1] += overlayImportDlg->spinBoxOffset->value();
+            point[2] += overlayImportDlg->spinBoxOffset->value();
+            point[0] *= overlayImportDlg->doubleSpinBoxScalingFactor->value();
+            point[1] *= overlayImportDlg->doubleSpinBoxScalingFactor->value();
+            point[2] *= overlayImportDlg->doubleSpinBoxScalingFactor->value();
+            overlayCloud[point[zAxis]].push_back({point[xAxis], point[yAxis],});
         }
-    } else if (overlayFileURL.path().endsWith(".obj")) {
-        volcart::io::OBJReader reader;
-        reader.setPath(fs::path(overlayFileURL.path().toStdString()));
-        reader.read();
 
-        auto mesh = reader.getMesh();
-        auto numPoints = mesh->GetNumberOfPoints();
-
-        for (std::uint64_t pnt_id = 0; pnt_id < numPoints; pnt_id++) {
-            auto point = mesh->GetPoint(pnt_id);
-            overlayCloud[point[2]].push_back({point[0], point[1]});
-        }
-    }
-    fVolumeViewerWidget->setPLY(overlayCloud);
-    fVolumeViewerWidget->UpdateView();
+        fVolumeViewerWidget->setOverlay(overlayCloud);
+        fVolumeViewerWidget->UpdateView();
+        dlg->close();
+    });
+    QObject::connect(overlayImportDlg->buttonBox, &QDialogButtonBox::rejected, dlg, &QDialog::reject);
+    dlg->show();
 }
 
 // Pop up about dialog
