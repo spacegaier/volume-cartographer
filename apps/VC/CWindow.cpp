@@ -19,6 +19,7 @@
 #include "vc/meshing/OrderedPointSetMesher.hpp"
 #include "vc/segmentation/LocalResliceParticleSim.hpp"
 #include "vc/segmentation/OpticalFlowSegmentation.hpp"
+#include "vc/core/io/OBJReader.hpp"
 #include "vc/core/io/PLYReader.hpp"
 
 namespace vc = volcart;
@@ -1894,7 +1895,7 @@ void CWindow::AddOverlay(void)
 
     auto overlayFileURL = QFileDialog::getOpenFileUrl(
         this, tr("Open overlay file"),
-        settings.value("volpkg/default_path").toString(), "*.ply", nullptr,
+        settings.value("volpkg/default_path").toString(), "*.ply *.obj", nullptr,
         QFileDialog::DontUseNativeDialog);
     // Dialog box cancelled
     if (overlayFileURL.isEmpty()) {
@@ -1902,18 +1903,35 @@ void CWindow::AddOverlay(void)
         return;
     }
 
-    volcart::io::PLYReader reader(fs::path(overlayFileURL.path().toStdString()));
-    reader.read();
-    auto mesh = reader.getMesh();
-    auto numPoints = mesh->GetNumberOfPoints();
+    std::map<int, std::vector<cv::Vec2d>> overlayCloud;
+    if (overlayFileURL.path().endsWith(".ply")) {
+        volcart::io::PLYReader reader(fs::path(overlayFileURL.path().toStdString()));
+        reader.read();
+        auto mesh = reader.getMesh();
+        auto numPoints = mesh->GetNumberOfPoints();
 
-    std::map<int, std::vector<cv::Vec2d>> ply;
-    for (std::uint64_t pnt_id = 0; pnt_id < mesh->GetNumberOfPoints(); pnt_id++) {
-        auto point = mesh->GetPoint(pnt_id);
-        double test = point[0];
-        ply[point[2]].push_back({point[0], point[1]});
+        for (std::uint64_t pnt_id = 0; pnt_id < numPoints; pnt_id++) {
+            auto point = mesh->GetPoint(pnt_id);
+            // -500 is required for Thaumato
+            point[0] -= 500;
+            point[1] -= 500;
+            point[2] -= 500;
+            overlayCloud[point[1]].push_back({point[2], point[0]});
+        }
+    } else if (overlayFileURL.path().endsWith(".obj")) {
+        volcart::io::OBJReader reader;
+        reader.setPath(fs::path(overlayFileURL.path().toStdString()));
+        reader.read();
+
+        auto mesh = reader.getMesh();
+        auto numPoints = mesh->GetNumberOfPoints();
+
+        for (std::uint64_t pnt_id = 0; pnt_id < numPoints; pnt_id++) {
+            auto point = mesh->GetPoint(pnt_id);
+            overlayCloud[point[2]].push_back({point[0], point[1]});
+        }
     }
-    fVolumeViewerWidget->setPLY(ply);
+    fVolumeViewerWidget->setPLY(overlayCloud);
     fVolumeViewerWidget->UpdateView();
 }
 

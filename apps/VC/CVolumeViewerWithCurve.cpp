@@ -682,35 +682,36 @@ void CVolumeViewerWithCurve::DrawControlPoints(QGraphicsScene* scene)
 
 void CVolumeViewerWithCurve::DrawPLY()
 {
+    const int alpha = 150;
     for (int i = 0; i < fPLY[fImageIndex-2].size(); ++i) {
         // Create new ellipse points
         auto p0 = fPLY[fImageIndex-2][i][0] - 2;
         auto p1 = fPLY[fImageIndex-2][i][1] - 2;
-        fScene->addEllipse(p0, p1, 4, 4, QPen(QColor(110, 80, 255)), QBrush(QColor(110, 80, 25)));
+        fScene->addEllipse(p0, p1, 4, 4, QPen(QColor(80, 100, 210)), QBrush(QColor(100, 120, 230, alpha)));
     }
     for (int i = 0; i < fPLY[fImageIndex-1].size(); ++i) {
         // Create new ellipse points
         auto p0 = fPLY[fImageIndex-1][i][0] - 2;
         auto p1 = fPLY[fImageIndex-1][i][1] - 2;
-        fScene->addEllipse(p0, p1, 4, 4, QPen(QColor(80, 50, 255)), QBrush(QColor(80, 50, 25)));
+        fScene->addEllipse(p0, p1, 4, 4, QPen(QColor(140, 100, 160)), QBrush(QColor(160, 120, 180, alpha)));
     }
     for (int i = 0; i < fPLY[fImageIndex].size(); ++i) {
         // Create new ellipse points
         auto p0 = fPLY[fImageIndex][i][0] - 2;
         auto p1 = fPLY[fImageIndex][i][1] - 2;
-        fScene->addEllipse(p0, p1, 4, 4, QPen(QColor(100, 255, 0)), QBrush(QColor(100, 255, 0)));
+        fScene->addEllipse(p0, p1, 4, 4, QPen(QColor(180, 90, 120)), QBrush(QColor(200, 110, 140, alpha)));
     }
     for (int i = 0; i < fPLY[fImageIndex+1].size(); ++i) {
         // Create new ellipse points
         auto p0 = fPLY[fImageIndex+1][i][0] - 2;
         auto p1 = fPLY[fImageIndex+1][i][1] - 2;
-        fScene->addEllipse(p0, p1, 4, 4, QPen(QColor(240, 80, 0)), QBrush(QColor(240, 80, 0)));
+        fScene->addEllipse(p0, p1, 4, 4, QPen(QColor(230, 100, 80)), QBrush(QColor(250, 120, 100, alpha)));
     }
         for (int i = 0; i < fPLY[fImageIndex+2].size(); ++i) {
         // Create new ellipse points
         auto p0 = fPLY[fImageIndex+2][i][0] - 2;
         auto p1 = fPLY[fImageIndex+2][i][1] - 2;
-        fScene->addEllipse(p0, p1, 4, 4, QPen(QColor(240, 110, 40)), QBrush(QColor(240, 110, 40)));
+        fScene->addEllipse(p0, p1, 4, 4, QPen(QColor(220, 140, 10)), QBrush(QColor(255 , 170, 30, alpha)));
     }
 }
 

@@ -56,6 +56,11 @@ public:
         BINARY_BIG_ENDIAN
     };
 
+    struct PropertyByteInfo {
+        unsigned int length;
+        unsigned int offset;
+    };
+
 private:
     /** Input file path */
     filesystem::path inputPath_;
@@ -79,8 +84,11 @@ private:
     int numFaces_;
     /** Number of lines used by the elements we can't handle */
     std::vector<int> skippedLine_;
-    /** Maps positions in a string to a particular attribute */
+    /** Maps positions in a string to a particular property */
     std::map<std::string, int> properties_;
+    /** Maps vertex property to its byte info */
+    std::map<std::string, PropertyByteInfo> vertextByteInfo_;
+    unsigned int vertextByteLength_{0};
 
     /**
      * Tracks if there is a leading character in front of each face line. This

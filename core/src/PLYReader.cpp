@@ -23,6 +23,7 @@ auto PLYReader::read() -> ITKMesh::Pointer
     pointList_.clear();
     faceList_.clear();
     properties_.clear();
+    vertextByteInfo_.clear();
     elementsList_.clear();
     outMesh_ = ITKMesh::New();
     numVertices_ = 0;
@@ -74,9 +75,11 @@ void PLYReader::parse_header_()
         } else if (line_.find("element") != std::string::npos) {
             auto splitLine = split(line_, ' ');
             elementsList_.push_back(splitLine[1]);
+            bool processVertex = false;
 
             if (splitLine[1] == "vertex") {
                 numVertices_ = std::stoi(splitLine[2]);
+                processVertex = true;
             } else if (splitLine[1] == "face") {
                 numFaces_ = std::stoi(splitLine[2]);
             } else {
@@ -95,6 +98,26 @@ void PLYReader::parse_header_()
                         hasPointNorm_ = true;
                     }
                     properties_[splitLine[2]] = currentLine;
+
+                    if (processVertex) {
+                        unsigned int length;
+                        if (splitLine[1] == "double" || splitLine[1] == "float64") {
+                            length = 8;
+                        } else if (splitLine[1] == "int"   || splitLine[1] == "int32"   ||
+                                   splitLine[1] == "uint"  || splitLine[1] == "unint32" || 
+                                   splitLine[1] == "float" || splitLine[1] == "float32") {
+                            length = 4;
+                        } else if (splitLine[1] == "short" || splitLine[1] == "ushort" ||
+                                   splitLine[1] == "int16" || splitLine[1] == "uint16") {
+                            length = 2;
+                        } else if (splitLine[1] == "char" || splitLine[1] == "uchar" ||
+                                   splitLine[1] == "int8" || splitLine[1] == "uint8") {
+                            length = 1;
+                        }
+
+                        vertextByteInfo_[splitLine[2]] = {length, vertextByteLength_};
+                        vertextByteLength_ += length;
+                    }
                 }
                 std::getline(plyFile_, line_);
                 currentLine++;
@@ -107,16 +130,42 @@ void PLYReader::parse_header_()
     if (numFaces_ == 0) {
         Logger()->warn("Warning: No face information found");
     }
-    std::getline(plyFile_, line_);
-
 }  // ParseHeader
+
+auto convert(char* buffer, int length) -> double
+{
+    double returnDouble;
+    float returnFloat;
+    int returnInt;
+    char returnChar;
+
+    if (length == sizeof(double)) {
+        memcpy(&returnDouble, buffer, length);
+        return returnDouble;
+    } else if (length == sizeof(float)) {
+        memcpy(&returnFloat, buffer, length);
+        return static_cast<double>(returnFloat);
+    } else if (length == sizeof(int)) {
+        memcpy(&returnInt, buffer, length);
+        return static_cast<double>(returnInt);
+    } else if (length == sizeof(char)) {
+        memcpy(&returnChar, buffer, length);
+        return static_cast<double>(returnChar);
+    } else {
+        auto msg = "Could not convert byte segment";
+        throw volcart::IOException(msg);
+    }
+}
 
 void PLYReader::read_points_()
 {
+    char buffer[vertextByteLength_];
+
     for (int i = 0; i < numVertices_; i++) {
         SimpleMesh::Vertex curPoint;
-        
+
         if (format_ == ASCII) {
+            std::getline(plyFile_, line_);
             auto curLine = split(line_, ' ');
             curPoint.x = std::stod(curLine[properties_["x"]]);
             curPoint.y = std::stod(curLine[properties_["y"]]);
@@ -126,37 +175,61 @@ void PLYReader::read_points_()
                 curPoint.ny = std::stod(curLine[properties_["ny"]]);
                 curPoint.nz = std::stod(curLine[properties_["nz"]]);
             }
-            if (properties_.find("r") != properties_.end()) {
-                curPoint.r = std::stoi(curLine[properties_["r"]]);
-                curPoint.g = std::stoi(curLine[properties_["g"]]);
-                curPoint.b = std::stoi(curLine[properties_["b"]]);
+            if (properties_.find("red") != properties_.end()) {
+                curPoint.r = std::stoi(curLine[properties_["red"]]);
+                curPoint.g = std::stoi(curLine[properties_["green"]]);
+                curPoint.b = std::stoi(curLine[properties_["blue"]]);
             }
-        } else {
-            unsigned char buffer[51];
-            memcpy(buffer, line_.data(), 51);
-            curPoint.x = buffer[8];
+        } else {            
+            plyFile_.read(buffer, vertextByteLength_);
+            char bufferX[vertextByteInfo_["x"].length];
+            char bufferY[vertextByteInfo_["y"].length];
+            char bufferZ[vertextByteInfo_["z"].length];
 
-            short x = 0x1234;
-            switch (*(char*)&x) {
-                case 0x12:                                       // Big-Endian
-                    curPoint.y = (buffer[1] << 32) | buffer[2];  // Simulate t = (short)*(a+1) on BE
-                    break;
-                case 0x34:                                       // Little-Endian
-                    curPoint.y = (buffer[2] << 32) | buffer[1];  // Simulate t = (short)*(a+1) on LE
-                    break;
+            memcpy(&bufferX, buffer + vertextByteInfo_["x"].offset, vertextByteInfo_["x"].length);
+            curPoint.x = convert(bufferX, vertextByteInfo_["x"].length);            
+            memcpy(&bufferY, buffer + vertextByteInfo_["y"].offset, vertextByteInfo_["y"].length);
+            curPoint.y = convert(bufferY, vertextByteInfo_["y"].length);     
+            memcpy(&bufferZ, buffer + vertextByteInfo_["z"].offset, vertextByteInfo_["z"].length);
+            curPoint.z = convert(bufferZ, vertextByteInfo_["z"].length);     
+
+            if (properties_.find("nx") != properties_.end()) {
+                char bufferNX[vertextByteInfo_["nx"].length];
+                char bufferNY[vertextByteInfo_["ny"].length];
+                char bufferNZ[vertextByteInfo_["nz"].length];
+                memcpy(&bufferNX, buffer + vertextByteInfo_["nx"].offset, vertextByteInfo_["nx"].length);
+                curPoint.nx = convert(bufferNX, vertextByteInfo_["nx"].length);
+                memcpy(&bufferNY, buffer + vertextByteInfo_["ny"].offset, vertextByteInfo_["ny"].length);
+                curPoint.ny = convert(bufferNY, vertextByteInfo_["ny"].length);
+                memcpy(&bufferNZ, buffer + vertextByteInfo_["nz"].offset, vertextByteInfo_["nz"].length);
+                curPoint.nz = convert(bufferNZ, vertextByteInfo_["nz"].length);
             }
-
-            curPoint.z = buffer[8];
+            if (properties_.find("red") != properties_.end()) {
+                char bufferRed[vertextByteInfo_["red"].length];
+                char bufferGreen[vertextByteInfo_["green"].length];
+                char bufferBlue[vertextByteInfo_["blue"].length];
+                memcpy(&bufferRed,   buffer + vertextByteInfo_["red"].offset,   vertextByteInfo_["red"].length);
+                curPoint.r = convert(bufferRed,   vertextByteInfo_["red"].length);
+                memcpy(&bufferGreen, buffer + vertextByteInfo_["green"].offset, vertextByteInfo_["green"].length);
+                curPoint.g = convert(bufferGreen, vertextByteInfo_["green"].length);
+                memcpy(&bufferBlue,  buffer + vertextByteInfo_["blue"].offset,  vertextByteInfo_["blue"].length);
+                curPoint.b = convert(bufferBlue,  vertextByteInfo_["blue"].length);
+            }
         }
-        pointList_.push_back(curPoint);
-        std::getline(plyFile_, line_);
+        pointList_.push_back(curPoint);  
     }
 }
 
 void PLYReader::read_faces_()
 {
+    if (format_ != ASCII) {
+        // Binary face reading is not yet supported
+        return;
+    }
+
     for (int i = 0; i < numFaces_; i++) {
         SimpleMesh::Cell face;
+        std::getline(plyFile_, line_);
         auto curFace = split(line_, ' ');
         if (hasLeadingChar_) {
             int pointsPerFace = std::stoi(curFace[0]);
@@ -180,7 +253,6 @@ void PLYReader::read_faces_()
                 faceList_.push_back(face);
             }
         }
-        std::getline(plyFile_, line_);
     }
 }
 
