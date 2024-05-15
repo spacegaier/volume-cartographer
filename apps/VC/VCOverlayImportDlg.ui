@@ -150,6 +150,13 @@
    </item>
   </layout>
  </widget>
+ <tabstops>
+  <tabstop>spinBoxOffset</tabstop>
+  <tabstop>comboBox1stAxis</tabstop>
+  <tabstop>comboBox2ndAxis</tabstop>
+  <tabstop>comboBox3rdAxis</tabstop>
+  <tabstop>doubleSpinBoxScalingFactor</tabstop>
+ </tabstops>
  <resources/>
  <connections/>
 </ui>

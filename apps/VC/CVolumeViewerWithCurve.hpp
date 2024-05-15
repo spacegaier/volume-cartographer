@@ -71,7 +71,7 @@ private:
 
     void DrawIntersectionCurve(QGraphicsScene* scene);
     void DrawControlPoints(QGraphicsScene* scene);
-    void DrawPLY();
+    void DrawOverlay();
 
 signals:
     void SendSignalPathChanged(std::string, PathChangePointVector before, PathChangePointVector after);
@@ -114,10 +114,6 @@ private:
     bool isPanning{false};
     bool rightPressed{false};
     int panStartX, panStartY;
-
-    // image drawn
-    cv::Mat fImgMat;
-    cv::Mat fImgMatCache;
 
     // Global or class-level storage for ellipse items
     QList<QGraphicsEllipseItem*> ellipseItems;
