@@ -373,7 +373,9 @@ void CVolumeViewer::OnPrevClicked(void)
 void CVolumeViewer::OnImageIndexEditTextChanged(void)
 {
     // send signal to controller in order to update the content
-    SendSignalOnLoadAnyImage(fImageIndexEdit->value());
+    if (fImageIndex != fImageIndexEdit->value()) {
+        SendSignalOnLoadAnyImage(fImageIndexEdit->value());
+    }
 }
 
 // Update the status of the buttons

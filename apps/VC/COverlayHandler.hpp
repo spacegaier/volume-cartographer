@@ -3,12 +3,18 @@
 #pragma once
 
 #include <map>
+#include <shared_mutex>
+
 #include <QString>
 #include <opencv2/imgproc.hpp>
 
 namespace ChaoVis
 {
 class CVolumeViewer;
+class COverlayGraphicsItem;
+
+typedef std::vector<cv::Vec2d> OverlaySliceData;
+typedef std::map<int, OverlaySliceData> OverlayData;
 
 class COverlayHandler
 {
@@ -28,14 +34,18 @@ public:
     void setOverlaySettings(OverlaySettings overlaySettings);
     auto determineOverlayFiles() -> QStringList;
     void loadOverlayData(QStringList files);
-    auto getOverlayData() const -> std::map<int, std::vector<cv::Vec2d>> { return data; }
+    auto getOverlayData() const -> OverlayData { return data; }
     void updateOverlayData();
+
+    void loadSingleOverlayFile(QString path) const;
+    void mergeThreadData(OverlayData threadData) const;
 
 protected:
     CVolumeViewer* viewer;
     OverlaySettings settings;
 
-    std::map<int, std::vector<cv::Vec2d>> data;
+    mutable OverlayData data;
+    mutable std::shared_mutex dataMutex;
 };
 
 }

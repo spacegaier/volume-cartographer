@@ -111,9 +111,7 @@ private:
     bool rightPressed{false};
     int panStartX, panStartY;
 
-    // Global or class-level storage for ellipse items
-    QList<QGraphicsEllipseItem*> ellipseItems;
-    QList<QGraphicsEllipseItem*> controlPointItems;
+    QList<COverlayGraphicsItem*> overlayItems;
 };  // class CVolumeViewerWithCurve
 
 }  // namespace ChaoVis

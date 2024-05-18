@@ -10,6 +10,7 @@ set(srcs
     UDataManipulateUtils.cpp
     CVolumeViewer.cpp
     CVolumeViewerWithCurve.cpp
+    COverlay.cpp
     COverlayHandler.cpp
     CBSpline.cpp
     CBezierCurve.cpp

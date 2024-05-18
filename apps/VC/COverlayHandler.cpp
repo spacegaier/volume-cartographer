@@ -102,46 +102,87 @@ void COverlayHandler::loadOverlayData(QStringList files)
     itk::Point<double, 3> point;
     data.clear();
 
-    for (auto file : files) {
-        std::cout << "File: " << file.toStdString() << std::endl;
-        if (file.endsWith(".ply")) {
-            volcart::io::PLYReader reader(fs::path(file.toStdString()));
-            reader.read();
-            mesh = reader.getMesh();
-        } else if (file.endsWith(".obj")) {
-            volcart::io::OBJReader reader;
-            reader.setPath(file.toStdString());
-            reader.read();
-            mesh = reader.getMesh();
-        } else {
-            continue;
+    int numThreads = static_cast<int>(std::thread::hardware_concurrency()) - 2;
+    for (int f = 0; f <= files.size(); f += numThreads) {
+        std::vector<std::thread> threads;
+
+        for (int i = 0; i <= numThreads && (f+i) < files.size(); i++) {
+            threads.emplace_back(&COverlayHandler::loadSingleOverlayFile, this, files.at(f+i));
         }
 
-        auto numPoints = mesh->GetNumberOfPoints();
-
-        for (std::uint64_t pnt_id = 0; pnt_id < numPoints; pnt_id++) {
-            point = mesh->GetPoint(pnt_id);
-            point[0] += settings.offset;
-            point[1] += settings.offset;
-            point[2] += settings.offset;
-            point[0] *= settings.scale;
-            point[1] *= settings.scale;
-            point[2] *= settings.scale;
-
-            if (point[settings.xAxis] > 0 && point[settings.yAxis] > 0 && point[settings.zAxis] > 0) {
-                data[point[settings.zAxis]].push_back({
-                    point[settings.xAxis],
-                    point[settings.yAxis],
-                });
-            }
+        for (auto& t : threads) {
+            t.join();
         }
+
+        // // Check if prefetching was stopped or slice index changed
+        // if (stopPrefetching.load() || prefetchSliceIndex.load() != currentSliceIndex) {
+        //     break;
+        // }
     }
 
     for (auto it = data.begin(); it != data.end(); ++it) {
         std::cout << it->first << ", ";
     }
     std::cout << std::endl;
-    // viewer->UpdateView();
+}
+
+void COverlayHandler::loadSingleOverlayFile(QString file) const
+{
+    vc::ITKMesh::Pointer mesh;
+    itk::Point<double, 3> point;
+    OverlayData threadData;
+
+    std::cout << "File: " << file.toStdString() << std::endl;
+    if (file.endsWith(".ply")) {
+        volcart::io::PLYReader reader(fs::path(file.toStdString()));
+        reader.read();
+        mesh = reader.getMesh();
+    } else if (file.endsWith(".obj")) {
+        volcart::io::OBJReader reader;
+        reader.setPath(file.toStdString());
+        reader.read();
+        mesh = reader.getMesh();
+    } else {
+        return;
+    }
+
+    auto numPoints = mesh->GetNumberOfPoints();
+
+    for (std::uint64_t pnt_id = 0; pnt_id < numPoints; pnt_id++) {
+        point = mesh->GetPoint(pnt_id);
+        point[0] += settings.offset;
+        point[1] += settings.offset;
+        point[2] += settings.offset;
+        point[0] *= settings.scale;
+        point[1] *= settings.scale;
+        point[2] *= settings.scale;
+
+        if (point[settings.xAxis] > 0 && point[settings.yAxis] > 0 && point[settings.zAxis] > 0) {
+            threadData[point[settings.zAxis]].push_back({
+                point[settings.xAxis],
+                point[settings.yAxis],
+            });
+        }
+    }
+
+    if (threadData.size() > 0) {
+        mergeThreadData(threadData);
+    }
+}
+
+void COverlayHandler::mergeThreadData(OverlayData threadData) const
+{
+    std::lock_guard<std::shared_mutex> lock(dataMutex);
+
+    for (auto it = threadData.begin(); it != threadData.end(); ++it) {
+        std::pair<OverlayData::iterator, bool> ins = data.insert(*it);
+        if (!ins.second) {  
+            // Map key already existed, so we have to merge the slice data
+            OverlaySliceData* vec1 = &(it->second);
+            OverlaySliceData* vec2 = &(ins.first->second);
+            vec2->insert(vec2->end(), vec1->begin(), vec1->end());
+        }
+    }
 }
 
 void COverlayHandler::updateOverlayData()

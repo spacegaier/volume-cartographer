@@ -4,25 +4,27 @@
 
 #include <QGraphicsItem>
 #include <QGraphicsScene>
+#include <opencv2/imgproc.hpp>
 
+#include "COverlayHandler.hpp"
 
 namespace ChaoVis
 {
-
 class COverlayGraphicsItem : public QGraphicsItem
 {
-    Q_OBJECT
-
     public:
         COverlayGraphicsItem(QWidget* parent = nullptr);
 
-        void setPoints(std::vector<cv::Vec2d> input) { points = input; }
+        void setPoints(OverlaySliceData input) { points = input; }
         void setPen(QPen input) { pen = input; }
         void setBrush(QBrush input) { brush = input; }
+
         void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr);
+        auto boundingRect() const -> QRectF;
 
     protected:
-        std::vector<cv::Vec2d> points;
+        OverlaySliceData points;
+        QRect rect;
         QPen pen;
         QBrush brush;
 };
