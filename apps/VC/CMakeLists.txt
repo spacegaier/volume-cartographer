@@ -10,6 +10,7 @@ set(srcs
     UDataManipulateUtils.cpp
     CVolumeViewer.cpp
     CVolumeViewerWithCurve.cpp
+    COverlayHandler.cpp
     CBSpline.cpp
     CBezierCurve.cpp
     BlockingDialog.hpp
@@ -26,7 +27,7 @@ if(APPLE)
     list(APPEND srcs ${MACOSX_BUNDLE_ICON})
 endif()
 
-set(copyright "Copyright 2023 EduceLab")
+set(copyright "Copyright 2024 EduceLab")
 string(CONCAT info_string
     ${target}
     " Version ${PROJECT_VERSION}"

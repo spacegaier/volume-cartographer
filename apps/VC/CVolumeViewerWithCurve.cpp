@@ -137,6 +137,8 @@ void CVolumeViewerWithCurve::SetImage(const QImage& nSrc)
     }
     fBaseImageItem = fScene->addPixmap(pixmap);
 
+    fOverlayHandler->updateOverlayData();
+
     UpdateButtons();
     update();
 }
@@ -685,66 +687,67 @@ void CVolumeViewerWithCurve::DrawControlPoints(QGraphicsScene* scene)
 
 void CVolumeViewerWithCurve::DrawOverlay()
 {
-    const int alpha = 150;
-    const int pointWidth = 6;
+    const int alpha = 120;
+    const int pointWidth = 4;
 
     QPen pen;
     QBrush brush;
 
-    std::cout << "Drawing -2: " << fPLY[fImageIndex - 2].size() << std::endl;
+    auto data = fOverlayHandler->getOverlayData();
+
+    //std::cout << "Drawing -2: " << data[fImageIndex - 2].size() << std::endl;
     // auto ovl1 = new COverlayGraphicsItem();
     // fScene->addItem(ovl1);
     pen = QPen(QColor(80, 100, 210));
     brush = QBrush(QColor(100, 120, 230, alpha));
-    for (int i = 0; i < fPLY[fImageIndex - 2].size(); ++i) {
+    for (int i = 0; i < data[fImageIndex - 2].size(); ++i) {
         // Create new ellipse points
-        auto p0 = fPLY[fImageIndex - 2][i][0] - pointWidth / 2;
-        auto p1 = fPLY[fImageIndex - 2][i][1] - pointWidth / 2;
+        auto p0 = data[fImageIndex - 2][i][0] - pointWidth / 2;
+        auto p1 = data[fImageIndex - 2][i][1] - pointWidth / 2;
         auto item = fScene->addEllipse(p0, p1, pointWidth, pointWidth, pen, brush);
         item->setCacheMode(QGraphicsItem::DeviceCoordinateCache);
     }
 
-    std::cout << "Drawing -1: " << fPLY[fImageIndex - 1].size() << std::endl;
+    //std::cout << "Drawing -1: " << data[fImageIndex - 1].size() << std::endl;
     pen = QPen(QColor(140, 100, 160));
     brush = QBrush(QColor(160, 120, 180, alpha));
-    for (int i = 0; i < fPLY[fImageIndex - 1].size(); ++i) {
+    for (int i = 0; i < data[fImageIndex - 1].size(); ++i) {
         // Create new ellipse points
-        auto p0 = fPLY[fImageIndex - 1][i][0] - pointWidth / 2;
-        auto p1 = fPLY[fImageIndex - 1][i][1] - pointWidth / 2;
+        auto p0 = data[fImageIndex - 1][i][0] - pointWidth / 2;
+        auto p1 = data[fImageIndex - 1][i][1] - pointWidth / 2;
         auto item = fScene->addEllipse(p0, p1, pointWidth, pointWidth, pen, brush);
         item->setCacheMode(QGraphicsItem::DeviceCoordinateCache);
     }
 
-    std::cout << "Drawing 0: " << fPLY[fImageIndex].size() << std::endl;
-
+    std::cout << "Drawing 0: " << data[fImageIndex].size() << std::endl;
     pen = QPen(QColor(180, 90, 120));
     brush = QBrush(QColor(200, 110, 140, alpha));
-    for (int i = 0; i < fPLY[fImageIndex].size(); ++i) {
+    for (int i = 0; i < data[fImageIndex].size(); ++i) {
         // Create new ellipse points
-        auto p0 = fPLY[fImageIndex][i][0] - pointWidth / 2;
-        auto p1 = fPLY[fImageIndex][i][1] - pointWidth / 2;
+        auto p0 = data[fImageIndex][i][0] - pointWidth / 2;
+        auto p1 = data[fImageIndex][i][1] - pointWidth / 2;
         auto item = fScene->addEllipse(p0, p1, pointWidth, pointWidth, pen, brush);
         item->setCacheMode(QGraphicsItem::DeviceCoordinateCache);
     }
 
-    std::cout << "Drawing +1: " << fPLY[fImageIndex + 1].size() << std::endl;
+    //std::cout << "Drawing +1: " << data[fImageIndex + 1].size() << std::endl;
     pen = QPen(QColor(230, 100, 80));
     brush = QBrush(QColor(250, 120, 100, alpha));
-    for (int i = 0; i < fPLY[fImageIndex + 1].size(); ++i) {
+    for (int i = 0; i < data[fImageIndex + 1].size(); ++i) {
         // Create new ellipse points
-        auto p0 = fPLY[fImageIndex + 1][i][0] - pointWidth / 2;
-        auto p1 = fPLY[fImageIndex + 1][i][1] - pointWidth / 2;
+        auto p0 = data[fImageIndex + 1][i][0] - pointWidth / 2;
+        auto p1 = data[fImageIndex + 1][i][1] - pointWidth / 2;
         auto item = fScene->addEllipse(p0, p1, pointWidth, pointWidth, pen, brush);
         item->setCacheMode(QGraphicsItem::DeviceCoordinateCache);
     }
 
-    std::cout << "Drawing +2: " << fPLY[fImageIndex + 2].size() << std::endl;
+    //std::cout << "Drawing +2: " << data[fImageIndex + 2].size() << std::endl;
     pen = QPen(QColor(220, 140, 10));
     brush = QBrush(QColor(255, 170, 30, alpha));
-    for (int i = 0; i < fPLY[fImageIndex + 2].size(); ++i) {
+    for (int i = 0; i < data[fImageIndex + 2].size(); ++i) {
         // Create new ellipse points
-        auto p0 = fPLY[fImageIndex + 2][i][0] - pointWidth / 2;
-        auto p1 = fPLY[fImageIndex + 2][i][1] - pointWidth / 2;
+        auto p0 = data[fImageIndex + 2][i][0] - pointWidth / 2;
+        auto p1 = data[fImageIndex + 2][i][1] - pointWidth / 2;
         auto item = fScene->addEllipse(p0, p1, pointWidth, pointWidth, pen, brush);
         item->setCacheMode(QGraphicsItem::DeviceCoordinateCache);
     }

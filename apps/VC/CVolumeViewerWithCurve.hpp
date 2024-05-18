@@ -50,8 +50,6 @@ public:
 
     void setButtonsEnabled(bool state);
 
-    void setOverlay(std::map<int, std::vector<cv::Vec2d>> ply) { fPLY = ply; }
-
 protected:
     bool eventFilter(QObject* watched, QEvent* event);
     void mousePressEvent(QMouseEvent* event);
@@ -94,8 +92,6 @@ private:
     std::unordered_map<std::string, SegmentationStruct>& fSegStructMapRef;
     CBSpline* fSplineCurveRef;
     std::vector<cv::Vec2f> fControlPoints;
-
-    std::map<int, std::vector<cv::Vec2d>> fPLY;
 
     // for editing
     CXCurve* fIntersectionCurveRef;

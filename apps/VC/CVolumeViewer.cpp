@@ -160,6 +160,8 @@ CVolumeViewer::CVolumeViewer(QWidget* parent)
 
     fGraphicsView->viewport()->installEventFilter(this);
 
+    fOverlayHandler = new COverlayHandler(this);
+
     fButtonsLayout = new QHBoxLayout;
     fButtonsLayout->addWidget(fZoomInBtn);
     fButtonsLayout->addWidget(fZoomOutBtn);
@@ -239,6 +241,11 @@ void CVolumeViewer::setNumSlices(int num)
     fImageIndexEdit->setMaximum(num);
 }
 
+void CVolumeViewer::SetOverlaySettings(COverlayHandler::OverlaySettings overlaySettings) 
+{
+    fOverlayHandler->setOverlaySettings(overlaySettings);
+}
+
 bool CVolumeViewer::eventFilter(QObject* watched, QEvent* event)
 {
     // Wheel events
@@ -284,9 +291,11 @@ bool CVolumeViewer::eventFilter(QObject* watched, QEvent* event)
             } else if (numDegrees < 0) {
                 SendSignalOnPrevSliceShift(fScanRange);
                 fGraphicsView->showCurrentSliceIndex(fImageIndex, (GetViewState() == EViewState::ViewStateEdit && fImageIndex == sliceIndexToolStart));
-            }
+            }            
             return true;
         }
+
+        
     }
     return QWidget::eventFilter(watched, event);
 }

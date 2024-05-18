@@ -128,7 +128,7 @@ void PLYReader::parse_header_()
         }
     }
     if (numFaces_ == 0) {
-        Logger()->warn("Warning: No face information found");
+        Logger()->debug("Warning: No face information found");
     }
 }  // ParseHeader
 

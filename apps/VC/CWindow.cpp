@@ -19,8 +19,6 @@
 #include "vc/meshing/OrderedPointSetMesher.hpp"
 #include "vc/segmentation/LocalResliceParticleSim.hpp"
 #include "vc/segmentation/OpticalFlowSegmentation.hpp"
-#include "vc/core/io/OBJReader.hpp"
-#include "vc/core/io/PLYReader.hpp"
 
 #include "ui_VCOverlayImportDlg.h"
 
@@ -191,7 +189,7 @@ CWindow::CWindow()
         QStringList files = settings.value("overlay/recent").toStringList();
 
         if (!files.empty() && !files.at(0).isEmpty()) {
-            AddOverlay(files[0]);
+            ShowOverlayImportDlg(files[0]);
         }
     }
 }
@@ -642,7 +640,7 @@ void CWindow::CreateActions(void)
     fSavePointCloudAct->setShortcut(QKeySequence::Save);
 
     fAddOverlay = new QAction(style()->standardIcon(QStyle::SP_DialogOpenButton), tr("Add overlay..."), this);
-    connect(fAddOverlay, SIGNAL(triggered()), this, SLOT(AddOverlay()));
+    connect(fAddOverlay, SIGNAL(triggered()), this, SLOT(ShowOverlayImportDlg()));
 
     fSettingsAct = new QAction(tr("Settings"), this);
     connect(fSettingsAct, SIGNAL(triggered()), this, SLOT(ShowSettings()));
@@ -1901,7 +1899,7 @@ void CWindow::OpenRecent()
         Open(action->data().toString());
 }
 
-void CWindow::AddOverlay(const QString& path)
+void CWindow::ShowOverlayImportDlg(const QString& path)
 {
     QSettings settings("VC.ini", QSettings::IniFormat);
     auto overlayPath = path;
@@ -1921,58 +1919,15 @@ void CWindow::AddOverlay(const QString& path)
     auto overlayImportDlg = new Ui::VCOverlayImportDlg();
     overlayImportDlg->setupUi(dlg);
     QObject::connect(overlayImportDlg->buttonBox, &QDialogButtonBox::accepted, this, [this, overlayPath, dlg, overlayImportDlg]() {
-        int xAxis = overlayImportDlg->comboBox1stAxis->currentText() == "X" ? 0 : overlayImportDlg->comboBox2ndAxis->currentText() == "X" ? 1 : 2;
-        int yAxis = overlayImportDlg->comboBox1stAxis->currentText() == "Y" ? 0 : overlayImportDlg->comboBox2ndAxis->currentText() == "Y" ? 1 : 2;
-        int zAxis = overlayImportDlg->comboBox1stAxis->currentText() == "Z" ? 0 : overlayImportDlg->comboBox2ndAxis->currentText() == "Z" ? 1 : 2;
+        COverlayHandler::OverlaySettings overlaySettings;
+        overlaySettings.path = overlayPath;
+        overlaySettings.xAxis = overlayImportDlg->comboBox1stAxis->currentText() == "X" ? 0 : overlayImportDlg->comboBox2ndAxis->currentText() == "X" ? 1 : 2;
+        overlaySettings.yAxis = overlayImportDlg->comboBox1stAxis->currentText() == "Y" ? 0 : overlayImportDlg->comboBox2ndAxis->currentText() == "Y" ? 1 : 2;
+        overlaySettings.zAxis = overlayImportDlg->comboBox1stAxis->currentText() == "Z" ? 0 : overlayImportDlg->comboBox2ndAxis->currentText() == "Z" ? 1 : 2;
+        overlaySettings.offset = overlayImportDlg->spinBoxOffset->value();
+        overlaySettings.scale = overlayImportDlg->doubleSpinBoxScalingFactor->value();
 
-        QDir overlayMainFolder(overlayPath);
-        QStringList overlayFolders = overlayMainFolder.entryList(QDir::NoDotAndDotDot | QDir::AllEntries);
-
-        std::map<int, std::vector<cv::Vec2d>> overlayCloud;
-        vc::ITKMesh::Pointer mesh;
-
-        for (auto folder : overlayFolders.filter("_000200_")) {
-            QDir overlayFolder(overlayMainFolder.absolutePath() + QDir::separator() + folder);
-            QStringList files = overlayFolder.entryList(QDir::NoDotAndDotDot | QDir::Files);
-
-            for (auto file : files) {
-                file = overlayFolder.path() + QDir::separator() + file;
-
-                if (file.endsWith(".ply")) {
-                    volcart::io::PLYReader reader(fs::path(file.toStdString()));
-                    reader.read();
-                    mesh = reader.getMesh();
-                } else if (file.endsWith(".obj")) {
-                    volcart::io::OBJReader reader;
-                    reader.setPath(file.toStdString());
-                    reader.read();
-                    mesh = reader.getMesh();
-                } else {
-                    continue;
-                }
-
-                auto numPoints = mesh->GetNumberOfPoints();
-
-                for (std::uint64_t pnt_id = 0; pnt_id < numPoints; pnt_id++) {
-                    auto point = mesh->GetPoint(pnt_id);
-                    point[0] += overlayImportDlg->spinBoxOffset->value();
-                    point[1] += overlayImportDlg->spinBoxOffset->value();
-                    point[2] += overlayImportDlg->spinBoxOffset->value();
-                    point[0] *= overlayImportDlg->doubleSpinBoxScalingFactor->value();
-                    point[1] *= overlayImportDlg->doubleSpinBoxScalingFactor->value();
-                    point[2] *= overlayImportDlg->doubleSpinBoxScalingFactor->value();
-                    overlayCloud[point[zAxis]].push_back({
-                        point[xAxis],
-                        point[yAxis],
-                    });
-                }
-            }
-        }
-
-        std::cout << "Size Cloud: " << overlayCloud.size() << std::endl;
-        std::cout << "Size Z == 0: " << overlayCloud[0].size() << std::endl;
-        fVolumeViewerWidget->setOverlay(overlayCloud);
-        fVolumeViewerWidget->UpdateView();
+        fVolumeViewerWidget->SetOverlaySettings(overlaySettings);
         dlg->close();
     });
     QObject::connect(overlayImportDlg->buttonBox, &QDialogButtonBox::rejected, dlg, &QDialog::reject);

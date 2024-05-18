@@ -11,6 +11,8 @@
 #include <QGraphicsScene>
 #include <QDebug>
 
+#include "COverlayHandler.hpp"
+
 namespace ChaoVis
 {
 
@@ -65,6 +67,7 @@ public:
 
     void SetViewState(EViewState nViewState) { fViewState = nViewState; }
     EViewState GetViewState(void) { return fViewState; }
+    auto GetView() -> QGraphicsView* { return fGraphicsView; }
 
     virtual void SetImage(const QImage& nSrc);
     void SetImageIndex(int nImageIndex)
@@ -73,7 +76,11 @@ public:
         fImageIndexEdit->setValue(nImageIndex);
         UpdateButtons();
     }
+    auto GetImageIndex() const -> int { return fImageIndex; }
     void setNumSlices(int num);
+    void SetOverlaySettings(COverlayHandler::OverlaySettings settings);
+
+    virtual void UpdateView() {};
 
 protected:
     bool eventFilter(QObject* watched, QEvent* event);
@@ -108,6 +115,7 @@ protected:
     // widget components
     CVolumeViewerView* fGraphicsView;
     QGraphicsScene* fScene;
+    COverlayHandler* fOverlayHandler;
 
     QLabel* fCanvas;
     QScrollArea* fScrollArea;

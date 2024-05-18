@@ -1,5 +1,5 @@
 // COverlay.hpp
-// Philip Allgaier May 2024
+// Philip Allgaier 2024 May
 #pragma once
 
 #include <QGraphicsItem>
