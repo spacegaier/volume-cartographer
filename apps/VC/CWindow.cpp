@@ -979,7 +979,7 @@ void CWindow::UpdateView(void)
     fVolumeViewerWidget->UpdateView();
     UpdateAnnotationList();
 
-    update();
+    // update();
 }
 
 // Reset point cloud

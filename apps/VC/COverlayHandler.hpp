@@ -3,6 +3,7 @@
 #pragma once
 
 #include <map>
+#include <set>
 #include <shared_mutex>
 
 #include <QString>
@@ -14,6 +15,7 @@ class CVolumeViewer;
 class COverlayGraphicsItem;
 
 typedef std::vector<cv::Vec2d> OverlaySliceData;
+// Map of Z index and overlay point data
 typedef std::map<int, OverlaySliceData> OverlayData;
 
 class COverlayHandler
@@ -37,7 +39,7 @@ public:
     auto getOverlayData() const -> OverlayData { return data; }
     void updateOverlayData();
 
-    void loadSingleOverlayFile(QString path) const;
+    void loadSingleOverlayFile(QString file, int threadNum) const;
     void mergeThreadData(OverlayData threadData) const;
 
 protected:
@@ -46,6 +48,11 @@ protected:
 
     mutable OverlayData data;
     mutable std::shared_mutex dataMutex;
+    // Each numbered thread fills its own overlay data and at the end
+    // of the data loading they will get merged together
+    mutable std::map<int, OverlayData> threadData;
+
+    std::set<QString> loadedFiles;
 };
 
 }

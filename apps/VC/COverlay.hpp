@@ -3,7 +3,7 @@
 #pragma once
 
 #include <QGraphicsItem>
-#include <QGraphicsScene>
+#include <QGraphicsView>
 #include <opencv2/imgproc.hpp>
 
 #include "COverlayHandler.hpp"
@@ -13,9 +13,8 @@ namespace ChaoVis
 class COverlayGraphicsItem : public QGraphicsItem
 {
     public:
-        COverlayGraphicsItem(QWidget* parent = nullptr);
+        COverlayGraphicsItem(QGraphicsView* graphicsView, OverlaySliceData points, QRect sceneRect, QWidget* parent = nullptr);
 
-        void setPoints(OverlaySliceData input) { points = input; }
         void setPen(QPen input) { pen = input; }
         void setBrush(QBrush input) { brush = input; }
 
@@ -24,8 +23,10 @@ class COverlayGraphicsItem : public QGraphicsItem
         auto type() const -> int { return 70000; }
 
     protected:
+        QGraphicsView* view;
         OverlaySliceData points;
-        QRect rect;
+        QRect sceneRect;
+        QRect intBoundingRect;
         QPen pen;
         QBrush brush;
 };

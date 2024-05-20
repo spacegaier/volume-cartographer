@@ -138,8 +138,7 @@ void CVolumeViewerWithCurve::SetImage(const QImage& nSrc)
     }
     fBaseImageItem = fScene->addPixmap(pixmap);
 
-    fOverlayHandler->updateOverlayData();
-
+    UpdateOverlay();
     UpdateButtons();
     update();
 }
@@ -219,8 +218,6 @@ void CVolumeViewerWithCurve::UpdateView()
         // qDebug() << "showCurve";
         DrawIntersectionCurve(fScene);
     }
-
-    //DrawOverlay();
 
     // If we have an image, draw it
     if (fImgQImage != nullptr) {
