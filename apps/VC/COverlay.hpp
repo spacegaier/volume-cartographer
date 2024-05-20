@@ -21,6 +21,7 @@ class COverlayGraphicsItem : public QGraphicsItem
 
         void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr);
         auto boundingRect() const -> QRectF;
+        auto type() const -> int { return 70000; }
 
     protected:
         OverlaySliceData points;

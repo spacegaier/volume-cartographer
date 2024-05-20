@@ -7,7 +7,6 @@
 #include <opencv2/imgproc.hpp>
 
 #include "ColorFrame.hpp"
-#include "COverlay.hpp"
 
 #include <QCoreApplication> // To use QCoreApplication::sendEvent()
 
@@ -188,17 +187,11 @@ void CVolumeViewerWithCurve::UpdateSplineCurve(void)
 
 void CVolumeViewerWithCurve::UpdateView()
 {
-    // for(auto overlay : overlayItems) {
-    //     fScene->removeItem(overlay);
-    //     delete overlay;
-    // }
-    // overlayItems.clear();
-
     // Remove all existing ellipses and lines
     QList<QGraphicsItem*> allItems = fScene->items();
     for(QGraphicsItem *item : allItems)
     {
-        if (qgraphicsitem_cast<QGraphicsEllipseItem*>(item) || qgraphicsitem_cast<QGraphicsLineItem*>(item))
+        if ((qgraphicsitem_cast<QGraphicsEllipseItem*>(item) || qgraphicsitem_cast<QGraphicsLineItem*>(item)) && item->type() != 70000)
         {
             fScene->removeItem(item);
             delete item;
@@ -227,7 +220,7 @@ void CVolumeViewerWithCurve::UpdateView()
         DrawIntersectionCurve(fScene);
     }
 
-    DrawOverlay();
+    //DrawOverlay();
 
     // If we have an image, draw it
     if (fImgQImage != nullptr) {
@@ -689,48 +682,6 @@ void CVolumeViewerWithCurve::DrawControlPoints(QGraphicsScene* scene)
         auto p1 = fControlPoints[i][1] - 0.5;
         scene->addEllipse(p0, p1, 2, 2, QPen(QColor(r, g, b)), QBrush(QColor(r, g, b)));
     }
-}
-
-void CVolumeViewerWithCurve::DrawOverlay()
-{
-    const int alpha = 120;
-    auto data = fOverlayHandler->getOverlayData();
-
-    auto overlay1 = new COverlayGraphicsItem(this);
-    overlay1->setPen(QPen(QColor(80, 100, 210)));
-    overlay1->setBrush(QBrush(QColor(100, 120, 230, alpha)));
-    overlay1->setPoints(data[fImageIndex - 2]);
-    fScene->addItem(overlay1);
-    overlayItems.append(overlay1);
-
-    auto overlay2 = new COverlayGraphicsItem(this);
-    overlay2->setPen(QPen(QColor(140, 100, 160)));
-    overlay2->setBrush(QBrush(QColor(160, 120, 180, alpha)));
-    overlay2->setPoints(data[fImageIndex - 1]);
-    fScene->addItem(overlay2);
-    overlayItems.append(overlay2);
-
-    std::cout << "Drawing 0: " << data[fImageIndex].size() << std::endl;
-    auto overlay3 = new COverlayGraphicsItem(this);
-    overlay3->setPen(QPen(QColor(180, 90, 120)));
-    overlay3->setBrush(QBrush(QColor(200, 110, 140, alpha)));
-    overlay3->setPoints(data[fImageIndex]);
-    fScene->addItem(overlay3);
-    overlayItems.append(overlay3);
-
-    auto overlay4 = new COverlayGraphicsItem(this);
-    overlay4->setPen(QPen(QColor(230, 100, 80)));
-    overlay4->setBrush(QBrush(QColor(250, 120, 100, alpha)));
-    overlay4->setPoints(data[fImageIndex + 1]);
-    fScene->addItem(overlay4);
-    overlayItems.append(overlay4);
-
-    auto overlay5 = new COverlayGraphicsItem(this);
-    overlay5->setPen(QPen(QColor(220, 140, 10)));
-    overlay5->setBrush(QBrush(QColor(255, 170, 30, alpha)));
-    overlay5->setPoints(data[fImageIndex + 2]);
-    fScene->addItem(overlay5);
-    overlayItems.append(overlay5);
 }
 
 // Update the status of the buttons

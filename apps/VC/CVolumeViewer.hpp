@@ -80,11 +80,11 @@ public:
     void setNumSlices(int num);
     void SetOverlaySettings(COverlayHandler::OverlaySettings settings);
 
+    void DrawOverlay();
     virtual void UpdateView() {};
 
 protected:
     bool eventFilter(QObject* watched, QEvent* event);
-    void paintEvent(QPaintEvent* event);
 
 public slots:
     void OnZoomInClicked(void);
@@ -136,6 +136,7 @@ protected:
     bool fCenterOnZoomEnabled;
 
     QGraphicsPixmapItem* fBaseImageItem;
+    QList<COverlayGraphicsItem*> overlayItems;
 };  // class CVolumeViewer
 
 }  // namespace ChaoVis

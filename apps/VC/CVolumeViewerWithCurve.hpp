@@ -69,7 +69,6 @@ private:
 
     void DrawIntersectionCurve(QGraphicsScene* scene);
     void DrawControlPoints(QGraphicsScene* scene);
-    void DrawOverlay();
 
 signals:
     void SendSignalPathChanged(std::string, PathChangePointVector before, PathChangePointVector after);
@@ -110,8 +109,6 @@ private:
     bool isPanning{false};
     bool rightPressed{false};
     int panStartX, panStartY;
-
-    QList<COverlayGraphicsItem*> overlayItems;
 };  // class CVolumeViewerWithCurve
 
 }  // namespace ChaoVis

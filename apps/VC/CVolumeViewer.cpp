@@ -3,6 +3,8 @@
 #include "CVolumeViewer.hpp"
 #include "HBase.hpp"
 
+#include "COverlay.hpp"
+
 using namespace ChaoVis;
 using qga = QGuiApplication;
 
@@ -187,6 +189,13 @@ CVolumeViewer::CVolumeViewer(QWidget* parent)
 
     setLayout(aWidgetLayout);
 
+    connect(this->GetView()->verticalScrollBar(), &QScrollBar::valueChanged, this, [this]() {
+        DrawOverlay();
+    });
+    connect(this->GetView()->horizontalScrollBar(), &QScrollBar::valueChanged, this, [this]() {
+        DrawOverlay();
+    });
+
     UpdateButtons();
 }
 
@@ -279,6 +288,8 @@ bool CVolumeViewer::eventFilter(QObject* watched, QEvent* event)
                 CenterOn(fGraphicsView->mapToScene(wheelEvent->position().toPoint()));
             }
 
+            DrawOverlay();
+
             return true;
         }
         // Shift = Scan through slices
@@ -298,12 +309,6 @@ bool CVolumeViewer::eventFilter(QObject* watched, QEvent* event)
         
     }
     return QWidget::eventFilter(watched, event);
-}
-
-// Handle paint event
-void CVolumeViewer::paintEvent(QPaintEvent* /*event*/)
-{
-    // REVISIT - FILL ME HERE
 }
 
 void CVolumeViewer::ScaleImage(double nFactor)
@@ -450,4 +455,52 @@ cv::Vec2f CVolumeViewer::GetScrollPosition() const
 
     // Return as cv::Vec2f
     return cv::Vec2f(horizontalPos, verticalPos);
+}
+
+void CVolumeViewer::DrawOverlay()
+{
+    for(auto overlay : overlayItems) {
+        fScene->removeItem(overlay);
+        delete overlay;
+    }
+    overlayItems.clear();
+
+    const int alpha = 120;
+    auto data = fOverlayHandler->getOverlayData();
+
+    auto overlay1 = new COverlayGraphicsItem(this);
+    overlay1->setPen(QPen(QColor(80, 100, 210)));
+    overlay1->setBrush(QBrush(QColor(100, 120, 230, alpha)));
+    overlay1->setPoints(data[fImageIndex - 2]);
+    fScene->addItem(overlay1);
+    overlayItems.append(overlay1);
+
+    auto overlay2 = new COverlayGraphicsItem(this);
+    overlay2->setPen(QPen(QColor(140, 100, 160)));
+    overlay2->setBrush(QBrush(QColor(160, 120, 180, alpha)));
+    overlay2->setPoints(data[fImageIndex - 1]);
+    fScene->addItem(overlay2);
+    overlayItems.append(overlay2);
+
+    std::cout << "Drawing 0: " << data[fImageIndex].size() << std::endl;
+    auto overlay3 = new COverlayGraphicsItem(this);
+    overlay3->setPen(QPen(QColor(180, 90, 120)));
+    overlay3->setBrush(QBrush(QColor(200, 110, 140, alpha)));
+    overlay3->setPoints(data[fImageIndex]);
+    fScene->addItem(overlay3);
+    overlayItems.append(overlay3);
+
+    auto overlay4 = new COverlayGraphicsItem(this);
+    overlay4->setPen(QPen(QColor(230, 100, 80)));
+    overlay4->setBrush(QBrush(QColor(250, 120, 100, alpha)));
+    overlay4->setPoints(data[fImageIndex + 1]);
+    fScene->addItem(overlay4);
+    overlayItems.append(overlay4);
+
+    auto overlay5 = new COverlayGraphicsItem(this);
+    overlay5->setPen(QPen(QColor(220, 140, 10)));
+    overlay5->setBrush(QBrush(QColor(255, 170, 30, alpha)));
+    overlay5->setPoints(data[fImageIndex + 2]);
+    fScene->addItem(overlay5);
+    overlayItems.append(overlay5);
 }

@@ -7,15 +7,16 @@
 using namespace ChaoVis;
 
 COverlayGraphicsItem::COverlayGraphicsItem(QWidget* parent)
-{}
+{
+    setCacheMode(QGraphicsItem::DeviceCoordinateCache);
+}
 
 void COverlayGraphicsItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget)
 {
     const int pointWidth = 4;
 
     painter->setPen(pen);
-    painter->setBrush(brush);
-    setCacheMode(QGraphicsItem::DeviceCoordinateCache);
+    painter->setBrush(brush);    
 
     int left, right, top, bottom;
     int boundLeft, boundRight, boundTop, boundBottom;
@@ -47,7 +48,7 @@ void COverlayGraphicsItem::paint(QPainter *painter, const QStyleOptionGraphicsIt
 
     // rect.setTopLeft(QPoint(boundLeft, boundTop));
     rect.setTopLeft(QPoint(0, 0));
-    rect.setBottomRight(QPoint(boundRight, boundBottom));
+    rect.setBottomRight(QPoint(2*boundRight, 2*boundBottom));
 }
 
 auto COverlayGraphicsItem::boundingRect() const -> QRectF
