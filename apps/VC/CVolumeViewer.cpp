@@ -10,6 +10,7 @@ using qga = QGuiApplication;
 
 #define BGND_RECT_MARGIN 8
 #define DEFAULT_TEXT_COLOR QColor(255, 255, 120)
+#define ZOOM_FACTOR 1.15
 
 // Constructor
 CVolumeViewerView::CVolumeViewerView(QWidget* parent)
@@ -48,6 +49,9 @@ void CVolumeViewerView::keyPressEvent(QKeyEvent* event)
     } else if (event->key() == Qt::Key_R) {
         curvePanKeyPressed = true;
         event->accept();
+    } else if (event->key() == Qt::Key_S) {
+        rotateKeyPressed = true;
+        event->accept();
     }
 }
 
@@ -58,6 +62,9 @@ void CVolumeViewerView::keyReleaseEvent(QKeyEvent* event)
         event->accept();
     } else if (event->key() == Qt::Key_R) {
         curvePanKeyPressed = false;
+        event->accept();
+    } else if (event->key() == Qt::Key_S) {
+        rotateKeyPressed = false;
         event->accept();
     }
 }
@@ -182,6 +189,7 @@ CVolumeViewer::CVolumeViewer(QWidget* parent)
 
     QSettings settings("VC.ini", QSettings::IniFormat);
     fCenterOnZoomEnabled = settings.value("viewer/center_on_zoom", false).toInt() != 0;
+    fScrollSpeed = settings.value("viewer/scroll_speed", false).toInt();
 
     QVBoxLayout* aWidgetLayout = new QVBoxLayout;
     aWidgetLayout->addWidget(fGraphicsView);
@@ -305,8 +313,37 @@ bool CVolumeViewer::eventFilter(QObject* watched, QEvent* event)
             }            
             return true;
         }
+        // Rotate key pressed
+        else if (fGraphicsView->isRotateKyPressed()) {
+            int delta = wheelEvent->angleDelta().y() / 22;
+            fGraphicsView->rotate(delta);
+            fGraphicsView->updateCurrentRotation(delta);
+            return true;
+        } 
+        // View scrolling
+        else {
+            // If there is no valid scroll speed override value set, we rely
+            // on the default handling of Qt, so we pass on the event.
+            if (fScrollSpeed > 0) {
+                // We have to add the two values since when pressing AltGr as the modifier, 
+                // the X component seems to be set by Qt
+                int delta = wheelEvent->angleDelta().x() + wheelEvent->angleDelta().y();
+                if (delta == 0) {
+                    return true;
+                }
 
-        
+                // Taken from QGraphicsView Qt source logic
+                const bool horizontal = qAbs(wheelEvent->angleDelta().x()) > qAbs(wheelEvent->angleDelta().y());
+                if (QApplication::keyboardModifiers() == Qt::AltModifier || horizontal) {
+                    fGraphicsView->horizontalScrollBar()->setValue(
+                        fGraphicsView->horizontalScrollBar()->value() + fScrollSpeed * ((delta < 0) ? 1 : -1));
+                } else {
+                    fGraphicsView->verticalScrollBar()->setValue(
+                        fGraphicsView->verticalScrollBar()->value() + fScrollSpeed * ((delta < 0) ? 1 : -1));
+                }
+                return true;
+            }
+        }
     }
     return QWidget::eventFilter(watched, event);
 }
@@ -324,11 +361,18 @@ void CVolumeViewer::CenterOn(const QPointF& point)
     fGraphicsView->centerOn(point);
 }
 
+void CVolumeViewer::ResetRotation()
+{
+    auto current = fGraphicsView->getCurrentRotation();
+    fGraphicsView->rotate(-current);
+    fGraphicsView->updateCurrentRotation(-current);
+}
+
 // Handle zoom in click
 void CVolumeViewer::OnZoomInClicked(void)
 {
     if (fZoomInBtn->isEnabled()) {
-        ScaleImage(1.15);
+        ScaleImage(ZOOM_FACTOR);
     }
 }
 
@@ -336,7 +380,7 @@ void CVolumeViewer::OnZoomInClicked(void)
 void CVolumeViewer::OnZoomOutClicked(void)
 {
     if (fZoomOutBtn->isEnabled()) {
-        ScaleImage(0.85);
+        ScaleImage(1 / ZOOM_FACTOR);
     }
 }
 
@@ -392,69 +436,6 @@ void CVolumeViewer::UpdateButtons(void)
         fImgQImage != nullptr && fabs(fScaleFactor - 1.0) > 1e-6);
     fNextBtn->setEnabled(fImgQImage != nullptr);
     fPrevBtn->setEnabled(fImgQImage != nullptr);
-}
-
-// Adjust scroll bar of scroll area
-void CVolumeViewer::AdjustScrollBar(QScrollBar* nScrollBar, double nFactor)
-{
-    nScrollBar->setValue(
-        int(nFactor * nScrollBar->value() +
-            ((nFactor - 1) * nScrollBar->pageStep() / 2)));
-}
-
-cv::Vec2f CVolumeViewer::CleanScrollPosition(cv::Vec2f pos) const
-{
-    int x = pos[0];
-    int y = pos[1];
-
-    // Get the size of the QGraphicsView viewport
-    int viewportWidth = fGraphicsView->viewport()->width();
-    int viewportHeight = fGraphicsView->viewport()->height();
-
-    // Calculate the position of the scroll bars
-    int horizontalPos = x - viewportWidth / 2;
-    int verticalPos = y - viewportHeight / 2;
-
-    // Check and respect horizontal boundaries
-    if (horizontalPos < fGraphicsView->horizontalScrollBar()->minimum())
-        horizontalPos = fGraphicsView->horizontalScrollBar()->minimum();
-    else if (horizontalPos > fGraphicsView->horizontalScrollBar()->maximum())
-        horizontalPos = fGraphicsView->horizontalScrollBar()->maximum();
-
-    // Check and respect vertical boundaries
-    if (verticalPos < fGraphicsView->verticalScrollBar()->minimum())
-        verticalPos = fGraphicsView->verticalScrollBar()->minimum();
-    else if (verticalPos > fGraphicsView->verticalScrollBar()->maximum())
-        verticalPos = fGraphicsView->verticalScrollBar()->maximum();
-
-    return cv::Vec2f(horizontalPos + viewportWidth / 2, verticalPos + viewportHeight / 2);
-}
-
-void CVolumeViewer::ScrollToCenter(cv::Vec2f pos)
-{
-    pos = CleanScrollPosition(pos);
-
-    // Get the size of the QGraphicsView viewport
-    int viewportWidth = fGraphicsView->viewport()->width();
-    int viewportHeight = fGraphicsView->viewport()->height();
-
-    // Calculate the position of the scroll bars
-    int horizontalPos = pos[0] - viewportWidth / 2;
-    int verticalPos = pos[1] - viewportHeight / 2;
-
-    // Set the scroll bar positions
-    fGraphicsView->horizontalScrollBar()->setValue(horizontalPos);
-    fGraphicsView->verticalScrollBar()->setValue(verticalPos);
-}
-
-cv::Vec2f CVolumeViewer::GetScrollPosition() const
-{
-    // Get the positions of the scroll bars
-    float horizontalPos = static_cast<float>(fGraphicsView->horizontalScrollBar()->value() + fGraphicsView->viewport()->width() / 2);
-    float verticalPos = static_cast<float>(fGraphicsView->verticalScrollBar()->value() + fGraphicsView->viewport()->height() / 2);
-
-    // Return as cv::Vec2f
-    return cv::Vec2f(horizontalPos, verticalPos);
 }
 
 void CVolumeViewer::DrawOverlay()

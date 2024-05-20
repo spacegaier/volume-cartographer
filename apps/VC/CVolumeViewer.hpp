@@ -30,22 +30,29 @@ class CVolumeViewerView : public QGraphicsView
 
         bool isRangeKeyPressed() { return rangeKeyPressed; }
         bool isCurvePanKeyPressed() { return curvePanKeyPressed; }
+        bool isRotateKyPressed() { return rotateKeyPressed; }
 
         void showTextAboveCursor(const QString& value, const QString& label, const QColor& color);
         void hideTextAboveCursor();
 
-    public slots:
         void showCurrentImpactRange(int range);
         void showCurrentScanRange(int range);
         void showCurrentSliceIndex(int slice, bool highlight);
 
+        void updateCurrentRotation(int delta) { currentRotation += delta; }
+        auto getCurrentRotation() -> int { return currentRotation; }
+
     protected:
         bool rangeKeyPressed{false};
         bool curvePanKeyPressed{false};
+        bool rotateKeyPressed{false};
 
         QGraphicsTextItem* textAboveCursor;
         QGraphicsRectItem* backgroundBehindText;
         QTimer* timerTextAboveCursor;
+
+        // Required to be able to reset the rotation without also resetting the scaling
+        int currentRotation{0};
 };
 
 class CVolumeViewer : public QWidget
@@ -78,6 +85,7 @@ public:
     }
     auto GetImageIndex() const -> int { return fImageIndex; }
     void setNumSlices(int num);
+    void ResetRotation();
     void SetOverlaySettings(COverlayHandler::OverlaySettings settings);
 
     void DrawOverlay();
@@ -106,10 +114,6 @@ protected:
     void ScaleImage(double nFactor);
     void CenterOn(const QPointF& point);
     virtual void UpdateButtons(void);
-    void AdjustScrollBar(QScrollBar* nScrollBar, double nFactor);
-    void ScrollToCenter(cv::Vec2f pos);
-    cv::Vec2f GetScrollPosition() const;
-    cv::Vec2f CleanScrollPosition(cv::Vec2f pos) const;
 
 protected:
     // widget components
@@ -133,7 +137,9 @@ protected:
     int sliceIndexToolStart{-1};
     int fScanRange;  // how many slices a mouse wheel step will jump
 
+    // user settings
     bool fCenterOnZoomEnabled;
+    int fScrollSpeed{-1};
 
     QGraphicsPixmapItem* fBaseImageItem;
     QList<COverlayGraphicsItem*> overlayItems;

@@ -232,7 +232,10 @@ void CVolumeViewerWithCurve::UpdateView()
 
 void CVolumeViewerWithCurve::panAlongCurve(double speed, bool forward)
 {
-    auto p2 = GetScrollPosition() / fScaleFactor  + scrollPositionModifier;
+    int viewportWidth = fGraphicsView->viewport()->width();
+    int viewportHeight = fGraphicsView->viewport()->height();
+    auto p0 = fGraphicsView->mapToScene(viewportWidth / 2, viewportHeight / 2);
+    auto p2 = cv::Vec2f(p0.x(), p0.y());
 
     auto res = SelectPointOnCurves(p2, false, true);
     fSelectedPointIndex = res.first;
@@ -244,7 +247,6 @@ void CVolumeViewerWithCurve::panAlongCurve(double speed, bool forward)
     // fIntersectionCurveRef from the fSelectedSegID
     int numCurvePoints = fSegStructMapRef[fSelectedSegID].fIntersectionCurve.GetPointsNum();
     int pointDifference = static_cast<int>(speed / fScaleFactor);
-    // qDebug() << "pointDifference: " << pointDifference << " fSelectedPointIndex: " << fSelectedPointIndex;
     if (!forward) {
         fSelectedPointIndex -= pointDifference;
     }
@@ -252,10 +254,10 @@ void CVolumeViewerWithCurve::panAlongCurve(double speed, bool forward)
         fSelectedPointIndex += pointDifference;
     }
     fSelectedPointIndex = std::max(0, std::min(numCurvePoints - 1, fSelectedPointIndex));
-    // qDebug() << "fSelectedPointIndex: " << fSelectedPointIndex;
     auto p1 = fSegStructMapRef[fSelectedSegID].fIntersectionCurve.GetPoint(fSelectedPointIndex);
     auto v = cv::Vec2f(p1[0] - p2[0], p1[1] - p2[1]);
     auto v2 = v * 0.1;
+
     if (0 < std::sqrt(v2[0]*v2[0] + v2[1]*v2[1]) && std::sqrt(v2[0]*v2[0] + v2[1]*v2[1]) < (10.0 / fScaleFactor)) {
         v2 *= (10.0 / fScaleFactor) / std::sqrt(v2[0]*v2[0] + v2[1]*v2[1]);
         // check that the v2 is not overshooting p1
@@ -266,11 +268,11 @@ void CVolumeViewerWithCurve::panAlongCurve(double speed, bool forward)
             v2[1] = v[1];
         }
     }
-    scrollPositionModifier = p2 + v2 - CleanScrollPosition((p2 + v2) * fScaleFactor) / fScaleFactor;
-    // qDebug() << "v2: " << v2 << " v: " << v << " p2: " << p2 << " p1: " << p1[0] << " " << p1[1];
+
     v2 += p2;
-    // qDebug() << "v2: " << v2 << " scrollPositionModifier: " << scrollPositionModifier;
-    ScrollToCenter(v2 * fScaleFactor);
+    scrollPositionModifier = cv::Vec2f(v2[0] - (viewportWidth / 2), v2[1] - (viewportHeight / 2));
+
+    fGraphicsView->centerOn(QPointF(v2[0], v2[1]));
 }
 
 // Handle mouse press event
@@ -530,9 +532,6 @@ bool CVolumeViewerWithCurve::eventFilter(QObject* watched, QEvent* event)
     // also call parent class implementation
     return CVolumeViewer::eventFilter(watched, event);
 }
-
-// Handle paint event
-void CVolumeViewerWithCurve::paintEvent(QPaintEvent* /*event*/) {}
 
 void CVolumeViewerWithCurve::toggleShowCurveBox()
 {

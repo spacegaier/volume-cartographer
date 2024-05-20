@@ -496,6 +496,7 @@ void CWindow::CreateWidgets(void)
     scanRangeDown = new QShortcut(QKeySequence(Qt::Key_Q), this);
     returnToEditSlice = new QShortcut(QKeySequence(Qt::Key_F), this);
     toggleAnchor = new QShortcut(QKeySequence(Qt::Key_L), this);
+    resetRotation = new QShortcut(QKeySequence(Qt::Key_X), this);
 
     connect(
         slicePrev, &QShortcut::activated, fVolumeViewerWidget,
@@ -568,6 +569,7 @@ void CWindow::CreateWidgets(void)
     connect(scanRangeDown, &QShortcut::activated, this, &CWindow::ScanRangeDown);
     connect(returnToEditSlice, &QShortcut::activated, this, &CWindow::ReturnToEditSlice);
     connect(toggleAnchor, &QShortcut::activated, this, &CWindow::ToggleAnchor);
+    connect(resetRotation, &QShortcut::activated, fVolumeViewerWidget, &CVolumeViewer::ResetRotation);
 }
 
 // Create menus
@@ -1963,6 +1965,7 @@ void CWindow::Keybindings(void)
         "F: Return to slice that the currently active tool was started on \n"
         "L: Mark/unmark current slice as anchor (only in Segmentation Tool) \n"
         "Y/Z: Evenly space Points on Curve (only in Segmentation Tool) \n"
+        "Z: Reset view rotation back to zero \n"
         "\n"
         "Mouse: \n"
         "------------------- \n"
@@ -1972,6 +1975,7 @@ void CWindow::Keybindings(void)
         "Mouse Wheel + Shift: Next/previous slice \n"
         "Mouse Wheel + W Key Hold: Change impact range \n"
         "Mouse Wheel + R Key Hold: Follow Highlighted Curve \n"
+        "Mouse Wheel + S Key Hold: Rotate view \n"
         "Mouse Left Click: Add Points to Curve in Pen Tool. Snap Closest Point to Cursor in Segmentation Tool. \n"
         "Mouse Left Drag: Drag Point / Curve after Mouse Left Click \n"
         "Mouse Right Drag: Pan slice image\n"
