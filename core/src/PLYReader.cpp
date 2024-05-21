@@ -161,6 +161,26 @@ void PLYReader::read_points_()
 {
     char buffer[vertextByteLength_];
 
+    // Read settings here one to prevent redundant std::map reads for each point
+    unsigned int xBinLength = vertextByteInfo_["x"].length;
+    unsigned int yBinLength = vertextByteInfo_["y"].length;
+    unsigned int zBinLength = vertextByteInfo_["z"].length;
+    unsigned int xBinOffset = vertextByteInfo_["x"].offset;
+    unsigned int yBinOffset = vertextByteInfo_["y"].offset;
+    unsigned int zBinOffset = vertextByteInfo_["z"].offset;
+    unsigned int nxBinLength = vertextByteInfo_["nx"].length;
+    unsigned int nyBinLength = vertextByteInfo_["ny"].length;
+    unsigned int nzBinLength = vertextByteInfo_["nz"].length;
+    unsigned int nxBinOffset = vertextByteInfo_["nx"].offset;
+    unsigned int nyBinOffset = vertextByteInfo_["ny"].offset;
+    unsigned int nzBinOffset = vertextByteInfo_["nz"].offset;
+    unsigned int redBinLength   = vertextByteInfo_["red"].length;
+    unsigned int greenBinLength = vertextByteInfo_["green"].length;
+    unsigned int blueBinLength  = vertextByteInfo_["blue"].length;
+    unsigned int redBinOffset   = vertextByteInfo_["red"].offset;
+    unsigned int greenBinOffset = vertextByteInfo_["green"].offset;
+    unsigned int blueBinOffset  = vertextByteInfo_["blue"].offset;
+
     for (int i = 0; i < numVertices_; i++) {
         SimpleMesh::Vertex curPoint;
 
@@ -182,38 +202,20 @@ void PLYReader::read_points_()
             }
         } else {            
             plyFile_.read(buffer, vertextByteLength_);
-            char bufferX[vertextByteInfo_["x"].length];
-            char bufferY[vertextByteInfo_["y"].length];
-            char bufferZ[vertextByteInfo_["z"].length];
 
-            memcpy(&bufferX, buffer + vertextByteInfo_["x"].offset, vertextByteInfo_["x"].length);
-            curPoint.x = convert(bufferX, vertextByteInfo_["x"].length);            
-            memcpy(&bufferY, buffer + vertextByteInfo_["y"].offset, vertextByteInfo_["y"].length);
-            curPoint.y = convert(bufferY, vertextByteInfo_["y"].length);     
-            memcpy(&bufferZ, buffer + vertextByteInfo_["z"].offset, vertextByteInfo_["z"].length);
-            curPoint.z = convert(bufferZ, vertextByteInfo_["z"].length);     
+            curPoint.x = convert(buffer + xBinOffset, xBinLength); 
+            curPoint.y = convert(buffer + yBinOffset, yBinLength);
+            curPoint.z = convert(buffer + zBinOffset, zBinLength);     
 
             if (properties_.find("nx") != properties_.end()) {
-                char bufferNX[vertextByteInfo_["nx"].length];
-                char bufferNY[vertextByteInfo_["ny"].length];
-                char bufferNZ[vertextByteInfo_["nz"].length];
-                memcpy(&bufferNX, buffer + vertextByteInfo_["nx"].offset, vertextByteInfo_["nx"].length);
-                curPoint.nx = convert(bufferNX, vertextByteInfo_["nx"].length);
-                memcpy(&bufferNY, buffer + vertextByteInfo_["ny"].offset, vertextByteInfo_["ny"].length);
-                curPoint.ny = convert(bufferNY, vertextByteInfo_["ny"].length);
-                memcpy(&bufferNZ, buffer + vertextByteInfo_["nz"].offset, vertextByteInfo_["nz"].length);
-                curPoint.nz = convert(bufferNZ, vertextByteInfo_["nz"].length);
+                curPoint.nx = convert(buffer + nxBinOffset, nxBinLength);
+                curPoint.ny = convert(buffer + nyBinOffset, nyBinLength);
+                curPoint.nz = convert(buffer+ nzBinOffset, nzBinLength);
             }
             if (properties_.find("red") != properties_.end()) {
-                char bufferRed[vertextByteInfo_["red"].length];
-                char bufferGreen[vertextByteInfo_["green"].length];
-                char bufferBlue[vertextByteInfo_["blue"].length];
-                memcpy(&bufferRed,   buffer + vertextByteInfo_["red"].offset,   vertextByteInfo_["red"].length);
-                curPoint.r = convert(bufferRed,   vertextByteInfo_["red"].length);
-                memcpy(&bufferGreen, buffer + vertextByteInfo_["green"].offset, vertextByteInfo_["green"].length);
-                curPoint.g = convert(bufferGreen, vertextByteInfo_["green"].length);
-                memcpy(&bufferBlue,  buffer + vertextByteInfo_["blue"].offset,  vertextByteInfo_["blue"].length);
-                curPoint.b = convert(bufferBlue,  vertextByteInfo_["blue"].length);
+                curPoint.r = convert(buffer + redBinOffset,   redBinLength);
+                curPoint.g = convert(buffer + greenBinOffset, greenBinLength);
+                curPoint.b = convert(buffer + blueBinOffset,  blueBinLength);
             }
         }
         pointList_.push_back(curPoint);  
