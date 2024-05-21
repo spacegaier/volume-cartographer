@@ -199,11 +199,14 @@ CVolumeViewer::CVolumeViewer(QWidget* parent)
 
     setLayout(aWidgetLayout);
 
+    timerOverlayUpdate = new QTimer(this);
+    timerOverlayUpdate->setSingleShot(true);
+    connect(timerOverlayUpdate, &QTimer::timeout, this, &CVolumeViewer::UpdateOverlay);
     connect(this->GetView()->verticalScrollBar(), &QScrollBar::valueChanged, this, [this]() {
-        UpdateOverlay();
+        timerOverlayUpdate->start(1000);
     });
     connect(this->GetView()->horizontalScrollBar(), &QScrollBar::valueChanged, this, [this]() {
-        UpdateOverlay();
+        timerOverlayUpdate->start(1000);
     });
 
     UpdateButtons();
@@ -442,6 +445,10 @@ void CVolumeViewer::UpdateButtons(void)
 
 void CVolumeViewer::UpdateOverlay()
 { 
+    // if (isPanning()) {
+    //     return;
+    // }
+
     std::cout << "------" << std::endl;
     for (auto overlay : overlayItems) {
         fScene->removeItem(overlay);
@@ -478,6 +485,17 @@ void CVolumeViewer::UpdateOverlay()
         fScene->addItem(overlay3);
         overlayItems.append(overlay3);
     }
+
+    // auto pen = QPen(QColor(180, 90, 120));
+    // auto brush = QBrush(QColor(200, 110, 140, alpha));
+    // const int pointWidth = 4;
+    // for (int i = 0; i < data.size(); ++i) {
+    //     // Create new ellipse points
+    //     auto p0 = data[i][0] - pointWidth / 2;
+    //     auto p1 = data[i][1] - pointWidth / 2;
+    //     auto item = fScene->addEllipse(p0, p1, pointWidth, pointWidth, pen, brush);
+    //     //item->setCacheMode(QGraphicsItem::DeviceCoordinateCache);
+    // }
 
     // auto overlay4 = new COverlayGraphicsItem(fGraphicsView, this);
     // overlay4->setPen(QPen(QColor(230, 100, 80)));

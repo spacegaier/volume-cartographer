@@ -11,7 +11,7 @@ using namespace ChaoVis;
 COverlayGraphicsItem::COverlayGraphicsItem(QGraphicsView* graphicsView, OverlaySliceData points, QRect sceneRect, QWidget* parent) : 
     QGraphicsItem(), view(graphicsView), points(points), sceneRect(sceneRect)
 {
-    // setCacheMode(QGraphicsItem::ItemCoordinateCache);
+    // setCacheMode(QGraphicsItem::DeviceCoordinateCache);
 }
 
 void COverlayGraphicsItem::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget)
@@ -28,11 +28,6 @@ void COverlayGraphicsItem::paint(QPainter* painter, const QStyleOptionGraphicsIt
     int count = 0;
 
     for (auto point : points) {
-
-        // Check no longer needed, as the data retrieval already ensures the view constraint
-        // if (!sceneRect.contains(point[0], point[1])) {
-        //     continue;
-        // }
 
         left = point[0] - sceneRectCenter.x();
         top = point[1] - sceneRectCenter.y();

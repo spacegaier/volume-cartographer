@@ -143,6 +143,7 @@ protected:
 
     QGraphicsPixmapItem* fBaseImageItem;
     QList<COverlayGraphicsItem*> overlayItems;
+    QTimer* timerOverlayUpdate;
 };  // class CVolumeViewer
 
 }  // namespace ChaoVis
