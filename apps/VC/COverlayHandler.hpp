@@ -14,9 +14,19 @@ namespace ChaoVis
 class CVolumeViewer;
 class COverlayGraphicsItem;
 
+typedef cv::Vec3i OverlayChunkID;
 typedef std::vector<cv::Vec2d> OverlaySliceData;
-// Map of Z index and overlay point data
-typedef std::map<int, OverlaySliceData> OverlayData;
+typedef std::vector<cv::Vec3d> OverlayData;
+
+struct cmpOverlayChunkID {
+    bool operator()(const OverlayChunkID& a, const OverlayChunkID& b) const
+    {
+        return a[0] < b[0] || (a[0] == b[0] && a[1] < b[1]) || (a[0] == b[0] && a[1] == b[1] && a[2] < b[2]);
+    }
+};
+
+typedef std::map<OverlayChunkID, OverlayData, cmpOverlayChunkID> OverlayChunkData;
+typedef std::map<OverlayChunkID, std::vector<QString>, cmpOverlayChunkID> OverlayChunkFiles;
 
 class COverlayHandler
 {
@@ -34,25 +44,26 @@ public:
     };
 
     void setOverlaySettings(OverlaySettings overlaySettings);
-    auto determineOverlayFiles() -> QStringList;
-    void loadOverlayData(QStringList files);
-    auto getOverlayData() const -> OverlayData { return data; }
+    auto determineChunksForView() const -> OverlayChunkData;
+    auto determineNotLoadedOverlayFiles() const -> OverlayChunkFiles;
+    void loadOverlayData(OverlayChunkFiles files);
+    auto getAllOverlayData() const -> OverlayChunkData { return chunkData; }
+    auto getOverlayDataForView() const -> OverlayChunkData;
+    auto getOverlayDataForView(int zIndex = -1) const -> OverlaySliceData;
     void updateOverlayData();
 
-    void loadSingleOverlayFile(QString file, int threadNum) const;
-    void mergeThreadData(OverlayData threadData) const;
+    void loadSingleOverlayFile(QString file, OverlayChunkID chunkID, int threadNum) const;
+    void mergeThreadData(OverlayChunkData threadData) const;
 
 protected:
     CVolumeViewer* viewer;
     OverlaySettings settings;
 
-    mutable OverlayData data;
+    mutable OverlayChunkData chunkData;
     mutable std::shared_mutex dataMutex;
     // Each numbered thread fills its own overlay data and at the end
     // of the data loading they will get merged together
-    mutable std::map<int, OverlayData> threadData;
-
-    std::set<QString> loadedFiles;
+    mutable std::map<int, OverlayChunkData> threadData;   
 };
 
 }

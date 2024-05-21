@@ -441,9 +441,7 @@ void CVolumeViewer::UpdateButtons(void)
 }
 
 void CVolumeViewer::UpdateOverlay()
-{
-    fOverlayHandler->updateOverlayData();    
-    
+{ 
     std::cout << "------" << std::endl;
     for (auto overlay : overlayItems) {
         fScene->removeItem(overlay);
@@ -452,7 +450,8 @@ void CVolumeViewer::UpdateOverlay()
     overlayItems.clear();
 
     const int alpha = 120;
-    auto data = fOverlayHandler->getOverlayData();
+    fOverlayHandler->updateOverlayData();
+    auto data = fOverlayHandler->getOverlayDataForView(fImageIndex);
 
     const QRect viewportRect(QPoint(fGraphicsView->horizontalScrollBar()->value(), fGraphicsView->verticalScrollBar()->value()), fGraphicsView->viewport()->size());
     auto sceneRect = fGraphicsView->transform().inverted().mapRect(viewportRect);
@@ -471,14 +470,13 @@ void CVolumeViewer::UpdateOverlay()
     // fScene->addItem(overlay2);
     // overlayItems.append(overlay2);
 
-    std::cout << "Drawing 0: " << data[fImageIndex].size() << std::endl;
-    if (data[fImageIndex].size()) {
-    auto overlay3 = new COverlayGraphicsItem(fGraphicsView, data[fImageIndex], sceneRect, this);
-    overlay3->setPen(QPen(QColor(180, 90, 120)));
-    overlay3->setBrush(QBrush(QColor(200, 110, 140, alpha)));
-    overlay3->setPos(sceneRect.left() + (sceneRect.right() - sceneRect.left()) / 2, sceneRect.top() + (sceneRect.bottom() - sceneRect.top()) / 2);
-    fScene->addItem(overlay3);
-    overlayItems.append(overlay3);
+    if (data.size() > 0) {
+        auto overlay3 = new COverlayGraphicsItem(fGraphicsView, data, sceneRect, this);
+        overlay3->setPen(QPen(QColor(180, 90, 120)));
+        overlay3->setBrush(QBrush(QColor(200, 110, 140, alpha)));
+        overlay3->setPos(sceneRect.left() + (sceneRect.right() - sceneRect.left()) / 2, sceneRect.top() + (sceneRect.bottom() - sceneRect.top()) / 2);
+        fScene->addItem(overlay3);
+        overlayItems.append(overlay3);
     }
 
     // auto overlay4 = new COverlayGraphicsItem(fGraphicsView, this);

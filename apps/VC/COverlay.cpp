@@ -25,14 +25,14 @@ void COverlayGraphicsItem::paint(QPainter* painter, const QStyleOptionGraphicsIt
     int boundLeft = 0, boundRight = 0, boundTop = 0, boundBottom = 0;
 
     const auto sceneRectCenter = sceneRect.topLeft() + (sceneRect.bottomRight() - sceneRect.topLeft()) / 2;
-    // std::cout << "Center: " << sceneRectCenter.x() << "|" << sceneRectCenter.y() << std::endl;
     int count = 0;
 
     for (auto point : points) {
 
-        if (!sceneRect.contains(point[0], point[1])) {
-            continue;
-        }
+        // Check no longer needed, as the data retrieval already ensures the view constraint
+        // if (!sceneRect.contains(point[0], point[1])) {
+        //     continue;
+        // }
 
         left = point[0] - sceneRectCenter.x();
         top = point[1] - sceneRectCenter.y();
