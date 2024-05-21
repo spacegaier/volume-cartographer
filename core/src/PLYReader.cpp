@@ -261,21 +261,28 @@ void PLYReader::read_faces_()
 void PLYReader::create_mesh_()
 {
     ITKPoint p;
+    auto points = ITKPointsContainer::New();
+    auto data = ITKPointDataContainer::New();
+    
     std::uint32_t pointCount = 0;
     for (auto& cur : pointList_) {
         p[0] = cur.x;
         p[1] = cur.y;
         p[2] = cur.z;
-        outMesh_->SetPoint(pointCount, p);
+        points->push_back(p);
         if (hasPointNorm_) {
             ITKPixel q;
             q[0] = cur.nx;
             q[1] = cur.ny;
             q[2] = cur.nz;
-            outMesh_->SetPointData(pointCount, q);
+            data->push_back(q);
         }
         pointCount++;
     }
+
+    outMesh_->SetPoints(points);
+    outMesh_->SetPointData(data);
+
     std::uint32_t faceCount = 0;
     for (auto& cur : faceList_) {
         ITKCell::CellAutoPointer cellpointer;

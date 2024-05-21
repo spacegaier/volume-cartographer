@@ -88,6 +88,7 @@ public:
     void ResetRotation();
     void SetOverlaySettings(COverlayHandler::OverlaySettings settings);
 
+    void ScheduleOverlayUpdate();
     void UpdateOverlay();
     virtual void UpdateView() {};
 

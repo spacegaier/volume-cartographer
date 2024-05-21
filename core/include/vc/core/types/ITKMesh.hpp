@@ -39,6 +39,9 @@ using ITKPointsLocator = itk::PointsLocator<ITKPointsContainer>;
 /** ITK Mesh Point Iterator */
 using ITKPointIterator = ITKPointsContainer::ConstIterator;
 
+/** ITK Mesh Point Data Container */
+using ITKPointDataContainer = ITKMesh::PointDataContainer;
+
 /** ITK Mesh Cell Iterator */
 using ITKCellIterator = ITKMesh::CellsContainer::Iterator;
 

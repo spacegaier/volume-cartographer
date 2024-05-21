@@ -203,10 +203,10 @@ CVolumeViewer::CVolumeViewer(QWidget* parent)
     timerOverlayUpdate->setSingleShot(true);
     connect(timerOverlayUpdate, &QTimer::timeout, this, &CVolumeViewer::UpdateOverlay);
     connect(this->GetView()->verticalScrollBar(), &QScrollBar::valueChanged, this, [this]() {
-        timerOverlayUpdate->start(1000);
+        ScheduleOverlayUpdate();
     });
     connect(this->GetView()->horizontalScrollBar(), &QScrollBar::valueChanged, this, [this]() {
-        timerOverlayUpdate->start(1000);
+        ScheduleOverlayUpdate();
     });
 
     UpdateButtons();
@@ -296,7 +296,7 @@ bool CVolumeViewer::eventFilter(QObject* watched, QEvent* event)
                 OnZoomInClicked();
             } else if (numDegrees < 0) {
                 OnZoomOutClicked();
-                UpdateOverlay();
+                ScheduleOverlayUpdate();
             }
 
             if (fCenterOnZoomEnabled) {
@@ -441,6 +441,11 @@ void CVolumeViewer::UpdateButtons(void)
         fImgQImage != nullptr && fabs(fScaleFactor - 1.0) > 1e-6);
     fNextBtn->setEnabled(fImgQImage != nullptr);
     fPrevBtn->setEnabled(fImgQImage != nullptr);
+}
+
+void CVolumeViewer::ScheduleOverlayUpdate()
+{
+    timerOverlayUpdate->start(1000);
 }
 
 void CVolumeViewer::UpdateOverlay()
