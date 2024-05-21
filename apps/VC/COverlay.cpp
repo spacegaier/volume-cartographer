@@ -59,7 +59,6 @@ void COverlayGraphicsItem::paint(QPainter* painter, const QStyleOptionGraphicsIt
 
     // std::cout << "Bounding Rect: " << intBoundingRect.left() << "|" << intBoundingRect.top() << "|"
     //           << intBoundingRect.right() << "|" << intBoundingRect.bottom() << std::endl;
-    std::cout << "-----------" << std::endl;
     std::cout << "Paint : " << count << std::endl;
 }
 

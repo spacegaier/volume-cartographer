@@ -31,8 +31,6 @@ public:
     CVolumeViewerWithCurve(std::unordered_map<std::string, SegmentationStruct>& nSegStructMapRef);
     ~CVolumeViewerWithCurve();
 
-    virtual void SetImage(const QImage& nSrc);
-
     // for drawing mode
     void SetSplineCurve(CBSpline& nCurve);
     void UpdateSplineCurve(void);

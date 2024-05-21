@@ -63,8 +63,9 @@ auto COverlayHandler::determineChunksForView() const -> OverlayChunkData
                 id[settings.yAxis] = y;
                 id[settings.zAxis] = z;
 
-                if (chunkData.find(id) != chunkData.end()) {
-                    res[id] = chunkData[id];
+                auto it = chunkData.find(id);
+                if (it != chunkData.end()) {
+                    res[id] = it->second;
                 } else {
                     res[id] = {};
                 }
@@ -80,7 +81,10 @@ auto COverlayHandler::determineNotLoadedOverlayFiles() const -> OverlayChunkFile
     auto chunks = determineChunksForView();
 
     QString folder;
-    OverlayChunkFiles folderList;
+    OverlayChunkFiles fileList;
+    QDir overlayMainFolder(settings.path);
+    auto absPath = overlayMainFolder.absolutePath();
+
     for (auto chunk : chunks) {
         if (chunkData.find(chunk.first) == chunkData.end()) {
             // TODO:Check if the settings logic for axis really works here
@@ -88,26 +92,13 @@ auto COverlayHandler::determineNotLoadedOverlayFiles() const -> OverlayChunkFile
                          .arg(chunk.first[settings.yAxis], 6, 10, QLatin1Char('0'))
                          .append("_" + QStringLiteral("%1").arg(chunk.first[settings.zAxis], 6, 10, QLatin1Char('0')))
                          .append("_" + QStringLiteral("%1").arg(chunk.first[settings.xAxis], 6, 10, QLatin1Char('0')));
-            folderList[chunk.first].push_back(folder);
-        }
-    }
 
-    QDir overlayMainFolder(settings.path);
-    QStringList overlayFolders = overlayMainFolder.entryList(QDir::NoDotAndDotDot | QDir::AllEntries);
+            QDir overlayFolder(absPath + QDir::separator() + folder);
+            QStringList files = overlayFolder.entryList({"*.ply", "*.obj"}, QDir::NoDotAndDotDot | QDir::Files);
 
-    OverlayChunkFiles fileList;
-    for (auto folder : folderList) {
-        // Use front(), because so far there is only a single string (the folder name) in here
-        QDir overlayFolder(overlayMainFolder.absolutePath() + QDir::separator() + folder.second.front());
-        QStringList files = overlayFolder.entryList(QDir::NoDotAndDotDot | QDir::Files);
-
-        // Clear to make room for the real file names
-        folder.second.clear();
-
-        for (auto file : files) {
-            if (file.endsWith(".ply") || file.endsWith(".obj")) {
+            for (auto file : files) {
                 file = overlayFolder.path() + QDir::separator() + file;
-                fileList[folder.first].push_back(file);
+                fileList[chunk.first].push_back(file);
             }
         }
     }

@@ -453,8 +453,6 @@ void CVolumeViewer::UpdateOverlay()
     // if (isPanning()) {
     //     return;
     // }
-
-    std::cout << "------" << std::endl;
     for (auto overlay : overlayItems) {
         fScene->removeItem(overlay);
         delete overlay;
