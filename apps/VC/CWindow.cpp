@@ -15,6 +15,7 @@
 
 #include "vc/core/types/Color.hpp"
 #include "vc/core/types/Exceptions.hpp"
+#include "vc/core/types/VolumeZARR.hpp"
 #include "vc/core/util/Iteration.hpp"
 #include "vc/core/util/Logging.hpp"
 #include "vc/meshing/OrderedPointSetMesher.hpp"
@@ -261,7 +262,7 @@ void CWindow::CreateWidgets(void)
         QString zarrLevel;
         if (newVolume->format() == vc::VolumeFormat::ZARR) {
             QStringList list;
-            for (auto level : newVolume->zarrLevels()) {
+            for (auto level : static_cast<vc::VolumeZARR*>(newVolume.get())->zarrLevels()) {
                 list.append(QString::fromStdString(level));
             }
 
@@ -277,7 +278,7 @@ void CWindow::CreateWidgets(void)
         //fVolumeViewerWidget->ResetView();
 
         if (newVolume->format() == vc::VolumeFormat::ZARR) {
-            newVolume->setZarrLevel(zarrLevel.toInt());
+            static_cast<vc::VolumeZARR*>(newVolume.get())->setZarrLevel(zarrLevel.toInt());
             fVolumeViewerWidget->SetcrossSectionIndexSide(newVolume->sliceWidth() / 2);
             fVolumeViewerWidget->SetcrossSectionIndexFront(newVolume->sliceWidth() / 2);
             fVolumeCrossSectionViewer->setVolume(newVolume);

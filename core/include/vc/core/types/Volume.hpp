@@ -13,11 +13,6 @@
 #include "vc/core/types/LRUCache.hpp"
 #include "vc/core/types/Reslice.hpp"
 
-#include "z5/types/types.hxx"
-#include "z5/dataset.hxx"
-#include "z5/filesystem/handle.hxx"
-#include "xtensor/xtensor.hpp"
-
 namespace volcart
 {
 
@@ -97,8 +92,6 @@ public:
     double max() const;
     /** @brief Get the format of the volume */
     VolumeFormat format() const;
-    /** @brief Get ZARR file levels*/
-    std::vector<std::string> zarrLevels() const;
     /**@}*/
 
     /**@{*/
@@ -114,8 +107,6 @@ public:
     void setMin(double m);
     /** @brief Set the maximum value in the Volume */
     void setMax(double m);
-    /** @brief Set desired ZARR level */
-    void setZarrLevel(int level);
     /**@}*/
 
     /**@{*/
@@ -153,10 +144,10 @@ public:
      *
      * @warning This will overwrite any existing slice data on disk.
      */
-    void setSliceData(int index, const cv::Mat& slice, bool compress = true);
+    virtual void setSliceData(int index, const cv::Mat& slice, bool compress = true) = 0;
 
     /** @brief Get the file path of a slice by index */
-    volcart::filesystem::path getSlicePath(int index) const;
+    virtual volcart::filesystem::path getSlicePath(int index) const;
     /**@}*/
 
     /**@{*/
@@ -236,11 +227,9 @@ public:
     void cachePurge() const;
     /**@}*/
 
-    void openZarr();
-
 protected:
     /** Volume format */
-    VolumeFormat format_{TIFF};
+    VolumeFormat format_;
     /** Slice width */
     int width_{0};
     /** Slice height */
@@ -258,19 +247,10 @@ protected:
     mutable std::mutex cacheMutex_;
     mutable std::vector<std::mutex> slice_mutexes_;
 
-    /** ZARR file*/
-    z5::filesystem::handle::File zarrFile_;
-    /** ZARR data set*/
-    std::unique_ptr<z5::Dataset> zarrDs_{nullptr};
-    /** Loaded chunks */
-    mutable std::map<VolumeAxis, std::map<unsigned int, xt::xtensor<uint16_t, 3>*>> loadedChunks_;
-    /** Active ZARR level */
-    int zarrLevel_{-1};
-
     /** Load slice from disk */
-    cv::Mat load_slice_(int index, VolumeAxis axis = Z) const;
+    virtual cv::Mat load_slice_(int index, VolumeAxis axis = Z) const = 0;
     /** Load slice from cache */
-    cv::Mat cache_slice_(int index) const;
+    virtual cv::Mat cache_slice_(int index) const = 0;
     /** Shared mutex for thread-safe access */
     mutable std::shared_mutex cache_mutex_;
     mutable std::shared_mutex print_mutex_;

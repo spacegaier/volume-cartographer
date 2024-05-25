@@ -45,6 +45,8 @@ set(type_srcs
     src/Transforms.cpp
     src/UVMap.cpp
     src/Volume.cpp
+    src/VolumeTIFF.cpp
+    src/VolumeZARR.cpp
     src/VolumeMask.cpp
     src/VolumePkg.cpp
     src/VolumetricMask.cpp

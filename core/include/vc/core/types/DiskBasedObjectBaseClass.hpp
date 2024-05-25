@@ -31,6 +31,8 @@ public:
     /** ID/Name pair */
     using Description = std::pair<Identifier, std::string>;
 
+    static const volcart::filesystem::path METADATA_FILE;
+
     /** Default constructor */
     DiskBasedObjectBaseClass() = delete;
 

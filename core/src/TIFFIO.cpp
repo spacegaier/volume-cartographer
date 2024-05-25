@@ -92,12 +92,14 @@ auto tio::ReadTIFF(const volcart::filesystem::path& path) -> cv::Mat
     std::uint16_t depth = 1;
     std::uint16_t channels = 1;
     std::uint16_t config = 0;
+    Compression compression = Compression::NONE;
     TIFFGetField(tif, TIFFTAG_IMAGEWIDTH, &width);
     TIFFGetField(tif, TIFFTAG_IMAGELENGTH, &height);
     TIFFGetField(tif, TIFFTAG_SAMPLEFORMAT, &type);
     TIFFGetField(tif, TIFFTAG_BITSPERSAMPLE, &depth);
     TIFFGetField(tif, TIFFTAG_SAMPLESPERPIXEL, &channels);
     TIFFGetField(tif, TIFFTAG_PLANARCONFIG, &config);
+    TIFFGetField(tif, TIFFTAG_COMPRESSION, &compression);
     TIFFGetField(tif, TIFFTAG_ROWSPERSTRIP, &rowsPerStrip);
     auto cvType = ::GetCVMatType(type, depth, channels);
 
@@ -105,7 +107,7 @@ auto tio::ReadTIFF(const volcart::filesystem::path& path) -> cv::Mat
     // but better safe than sorry
     auto canMMap =
         config == PLANARCONFIG_CONTIG and type == SAMPLEFORMAT_UINT and
-        depth == 16 and channels == 1 and
+        depth == 16 and channels == 1 and compression == Compression::NONE and
         rowsPerStrip == height;  // important, full image is in a single strip
 
     // Construct the mat
@@ -138,11 +140,11 @@ auto tio::ReadTIFF(const volcart::filesystem::path& path) -> cv::Mat
 
         img = cv::Mat(h, w, cvType, (char*)data + stripOffset[0]);
     } else {  
-        // Load the old way
+        // Load the old way via TIFF library
         vc::Logger()->debug(
-            "Cannot mmap TIFF width: %d height: %d config: %d type: %d depth: "
-            "%d channel: %d rowsPerStrip: %d, loading the old way",
-            width, height, config, type, depth, channels, rowsPerStrip);
+            "Cannot mmap TIFF (width: %d height: %d config: %d type: %d depth: "
+            "%d channel: %d rowsPerStrip: %d compression: %s) => loading the old way",
+            width, height, config, type, depth, channels, rowsPerStrip, (compression != Compression::NONE ? "true" : "false"));
 
         img = cv::Mat::zeros(h, w, cvType);
 
@@ -155,7 +157,7 @@ auto tio::ReadTIFF(const volcart::filesystem::path& path) -> cv::Mat
                 std::memcpy(img.ptr(row), &buffer[0], bufferSize);
             }
         } else if (config == PLANARCONFIG_SEPARATE) {
-            IOException("Unsupported TIFF planar configuration: PLANARCONFIG_SEPARATE");
+            throw IOException("Unsupported TIFF planar configuration: PLANARCONFIG_SEPARATE");
         }
 
         // Do channel conversion
@@ -327,6 +329,6 @@ void tio::WriteTIFF(
         }
     }
 
-    // Close the tiff
+    // Close the TIFF
     lt::TIFFClose(out);
 }

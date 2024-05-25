@@ -4,7 +4,7 @@ using namespace volcart;
 
 namespace fs = volcart::filesystem;
 
-static const fs::path METADATA_FILE = "meta.json";
+const fs::path DiskBasedObjectBaseClass::METADATA_FILE = "meta.json";
 
 // Load file from disk
 DiskBasedObjectBaseClass::DiskBasedObjectBaseClass(
