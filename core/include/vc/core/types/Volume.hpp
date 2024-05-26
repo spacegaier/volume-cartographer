@@ -120,22 +120,32 @@ public:
 
     /**@{*/
     /**
-     * @brief Get a slice by index number
+     * @brief Get a slice by index number. Method decides based on the volume
+     * format whether the wholhe slice is returned or just the provided rect.
+    */
+    cv::Mat getSliceDataDefault(int index, cv::Rect rect = cv::Rect(), VolumeAxis axis = Z) const;
+    
+    /**
+     * @brief Get a slice by index number.
      *
      * @warning Because cv::Mat is essentially a pointer to a matrix, modifying
      * the slice returned by getSliceData() will modify the cached slice as
      * well. Use getSliceDataCopy() if the slice is to be modified.
      */
-    cv::Mat getSliceData(int index, VolumeAxis axis = Z) const;
+    virtual cv::Mat getSliceData(int index, VolumeAxis axis = Z) const = 0;
 
     /** @copydoc getSliceData(int) const */
     cv::Mat getSliceDataCopy(int index, VolumeAxis axis = Z) const;
 
-    /** @brief Get slice by index and cut out a rect to return */
-    cv::Mat getSliceDataRect(int index, cv::Rect rect) const;
+    /** @brief Get slice by index and cut out a rect to return or in case of a 
+     * chunked volume format, only read the required rect.
+     */
+    virtual cv::Mat getSliceDataRect(int index, cv::Rect rect, VolumeAxis axis = Z) const = 0;
 
-    /** @brief Copy a slice by index and cut out a rect to return */
-    cv::Mat getSliceDataRectCopy(int index, cv::Rect rect) const;
+    /** @brief Copy a slice by index and cut out a rect to return or in case of a 
+     * chunked volume format, only read the required rect.
+     */
+    cv::Mat getSliceDataRectCopy(int index, cv::Rect rect, VolumeAxis axis = Z) const;
 
     /**
      * @brief Set a slice by index number
@@ -147,7 +157,7 @@ public:
     virtual void setSliceData(int index, const cv::Mat& slice, bool compress = true) = 0;
 
     /** @brief Get the file path of a slice by index */
-    virtual volcart::filesystem::path getSlicePath(int index) const;
+    virtual volcart::filesystem::path getSlicePath(int index) const = 0;
     /**@}*/
 
     /**@{*/
@@ -247,10 +257,10 @@ protected:
     mutable std::mutex cacheMutex_;
     mutable std::vector<std::mutex> slice_mutexes_;
 
-    /** Load slice from disk */
-    virtual cv::Mat load_slice_(int index, VolumeAxis axis = Z) const = 0;
-    /** Load slice from cache */
-    virtual cv::Mat cache_slice_(int index) const = 0;
+    // /** Load slice from disk */
+    // cv::Mat load_slice_(int index, cv::Rect rect = cv::Rect(), VolumeAxis axis = Z);
+    // /** Load slice from cache */
+    // cv::Mat cache_slice_(int index);
     /** Shared mutex for thread-safe access */
     mutable std::shared_mutex cache_mutex_;
     mutable std::shared_mutex print_mutex_;

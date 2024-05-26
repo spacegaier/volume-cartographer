@@ -182,6 +182,16 @@ CImageViewer::CImageViewer(QWidget* parent)
     setLayout(aWidgetLayout);
 
     UpdateButtons();
+
+    timerChunkUpdate = new QTimer(this);
+    timerChunkUpdate->setSingleShot(true);
+    connect(timerChunkUpdate, &QTimer::timeout, this, [this]() { SendSignalOnLoadAnyImage(fImageIndex); });
+    connect(this->GetView()->verticalScrollBar(), &QScrollBar::valueChanged, this, [this]() {
+        ScheduleChunkUpdate();
+    });
+    connect(this->GetView()->horizontalScrollBar(), &QScrollBar::valueChanged, this, [this]() {
+        ScheduleChunkUpdate();
+    });
 }
 
 // Destructor
@@ -207,7 +217,7 @@ void CImageViewer::setButtonsEnabled(bool state)
     fImageIndexEdit->setEnabled(state);
 }
 
-void CImageViewer::SetImage(const QImage& nSrc)
+void CImageViewer::SetImage(const QImage& nSrc, const QPoint pos)
 {
     if (fImgQImage == nullptr) {
         fImgQImage = new QImage(nSrc);
@@ -215,17 +225,20 @@ void CImageViewer::SetImage(const QImage& nSrc)
         *fImgQImage = nSrc;
     }
 
-    // Create a QPixmap from the QImage
-    QPixmap pixmap = QPixmap::fromImage(*fImgQImage);
+    auto rect = GetView()->mapToScene(GetView()->viewport()->rect());
 
-    // Add the QPixmap to the scene as a QGraphicsPixmapItem
-    if (fBaseImageItem) {
-        // If the item already exists, remove it from the scene
-        fScene->removeItem(fBaseImageItem);
-        delete fBaseImageItem; // Delete the old item
+    // Create a QPixmap from the QImage
+    QPixmap pixmap = QPixmap::fromImage(*fImgQImage, Qt::NoFormatConversion);
+
+    if (!fBaseImageItem) {
+        fBaseImageItem = fScene->addPixmap(pixmap);
+    } else {
+        fBaseImageItem->setPixmap(pixmap);
     }
-    fBaseImageItem = fScene->addPixmap(pixmap);
-    fGraphicsView->centerOn(fBaseImageItem);
+
+    QPoint newPos = {std::max(0, pos.x()), std::max(0, pos.y())};
+    fBaseImageItem->setPos(newPos);
+    //fGraphicsView->centerOn(fBaseImageItem);
 
     UpdateButtons();
     update();
@@ -535,4 +548,9 @@ void CImageViewer::mouseReleaseEvent(QMouseEvent* event)
     }
 
     setCursor(Qt::ArrowCursor);
+}
+
+void CImageViewer::ScheduleChunkUpdate()
+{
+    timerChunkUpdate->start(50);
 }

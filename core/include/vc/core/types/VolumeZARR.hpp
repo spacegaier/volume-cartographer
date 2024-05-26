@@ -11,6 +11,33 @@
 namespace volcart
 {
 
+typedef cv::Vec<unsigned long, 3> ChunkID;
+typedef std::vector<cv::Vec2d> ChunkSlice;
+typedef xt::xtensor<uint16_t, 3> Chunck;
+
+struct cmpChunkID {
+    bool operator()(const ChunkID& a, const ChunkID& b) const
+    {
+        return a[0] < b[0] || (a[0] == b[0] && a[1] < b[1]) || (a[0] == b[0] && a[1] == b[1] && a[2] < b[2]);
+    }
+};
+
+typedef std::map<ChunkID, Chunck*, cmpChunkID> ChunkData;
+typedef std::map<ChunkID, std::vector<std::string>, cmpChunkID> ChunkFiles;
+
+typedef z5::types::ShapeType ChunkRequest;
+typedef std::vector<ChunkRequest> ChunkRequests;
+
+struct ChunkDataSettings {
+    std::string path;
+    int xAxis;
+    int yAxis;
+    int zAxis;
+    int offset;
+    float scale;
+    int chunkSize; // logical chunk size on disk before applying "scale"
+};
+
 /**
  * @class VolumeZARR
  * @author Philip Allgaier
@@ -36,6 +63,10 @@ public:
     volcart::filesystem::path getSlicePath(int index) const override;
     /**@}*/
 
+    cv::Mat getSliceData(int index, VolumeAxis axis = Z) const override;
+
+    cv::Mat getSliceDataRect(int index, cv::Rect rect, VolumeAxis axis = Z) const override;
+
     void setSliceData(int index, const cv::Mat& slice, bool compress = true) override;
 
     /**@{*/
@@ -50,7 +81,19 @@ public:
 
     void openZarr();
 
+    void setChunkSettings(ChunkDataSettings chunkSettings);
+    auto determineChunksForRect(int index, cv::Rect rect) const -> ChunkData;
+    auto determineNotLoadedChunks(int index, cv::Rect rect) const -> ChunkRequests;
+    void loadChunkFiles(ChunkRequests requests, VolumeAxis axis) const;
+    auto getChunkData(int index, cv::Rect rect, VolumeAxis axis) -> ChunkData;
+    auto getChunkSliceData(int index, cv::Rect rect) const -> ChunkSlice;
+
+    void loadSingleChunkFile(std::string file, ChunkID chunkID, int threadNum) const;
+    void mergeThreadData(ChunkData threadData) const;
+
 protected:
+    ChunkDataSettings settings;
+
     /** ZARR file*/
     z5::filesystem::handle::File zarrFile_;
     /** ZARR data set*/
@@ -60,9 +103,16 @@ protected:
     /** Active ZARR level */
     int zarrLevel_{-1};
 
+    nlohmann::json groupAttr_;
+
+    mutable ChunkData chunkData;
+    mutable std::shared_mutex dataMutex;
+    // Each numbered thread fills its own overlay data and at the end
+    // of the data loading they will get merged together
+    mutable std::map<int, ChunkData> threadData;
+
     /** Load slice from disk */
-    cv::Mat load_slice_(int index, VolumeAxis axis = Z) const override;
-    /** Load slice from cache */
-    cv::Mat cache_slice_(int index) const override;
+    cv::Mat load_slice_(int index, VolumeAxis axis = Z) const;
+    cv::Mat load_slice_(int index, cv::Rect rect = cv::Rect(), VolumeAxis axis = Z) const;
 };
 }  // namespace volcart

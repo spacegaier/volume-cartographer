@@ -46,6 +46,21 @@ auto VolumeTIFF::getSlicePath(int index) const -> fs::path
     return path_ / ss.str();
 }
 
+auto VolumeTIFF::getSliceData(int index, VolumeAxis axis) const -> cv::Mat
+{       
+    if (cacheSlices_) {
+        return cache_slice_(index);
+    } 
+    return load_slice_(index, axis);
+}
+
+auto VolumeTIFF::getSliceDataRect(int index, cv::Rect rect, VolumeAxis axis) const -> cv::Mat
+{
+    auto slice = getSliceData(index, axis);
+    std::shared_lock<std::shared_mutex> lock(cache_mutex_);
+    return slice(rect);
+}
+
 void VolumeTIFF::setSliceData(int index, const cv::Mat& slice, bool compress)
 {
     auto slicePath = getSlicePath(index);

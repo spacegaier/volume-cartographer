@@ -54,7 +54,7 @@ public:
     ~CImageViewer(void);
     virtual void setButtonsEnabled(bool state);
 
-    virtual void SetImage(const QImage& nSrc);
+    virtual void SetImage(const QImage& nSrc, const QPoint pos = {0, 0});
     void SetImageIndex(int imageIndex)
     {
         fImageIndex = imageIndex;
@@ -68,9 +68,11 @@ public:
     auto GetImageSize() const -> QSize { return fBaseImageItem->pixmap().size(); }
     void ScaleImage(double nFactor);
     auto GetScene() const -> QGraphicsScene* { return fScene; }
+    auto GetView() const -> CImageViewerView* { return fGraphicsView; }
     auto GetImage() const -> QImage* { return fImgQImage; }
 
     void ResetView();
+    void ScheduleChunkUpdate();
 
     virtual bool CanChangeImage() const { return fPrevBtn->isEnabled(); }
     virtual bool ShouldHighlightImageIndex(const int imageIndex) { return false; }
@@ -136,6 +138,7 @@ protected:
     int panStartX, panStartY;
 
     QGraphicsPixmapItem* fBaseImageItem;
+    QTimer* timerChunkUpdate;
 };  // class CImageViewer
 
 }  // namespace ChaoVis

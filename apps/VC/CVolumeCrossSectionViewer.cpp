@@ -155,7 +155,10 @@ void CVolumeCrossSectionViewer::updateImage(vc::VolumeAxis axis)
     QImage aImgQImage;
     cv::Mat aImgMat;
     if (currentVolume != nullptr) {
-        aImgMat = currentVolume->getSliceData(getViewerForAxis(axis)->GetImageIndex(), axis);
+        auto rect = getViewerForAxis(axis)->GetView()->mapToScene(getViewerForAxis(axis)->GetView()->viewport()->rect());
+        aImgMat = currentVolume->getSliceDataDefault(getViewerForAxis(axis)->GetImageIndex(),
+            cv::Rect(rect.at(0).x(), rect.at(0).y(), rect.at(2).x() - rect.at(0).x(), rect.at(2).y() - rect.at(0).y()), 
+            axis);
     } else {
         aImgMat = cv::Mat::zeros(10, 10, CV_8UC1);
     }

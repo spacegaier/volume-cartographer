@@ -275,13 +275,15 @@ void CWindow::CreateWidgets(void)
             }
         }
 
+        fVolumeViewerWidget->OnResetClicked();
         //fVolumeViewerWidget->ResetView();
+        fVolumeViewerWidget->GetView()->centerOn(0, 0);
 
         if (newVolume->format() == vc::VolumeFormat::ZARR) {
             static_cast<vc::VolumeZARR*>(newVolume.get())->setZarrLevel(zarrLevel.toInt());
-            fVolumeViewerWidget->SetcrossSectionIndexSide(newVolume->sliceWidth() / 2);
-            fVolumeViewerWidget->SetcrossSectionIndexFront(newVolume->sliceWidth() / 2);
-            fVolumeCrossSectionViewer->setVolume(newVolume);
+            // fVolumeViewerWidget->SetcrossSectionIndexSide(newVolume->sliceWidth() / 2);
+            // fVolumeViewerWidget->SetcrossSectionIndexFront(newVolume->sliceWidth() / 2);
+            // fVolumeCrossSectionViewer->setVolume(newVolume);
         }
 
         currentVolume = newVolume;
@@ -1630,6 +1632,8 @@ void CWindow::prefetchSlices(void) {
     int currentSliceIndex = prefetchSliceIndex.load();
     int start = std::max(0, currentSliceIndex - prefetchSize * stepSize);
     int end = std::min(currentVolume->numSlices()-1, currentSliceIndex + prefetchSize * stepSize);
+    auto rect = fVolumeViewerWidget->GetView()->mapToScene(fVolumeViewerWidget->GetView()->viewport()->rect());
+    auto sliceRect = cv::Rect(rect.at(0).x(), rect.at(0).y(), rect.at(2).x() - rect.at(0).x(), rect.at(2).y() - rect.at(0).y());
 
     int n = 5;  // Number Fetching Threads
     // fetching from index outwards
@@ -1639,11 +1643,11 @@ void CWindow::prefetchSlices(void) {
         for (int i = 0; i <= n; i++) {
             // Fetch the slice data on the right side
             if (currentSliceIndex + offset + i * stepSize <= end) {
-                threads.emplace_back(&vc::Volume::getSliceData, currentVolume, currentSliceIndex + offset + i * stepSize, vc::VolumeAxis::Z);
+                threads.emplace_back(&vc::Volume::getSliceDataDefault, currentVolume, currentSliceIndex + offset + i * stepSize, sliceRect, vc::VolumeAxis::Z);
             }
             // Fetch the slice data on the left side
             if (currentSliceIndex - offset - i * stepSize >= start) {
-                threads.emplace_back(&vc::Volume::getSliceData, currentVolume, currentSliceIndex - offset - i * stepSize, vc::VolumeAxis::Z);
+                threads.emplace_back(&vc::Volume::getSliceDataDefault, currentVolume, currentSliceIndex - offset - i * stepSize, sliceRect, vc::VolumeAxis::Z);
             }
         }
 
@@ -1672,12 +1676,17 @@ void CWindow::OpenSlice(void)
 {
     QImage aImgQImage;
     cv::Mat aImgMat;
+    auto rect = fVolumeViewerWidget->GetView()->mapToScene(fVolumeViewerWidget->GetView()->viewport()->rect());
+
     if (fVpkg != nullptr) {
         // Stop prefetching
         prefetchSliceIndex = -1;
         cv.notify_one();
-
-        aImgMat = currentVolume->getSliceData(fPathOnSliceIndex);
+        
+        aImgMat = currentVolume->getSliceDataDefault(fPathOnSliceIndex, 
+            cv::Rect(rect.at(0).x(), rect.at(0).y(), 
+            rect.at(2).x() - rect.at(0).x(), 
+            rect.at(2).y() - rect.at(0).y()));
     } else {
         aImgMat = cv::Mat::zeros(10, 10, CV_8UC1);
     }
@@ -1706,7 +1715,7 @@ void CWindow::OpenSlice(void)
         aImgQImage = Mat2QImage(aImgMat);
     }
 
-    fVolumeViewerWidget->SetImage(aImgQImage);
+    fVolumeViewerWidget->SetImage(aImgQImage, {rect.at(0).x(), rect.at(0).y()});
     fVolumeViewerWidget->SetImageIndex(fPathOnSliceIndex);
     fVolumeCrossSectionViewer->setcrossSectionIndexTop(fPathOnSliceIndex);
 }

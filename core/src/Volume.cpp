@@ -20,8 +20,8 @@ Volume::Volume(fs::path path) : DiskBasedObjectBaseClass(std::move(path))
 // Setup a Volume from a folder of slices
 Volume::Volume(fs::path path, std::string uuid, std::string name)
     : DiskBasedObjectBaseClass(
-          std::move(path), std::move(uuid), std::move(name)),
-          slice_mutexes_(slices_)
+        std::move(path), std::move(uuid), std::move(name)),
+        slice_mutexes_(slices_)
 {
 }
 
@@ -115,40 +115,40 @@ auto Volume::isInBounds(const cv::Vec3d& v) const -> bool
     return isInBounds(v(0), v(1), v(2));
 }
 
-auto Volume::getSlicePath(int index) const -> fs::path
+auto Volume::getSliceDataDefault(int index, cv::Rect rect, VolumeAxis axis) const -> cv::Mat
 {
-    std::stringstream ss;
-    ss << std::setw(numSliceCharacters_) << std::setfill('0') << index
-       << ".tif";
-    return path_ / ss.str();
+    // ToDo use "isChunkedFormat" variable
+    if (format_ == ZARR) {
+        return getSliceDataRect(index, rect, axis);
+    } else {
+        return getSliceData(index, axis);
+    }
 }
 
-auto Volume::getSliceData(int index, VolumeAxis axis) const -> cv::Mat
-{
-    // We only cache the main Z axis for now
-    if (cacheSlices_ && axis == Z) {
-        return cache_slice_(index);
-    }
-    return load_slice_(index, axis);
-}
+// auto Volume::getSliceData(int index, VolumeAxis axis) const -> cv::Mat
+// {       
+//     // We only cache the main Z axis for now
+//     if (cacheSlices_ && axis == Z) {
+//         return cache_slice_(index);
+//     } 
+//     return load_slice_(index, rect, axis);
+// }
 
 auto Volume::getSliceDataCopy(int index, VolumeAxis axis) const -> cv::Mat
 {
     return getSliceData(index, axis).clone();
 }
 
-auto Volume::getSliceDataRect(int index, cv::Rect rect) const -> cv::Mat
-{
-    auto whole_img = getSliceData(index);
-    std::shared_lock<std::shared_mutex> lock(cache_mutex_);
-    return whole_img(rect);
-}
+// auto Volume::getSliceDataRect(int index, cv::Rect rect, VolumeAxis axis) const -> cv::Mat
+// {
+//     auto slice = getSliceData(index, rect, axis);
+//     std::shared_lock<std::shared_mutex> lock(cache_mutex_);
+//     return slice(rect);
+// }
 
-auto Volume::getSliceDataRectCopy(int index, cv::Rect rect) const -> cv::Mat
+auto Volume::getSliceDataRectCopy(int index, cv::Rect rect, VolumeAxis axis) const -> cv::Mat
 {
-    auto whole_img = getSliceData(index);
-    std::shared_lock<std::shared_mutex> lock(cache_mutex_);
-    return whole_img(rect).clone();
+    return getSliceDataRect(index, rect, axis).clone();
 }
 
 auto Volume::intensityAt(int x, int y, int z) const -> std::uint16_t

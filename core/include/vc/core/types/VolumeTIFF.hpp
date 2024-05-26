@@ -32,12 +32,16 @@ public:
     volcart::filesystem::path getSlicePath(int index) const override;
     /**@}*/
 
+    cv::Mat getSliceData(int index, VolumeAxis axis = Z) const override;
+
+    cv::Mat getSliceDataRect(int index, cv::Rect rect, VolumeAxis axis = Z) const override; 
+
     void setSliceData(int index, const cv::Mat& slice, bool compress = true) override;
 
 protected:
     /** Load slice from disk */
-    cv::Mat load_slice_(int index, VolumeAxis axis = Z) const override;
+    cv::Mat load_slice_(int index, VolumeAxis axis = Z) const;
     /** Load slice from cache */
-    cv::Mat cache_slice_(int index) const override;
+    cv::Mat cache_slice_(int index) const;
 };
 }  // namespace volcart
