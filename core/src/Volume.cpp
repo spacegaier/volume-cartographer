@@ -125,26 +125,10 @@ auto Volume::getSliceDataDefault(int index, cv::Rect rect, VolumeAxis axis) cons
     }
 }
 
-// auto Volume::getSliceData(int index, VolumeAxis axis) const -> cv::Mat
-// {       
-//     // We only cache the main Z axis for now
-//     if (cacheSlices_ && axis == Z) {
-//         return cache_slice_(index);
-//     } 
-//     return load_slice_(index, rect, axis);
-// }
-
 auto Volume::getSliceDataCopy(int index, VolumeAxis axis) const -> cv::Mat
 {
     return getSliceData(index, axis).clone();
 }
-
-// auto Volume::getSliceDataRect(int index, cv::Rect rect, VolumeAxis axis) const -> cv::Mat
-// {
-//     auto slice = getSliceData(index, rect, axis);
-//     std::shared_lock<std::shared_mutex> lock(cache_mutex_);
-//     return slice(rect);
-// }
 
 auto Volume::getSliceDataRectCopy(int index, cv::Rect rect, VolumeAxis axis) const -> cv::Mat
 {

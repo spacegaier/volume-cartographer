@@ -70,6 +70,8 @@ set(logging_srcs
 
 configure_file(src/Version.cpp.in Version.cpp)
 
+find_package(CURL REQUIRED)
+
 add_library(vc_core
     ${io_srcs}
     ${math_srcs}
@@ -105,6 +107,7 @@ target_link_libraries(vc_core
         spdlog::spdlog
         nlohmann_json::nlohmann_json
         smgl::smgl
+        CURL::libcurl
     PRIVATE
         TIFF::TIFF
 )

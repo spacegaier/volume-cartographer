@@ -55,6 +55,8 @@ public:
     /** @brief Load the Volume from a directory path */
     explicit VolumeZARR(volcart::filesystem::path path);
 
+    virtual bool isChunked() const { return true; };
+
     /** @brief Make a new Volume at the specified path */
     VolumeZARR(volcart::filesystem::path path, Identifier uuid, std::string name);
 
@@ -82,11 +84,11 @@ public:
     void openZarr();
 
     void setChunkSettings(ChunkDataSettings chunkSettings);
-    auto determineChunksForRect(int index, cv::Rect rect) const -> ChunkData;
-    auto determineNotLoadedChunks(int index, cv::Rect rect) const -> ChunkRequests;
+    auto determineChunksForRect(int index, cv::Rect2i rect) const -> ChunkData;
+    auto determineNotLoadedChunks(int index, cv::Rect2i rect) const -> ChunkRequests;
     void loadChunkFiles(ChunkRequests requests, VolumeAxis axis) const;
     auto getChunkData(int index, cv::Rect rect, VolumeAxis axis) -> ChunkData;
-    auto getChunkSliceData(int index, cv::Rect rect) const -> ChunkSlice;
+    auto getChunkSliceData(int index, cv::Rect2i rect) const -> ChunkSlice;
 
     void loadSingleChunkFile(std::string file, ChunkID chunkID, int threadNum) const;
     void mergeThreadData(ChunkData threadData) const;
@@ -98,21 +100,14 @@ protected:
     z5::filesystem::handle::File zarrFile_;
     /** ZARR data set*/
     std::unique_ptr<z5::Dataset> zarrDs_{nullptr};
-    /** Loaded chunks */
-    mutable std::map<VolumeAxis, std::map<unsigned int, xt::xtensor<uint16_t, 3>*>> loadedChunks_;
     /** Active ZARR level */
     int zarrLevel_{-1};
 
     nlohmann::json groupAttr_;
 
     mutable ChunkData chunkData;
-    mutable std::shared_mutex dataMutex;
-    // Each numbered thread fills its own overlay data and at the end
-    // of the data loading they will get merged together
-    mutable std::map<int, ChunkData> threadData;
 
     /** Load slice from disk */
-    cv::Mat load_slice_(int index, VolumeAxis axis = Z) const;
-    cv::Mat load_slice_(int index, cv::Rect rect = cv::Rect(), VolumeAxis axis = Z) const;
+    cv::Mat load_slice_(int index, cv::Rect2i rect = cv::Rect2i(), VolumeAxis axis = Z) const;
 };
 }  // namespace volcart

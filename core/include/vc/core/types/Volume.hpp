@@ -92,6 +92,8 @@ public:
     double max() const;
     /** @brief Get the format of the volume */
     VolumeFormat format() const;
+    /** @brief Indicate if volume uses a chunked format */
+    virtual bool isChunked() const { return false; };
     /**@}*/
 
     /**@{*/
@@ -257,10 +259,6 @@ protected:
     mutable std::mutex cacheMutex_;
     mutable std::vector<std::mutex> slice_mutexes_;
 
-    // /** Load slice from disk */
-    // cv::Mat load_slice_(int index, cv::Rect rect = cv::Rect(), VolumeAxis axis = Z);
-    // /** Load slice from cache */
-    // cv::Mat cache_slice_(int index);
     /** Shared mutex for thread-safe access */
     mutable std::shared_mutex cache_mutex_;
     mutable std::shared_mutex print_mutex_;

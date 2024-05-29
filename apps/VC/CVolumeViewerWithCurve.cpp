@@ -277,6 +277,7 @@ void CVolumeViewerWithCurve::mousePressEvent(QMouseEvent* event)
         // Handle draw and edit
         if (fViewState == EViewState::ViewStateDraw && event->buttons() == Qt::LeftButton) {
             // With left click, add control points to the curve
+            std::cout << "Draw Point : " << aImgLoc[0] << ", " << aImgLoc[1] << std::endl;
             fControlPoints.push_back(aImgLoc);
             UpdateSplineCurve();
             UpdateView();
@@ -497,11 +498,13 @@ void CVolumeViewerWithCurve::WidgetLoc2ImgLoc(
 
     QPointF scenePoint = fGraphicsView->mapToScene(widgetPoint.toPoint());
 
-    // Step 2: Convert scene coordinates to item coordinates
-    QPointF itemPoint = fBaseImageItem->mapFromScene(scenePoint);
+    std::cout << "Scene Point: " << scenePoint.x() << ", " << scenePoint.y() << std::endl;
 
-    nImgLoc[0] = static_cast<float>(itemPoint.x());
-    nImgLoc[1] = static_cast<float>(itemPoint.y());
+    // // Step 2: Convert scene coordinates to item coordinates
+    // QPointF itemPoint = fBaseImageItem->mapFromScene(scenePoint);
+
+    nImgLoc[0] = static_cast<float>(scenePoint.x());
+    nImgLoc[1] = static_cast<float>(scenePoint.y());
 }
 
 // Select point on curves

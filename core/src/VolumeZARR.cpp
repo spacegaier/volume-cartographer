@@ -35,19 +35,12 @@ auto VolumeZARR::getSlicePath(int index) const -> fs::path
 
 auto VolumeZARR::getSliceData(int index, VolumeAxis axis) const -> cv::Mat
 {       
-    // // We only cache the main Z axis for now
-    // if (cacheSlices_ && axis == Z) {
-    //     return cache_slice_(index);
-    // } 
-    return load_slice_(index, axis);
+    // Not implemented yet}
+    return cv::Mat();
 }
 
 auto VolumeZARR::getSliceDataRect(int index, cv::Rect rect, VolumeAxis axis) const -> cv::Mat
 {
-    // // We only cache the main Z axis for now
-    // if (cacheSlices_ && axis == Z) {
-    //     return cache_slice_(index);
-    // } 
     return load_slice_(index, rect, axis);
 }
 
@@ -56,7 +49,7 @@ void VolumeZARR::setSliceData(int index, const cv::Mat& slice, bool compress)
     // Not implemented yet
 }
 
-void VolumeZARR::setZarrLevel(int level) { zarrLevel_ = level; openZarr(); }
+void VolumeZARR::setZarrLevel(int level) { zarrLevel_ = level; }
 
 auto VolumeZARR::zarrLevels() const -> std::vector<std::string>
 { 
@@ -66,13 +59,7 @@ auto VolumeZARR::zarrLevels() const -> std::vector<std::string>
     return keys;
 }
 
-auto VolumeZARR::load_slice_(int index, VolumeAxis axis) const -> cv::Mat
-{
-    // TODO
-    return cv::Mat();
-}
-
-auto VolumeZARR::load_slice_(int index, cv::Rect rect, VolumeAxis axis) const -> cv::Mat
+auto VolumeZARR::load_slice_(int index, cv::Rect2i rect, VolumeAxis axis) const -> cv::Mat
 {
     {
         std::unique_lock<std::shared_mutex> lock(print_mutex_);
@@ -101,41 +88,24 @@ auto VolumeZARR::load_slice_(int index, cv::Rect rect, VolumeAxis axis) const ->
             //     return cv::Mat(data->shape()[1], data->shape()[2], CV_16U, data->data(), 0);
             // } else {
 
-                z5::types::ShapeType chunkShape;
-                z5::types::ShapeType chunkIndex = {0, 0, 0};
-                zarrDs_->getChunkShape(chunkIndex, chunkShape);
-                // Determine required chunk number
-                unsigned int chunkNum = index / chunkShape[(int)axis];
-                unsigned int offset = chunkNum * chunkShape[(int)axis];
-
-                std::cout << "Chunk Num: " << chunkNum << std::endl;
-
-                std::cout << "Rect Before: " << rect.x << ", " << rect.y << ", " << rect.width << ", " << rect.height << std::endl;
+                // z5::types::ShapeType chunkShape;
+                // z5::types::ShapeType chunkIndex = {0, 0, 0};
+                // zarrDs_->getChunkShape(chunkIndex, chunkShape);
+                // // Determine required chunk number
+                // size_t chunkNum = index / chunkShape[(int)axis];
+                // size_t offset = chunkNum * chunkShape[(int)axis];
 
                 // Adjust rect based on ZARR scaling
-
-                if (rect.x < 0) {
-                    rect.width += std::abs(rect.x);
-                }
-
-                if (rect.y < 0) {
-                    rect.height += std::abs(rect.y);
-                }
-
                 // rect.x /= groupAttr_["multiscales"][0]["datasets"][zarrLevel_]["coordinateTransformations"][0]["scale"][0].get<float>();
-                rect.x = std::max(0, rect.x);
                 // rect.y /= groupAttr_["multiscales"][0]["datasets"][zarrLevel_]["coordinateTransformations"][0]["scale"][1].get<float>();
-                rect.y = std::max(0, rect.y);
-            
                 // rect.width *= groupAttr_["multiscales"][0]["datasets"][zarrLevel_]["coordinateTransformations"][0]["scale"][0].get<float>();
                 // rect.height *= groupAttr_["multiscales"][0]["datasets"][zarrLevel_]["coordinateTransformations"][0]["scale"][1].get<float>();
 
                 xt::xtensor<std::uint16_t, 3>* data = nullptr;
-                auto offsetShape = (axis == Z)   ? z5::types::ShapeType({(int)index,  (int)rect.y, (int)rect.x})
-                                   : (axis == X) ? z5::types::ShapeType({(int)rect.x, (int)index,  (int)rect.y})
-                                                 : z5::types::ShapeType({(int)rect.x, (int)rect.y, (int)index});
-                // auto offsetShape = (axis == Z) ? z5::types::ShapeType({offset, 0, 0}) : (axis == X) ? z5::types::ShapeType({0, offset, 0}) : z5::types::ShapeType({0, 0, offset});
-                std::cout << "Offset Shape: " << offsetShape[0] << ", " << offsetShape[1] << ", " << offsetShape[2] << std::endl;
+                auto offsetShape = (axis == Z)   ? z5::types::ShapeType({(size_t)index,  (size_t)rect.y, (size_t)rect.x})
+                                   : (axis == X) ? z5::types::ShapeType({(size_t)rect.x, (size_t)index,  (size_t)rect.y})
+                                                 : z5::types::ShapeType({(size_t)rect.x, (size_t)rect.y, (size_t)index});
+                // std::cout << "Offset Shape: " << offsetShape[0] << ", " << offsetShape[1] << ", " << offsetShape[2] << std::endl;
 
                 // auto it = loadedChunks_[axis].find(chunkNum);
                 // if (it == loadedChunks_[axis].end()) {
@@ -147,15 +117,15 @@ auto VolumeZARR::load_slice_(int index, cv::Rect rect, VolumeAxis axis) const ->
                     auto shape = zarrDs_->shape();
                     // shape.at((axis == Z) ? 0 : (axis == Y) ? 2 : 1) = chunkShape[(int)axis];  // load as many slices as there are in a single chunk
                     xt::xtensor<std::uint16_t, 3>::shape_type tensorShape;
-                    int maxWidth = shape[2] - (int)rect.x;
-                    int maxHeight = shape.at(1) - (int)rect.y;
-                    tensorShape = {1, std::min((int)rect.height, maxHeight), std::min((int)rect.width, maxWidth)};
-                    // tensorShape = {shape[0], shape[1], shape[2]};
+                    size_t maxWidth = shape[2] - rect.x;
+                    size_t maxHeight = shape.at(1) - rect.y;
+                    tensorShape = {1, std::min((size_t)rect.height, maxHeight), std::min((size_t)rect.width, maxWidth)};
                     std::cout << "Tensor Shape: " << tensorShape[0] << ", " << tensorShape[1] << ", " << tensorShape[2] << std::endl;
 
                     // Read data
                     data = new xt::xtensor<std::uint16_t, 3>(tensorShape);
                     int threads = static_cast<int>(std::thread::hardware_concurrency());
+                    zarrDs_->prepareMultiThreadedRead(threads);
                     z5::multiarray::readSubarray<std::uint16_t>(*zarrDs_, *data, offsetShape.begin(), threads);
 
                     // // Adjust axis
@@ -265,34 +235,25 @@ void VolumeZARR::setChunkSettings(ChunkDataSettings chunkSettings)
     settings.chunkSize = 25;
 }
 
-auto VolumeZARR::determineChunksForRect(int index, cv::Rect rect) const -> ChunkData
+auto VolumeZARR::determineChunksForRect(int index, cv::Rect2i rect) const -> ChunkData
 {
-    ChunkData res;
-    
     // if (settings.path.size() == 0) {
     //     return {};
     // }
 
+    ChunkData res;
     int axis = Z;
 
-    z5::types::ShapeType chunkShape;
-    z5::types::ShapeType chunkIndex = {0, 0, 0};
-    zarrDs_->getChunkShape(chunkIndex, chunkShape);
-    // Determine required chunk number
-    unsigned int chunkNum = index / chunkShape[(int)axis];
-    unsigned int offset = chunkNum * chunkShape[(int)axis];
+    auto offsetShape = (axis == Z)   ? z5::types::ShapeType({(size_t)index, (size_t)rect.y, (size_t)rect.x})
+                       : (axis == X) ? z5::types::ShapeType({(size_t)rect.x, (size_t)index, (size_t)rect.y})
+                                     : z5::types::ShapeType({(size_t)rect.x, (size_t)rect.y, (size_t)index});
 
-    std::cout << "Chunk Num: " << chunkNum << std::endl;
-
-    xt::xtensor<std::uint16_t, 3>* data = nullptr;
-    auto offsetShape = (axis == Z) ? z5::types::ShapeType({offset, 0, 0}) : (axis == X) ? z5::types::ShapeType({0, offset, 0}) : z5::types::ShapeType({0, 0, offset});
-    std::cout << "Offset Shape: " << offsetShape[0] << ", " << offsetShape[1] << ", " << offsetShape[2] << std::endl;
-
-    // Prepare desired read shape to control how many slices get loaded
     auto shape = zarrDs_->shape();
-    shape.at((axis == Z) ? 0 : (axis == Y) ? 2 : 1) = chunkShape[(int)axis];  // load as many slices as there are in a single chunk
     xt::xtensor<std::uint16_t, 3>::shape_type tensorShape;
-    tensorShape = {shape[0], shape[1], shape[2]};
+    size_t maxWidth = shape[2] - rect.x;
+    size_t maxHeight = shape.at(1) - rect.y;
+    tensorShape = {1, std::min((size_t)rect.height, maxHeight), std::min((size_t)rect.width, maxWidth)};
+    std::cout << "Tensor Shape: " << tensorShape[0] << ", " << tensorShape[1] << ", " << tensorShape[2] << std::endl;
 
     std::vector<z5::types::ShapeType> chunkRequests;
     const auto& chunking = zarrDs_->chunking();
@@ -341,16 +302,16 @@ auto VolumeZARR::determineChunksForRect(int index, cv::Rect rect) const -> Chunk
     return res;
 }
 
-auto VolumeZARR::determineNotLoadedChunks(int index, cv::Rect rect) const -> ChunkRequests
+auto VolumeZARR::determineNotLoadedChunks(int index, cv::Rect2i rect) const -> ChunkRequests
 {
     auto chunks = determineChunksForRect(index, rect);
 
     ChunkRequests requests;
-    // for(auto chunk : chunks) {
-    //     if (chunk.second.size() == 0) {
-    //         requests.push_back(ChunkRequest({chunk.first[0], chunk.first[1], chunk.first[2]}));
-    //     }
-    // }
+    for(auto chunk : chunks) {
+        if (chunk.second->size() == 0) {
+            requests.push_back(ChunkRequest({chunk.first[0], chunk.first[1], chunk.first[2]}));
+        }
+    }
 
     return requests;
 
@@ -386,10 +347,6 @@ void VolumeZARR::loadChunkFiles(ChunkRequests chunksToLoad, VolumeAxis axis) con
         return;
     }
 
-    // vc::ITKMesh::Pointer mesh;
-    // itk::Point<double, 3> point;
-    threadData.clear();
-
     z5::types::ShapeType chunkShape;
     z5::types::ShapeType chunkIndex = {0, 0, 0};
     zarrDs_->getChunkShape(chunkIndex, chunkShape);
@@ -397,14 +354,16 @@ void VolumeZARR::loadChunkFiles(ChunkRequests chunksToLoad, VolumeAxis axis) con
     auto shape = zarrDs_->shape();
     shape.at((axis == Z) ? 0 : (axis == Y) ? 2 : 1) = chunkShape[(int)axis];  // load as many slices as there are in a single chunk
     xt::xtensor<std::uint16_t, 3>::shape_type tensorShape;
-    tensorShape = {shape[0], shape[1], shape[2]};
+    tensorShape = {1, shape[1], shape[2]};
+    // tensorShape = {shape[0], shape[1], shape[2]};
     auto data = new xt::xtensor<std::uint16_t, 3>(tensorShape);
 
     z5::multiarray::readSubarrayMultiThreaded<std::uint16_t>(*zarrDs_, *data, z5::types::ShapeType(), shape, chunksToLoad, std::thread::hardware_concurrency());
 
-    // for (auto chunk : chunksToLoad) {
-    //     chunkData[{chunk[0], chunk[1], chunk[2]}] = data;
-    // }
+
+    for (auto chunk : chunksToLoad) {
+        chunkData[{chunk[0], chunk[1], chunk[2]}] = data + shape[1] * shape[2];
+    }
 
     // auto view = xt::view(*data, index % chunkShape[(int)axis]);
     // return cv::Mat(view.shape()[0], view.shape()[1], CV_16U, view.data() + view.data_offset(), 0);
@@ -496,7 +455,7 @@ void VolumeZARR::mergeThreadData(ChunkData threadData) const
     // }
 }
 
-auto VolumeZARR::getChunkData(int index, cv::Rect rect, VolumeAxis axis) -> ChunkData
+auto VolumeZARR::getChunkData(int index, cv::Rect2i rect, VolumeAxis axis) -> ChunkData
 {
     ChunkData res;
 
@@ -510,7 +469,7 @@ auto VolumeZARR::getChunkData(int index, cv::Rect rect, VolumeAxis axis) -> Chun
     return res;
 }
 
-auto VolumeZARR::getChunkSliceData(int index, cv::Rect rect) const -> ChunkSlice
+auto VolumeZARR::getChunkSliceData(int index, cv::Rect2i rect) const -> ChunkSlice
 {
     ChunkSlice res;
 

@@ -225,8 +225,6 @@ void CImageViewer::SetImage(const QImage& nSrc, const QPoint pos)
         *fImgQImage = nSrc;
     }
 
-    auto rect = GetView()->mapToScene(GetView()->viewport()->rect());
-
     // Create a QPixmap from the QImage
     QPixmap pixmap = QPixmap::fromImage(*fImgQImage, Qt::NoFormatConversion);
 
@@ -236,12 +234,11 @@ void CImageViewer::SetImage(const QImage& nSrc, const QPoint pos)
         fBaseImageItem->setPixmap(pixmap);
     }
 
-    QPoint newPos = {std::max(0, pos.x()), std::max(0, pos.y())};
-    fBaseImageItem->setPos(newPos);
-    //fGraphicsView->centerOn(fBaseImageItem);
+    if (pos.x() != -1) {
+        fBaseImageItem->setPos(pos);
+    }
 
     UpdateButtons();
-    update();
 }
 
 void CImageViewer::SetNumImages(int num)
@@ -363,6 +360,7 @@ void CImageViewer::OnZoomOutClicked(void)
 {
     if (fZoomOutBtn->isEnabled()) {
         ScaleImage(1 / ZOOM_FACTOR);
+        ScheduleChunkUpdate();
     }
 }
 
