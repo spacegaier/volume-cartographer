@@ -23,11 +23,11 @@ CVolumeViewerWithCurve::CVolumeViewerWithCurve(std::unordered_map<std::string, S
     , fSegStructMapRef(nSegStructMapRef)
 {
     timer = new QTimer(this);
-    QSettings settings;
+    QSettings internalSettings;
     colorSelector = new ColorFrame(this);
     colorSelector->setFixedSize(16, 16);
     colorSelector->setToolTip(tr("Curve color"));
-    auto color = settings.value("volumeViewer/curveColor", QColor("green"))
+    auto color = internalSettings.value("volumeViewer/curveColor", QColor("green"))
                      .value<QColor>();
     colorSelector->setColor(color);
     fButtonsLayout->addWidget(colorSelector);
@@ -35,14 +35,14 @@ CVolumeViewerWithCurve::CVolumeViewerWithCurve(std::unordered_map<std::string, S
         colorSelector, &ColorFrame::colorChanged, this,
         &CVolumeViewerWithCurve::UpdateView);
     connect(colorSelector, &ColorFrame::colorChanged, [](const QColor& c) {
-        QSettings settings;
-        settings.setValue("volumeViewer/curveColor", c);
+        QSettings internalSettings;
+        internalSettings.setValue("volumeViewer/curveColor", c);
     });
 
     colorSelectorCompute = new ColorFrame(this);
     colorSelectorCompute->setFixedSize(16, 16);
     colorSelectorCompute->setToolTip(tr("Curve color (for \"Compute\" mode)"));
-    auto colorCompute = settings.value("volumeViewer/computeColor", QColor("blue"))
+    auto colorCompute = internalSettings.value("volumeViewer/computeColor", QColor("blue"))
                      .value<QColor>();
     colorSelectorCompute->setColor(colorCompute);
     fButtonsLayout->addWidget(colorSelectorCompute);
@@ -50,14 +50,14 @@ CVolumeViewerWithCurve::CVolumeViewerWithCurve(std::unordered_map<std::string, S
         colorSelectorCompute, &ColorFrame::colorChanged, this,
         &CVolumeViewerWithCurve::UpdateView);
     connect(colorSelectorCompute, &ColorFrame::colorChanged, [](const QColor& c) {
-        QSettings settings;
-        settings.setValue("volumeViewer/computeColor", c);
+        QSettings internalSettings;
+        internalSettings.setValue("volumeViewer/computeColor", c);
     });
 
     colorSelectorHighlight = new ColorFrame(this);
     colorSelectorHighlight->setFixedSize(16, 16);
     colorSelectorHighlight->setToolTip(tr("Highlighted curve color"));
-    auto colorHighlight = settings.value("volumeViewer/computeHighlight", QColor("red"))
+    auto colorHighlight = internalSettings.value("volumeViewer/computeHighlight", QColor("red"))
                      .value<QColor>();
     colorSelectorHighlight->setColor(colorHighlight);
     fButtonsLayout->addWidget(colorSelectorHighlight);
@@ -65,14 +65,14 @@ CVolumeViewerWithCurve::CVolumeViewerWithCurve(std::unordered_map<std::string, S
         colorSelectorHighlight, &ColorFrame::colorChanged, this,
         &CVolumeViewerWithCurve::UpdateView);
     connect(colorSelectorHighlight, &ColorFrame::colorChanged, [](const QColor& c) {
-        QSettings settings;
-        settings.setValue("volumeViewer/computeHighlight", c);
+        QSettings internalSettings;
+        internalSettings.setValue("volumeViewer/computeHighlight", c);
     });
 
     colorSelectorManual = new ColorFrame(this);
     colorSelectorManual->setFixedSize(16, 16);
     colorSelectorManual->setToolTip(tr("Manually changed points color"));
-    auto colorManual = settings.value("volumeViewer/manualColor", QColor("orange"))
+    auto colorManual = internalSettings.value("volumeViewer/manualColor", QColor("orange"))
                      .value<QColor>();
     colorSelectorManual->setColor(colorManual);
     fButtonsLayout->addWidget(colorSelectorManual);
@@ -80,8 +80,8 @@ CVolumeViewerWithCurve::CVolumeViewerWithCurve(std::unordered_map<std::string, S
         colorSelectorManual, &ColorFrame::colorChanged, this,
         &CVolumeViewerWithCurve::UpdateView);
     connect(colorSelectorManual, &ColorFrame::colorChanged, [](const QColor& c) {
-        QSettings settings;
-        settings.setValue("volumeViewer/manualColor", c);
+        QSettings internalSettings;
+        internalSettings.setValue("volumeViewer/manualColor", c);
     });
 
     // show curve box
@@ -96,8 +96,9 @@ CVolumeViewerWithCurve::CVolumeViewerWithCurve(std::unordered_map<std::string, S
     fButtonsLayout->addWidget(fShowCurveBox);
     fButtonsLayout->addWidget(ShowCurveLabel);
 
-    QSettings settingsJump("VC.ini", QSettings::IniFormat);
-    fwdBackMsJump = settingsJump.value("viewer/fwd_back_step_ms", 25).toInt();
+    QSettings userSettings("VC.ini", QSettings::IniFormat);
+    fwdBackMsJump = userSettings.value("viewer/fwd_back_step_ms", 25).toInt();
+    displaySegmentOpacity = userSettings.value("viewer/display_segment_opacity", 70).toInt();
 
     UpdateButtons();
 
@@ -546,7 +547,7 @@ std::pair<int, std::string> CVolumeViewerWithCurve::SelectPointOnCurves(
 void CVolumeViewerWithCurve::DrawIntersectionCurve() {
     for (auto& seg : fSegStructMapRef) {
         auto& segStruct = seg.second;
-        int r{0}, g{0}, b{0};
+        int r{0}, g{0}, b{0}, a{255};
         if (segStruct.highlighted && segStruct.compute) {
             colorSelectorHighlight->color().getRgb(&r, &g, &b);
         }
@@ -561,6 +562,7 @@ void CVolumeViewerWithCurve::DrawIntersectionCurve() {
         }
         else {
             colorSelector->color().getRgb(&r, &g, &b);
+            a = displaySegmentOpacity / 100.f * 255;
         }
         if (!fScene || !segStruct.display || segStruct.fIntersectionCurve.GetPointsNum()==0 || !colorSelector) {
             continue;  // Early continue if either object is null or the list is empty
@@ -571,7 +573,7 @@ void CVolumeViewerWithCurve::DrawIntersectionCurve() {
         // Get annotations for current curve
         auto hasAnnotations = !segStruct.fAnnotationCloud.empty();
         auto pointIndex = segStruct.GetAnnotationIndexForSliceIndex(segStruct.fPathOnSliceIndex);
-        auto gray = QColor(180, 180, 180);
+        auto gray = QColor(180, 180, 180, a);
 
         for (int i = 0; i < pointsNum; ++i) {
             // Create new ellipse points
@@ -586,8 +588,8 @@ void CVolumeViewerWithCurve::DrawIntersectionCurve() {
             }
 
             // Determine pen and brush colors
-            auto penColor = manualPoint ? colorSelectorManual->color() : QColor(r, g, b);
-            auto brushColor = QColor(r, g, b);
+            auto penColor = manualPoint ? colorSelectorManual->color() : QColor(r, g, b, a);
+            auto brushColor = QColor(r, g, b, a);
             // Slightly mark every 10th point
             if (i % 20 == 0) {
                 brushColor = gray;
@@ -647,16 +649,16 @@ void CVolumeViewerWithCurve::UpdateButtons(void)
         fImgQImage != nullptr && (fViewState == EViewState::ViewStateIdle || fViewState == EViewState::ViewStateEdit));
     fPrevBtn->setEnabled(
         fImgQImage != nullptr && (fViewState == EViewState::ViewStateIdle || fViewState == EViewState::ViewStateEdit));
-    fImageIndexEdit->setEnabled(fViewState == EViewState::ViewStateIdle || fViewState == EViewState::ViewStateEdit);
+    fImageIndexSpin->setEnabled(fViewState == EViewState::ViewStateIdle || fViewState == EViewState::ViewStateEdit);
 }
 
 // Disable stuff
-void CVolumeViewerWithCurve::setButtonsEnabled(bool state)
+void CVolumeViewerWithCurve::SetButtonsEnabled(bool state)
 {
     fZoomOutBtn->setEnabled(state);
     fZoomInBtn->setEnabled(state);
     fPrevBtn->setEnabled(state);
     fNextBtn->setEnabled(state);
-    fImageIndexEdit->setEnabled(state);
+    fImageIndexSpin->setEnabled(state);
     fShowCurveBox->setEnabled(state);
 }

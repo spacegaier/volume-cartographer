@@ -75,9 +75,13 @@ auto VolumeTIFF::load_slice_(int index, VolumeAxis axis) const -> cv::Mat
         std::unique_lock<std::shared_mutex> lock(print_mutex_);
         std::cout << "Requested to load slice " << index << std::endl;
     }
-
     auto slicePath = getSlicePath(index);
-    return cv::imread(slicePath.string(), -1);
+    cv::Mat mat;
+    try {
+        mat = tio::ReadTIFF(slicePath.string());
+    } catch (std::runtime_error) {
+    }
+    return mat;
 }
 
 auto VolumeTIFF::cache_slice_(int index) const -> cv::Mat 

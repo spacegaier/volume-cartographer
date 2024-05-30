@@ -27,11 +27,11 @@ class CImageViewerView : public QGraphicsView
 
         bool isRangeKeyPressed() { return rangeKeyPressed; }
         bool isCurvePanKeyPressed() { return curvePanKeyPressed; }
+        bool isRotateKyPressed() { return rotateKeyPressed; }
 
         void showTextAboveCursor(const QString& value, const QString& label, const QColor& color);
         void hideTextAboveCursor();
 
-    public slots:
         void showCurrentImpactRange(int range);
         void showCurrentScanRange(int range);
         void showCurrentImageIndex(int slice, bool highlight);
@@ -39,6 +39,7 @@ class CImageViewerView : public QGraphicsView
     protected:
         bool rangeKeyPressed{false};
         bool curvePanKeyPressed{false};
+        bool rotateKeyPressed{false};
 
         QGraphicsTextItem* textAboveCursor;
         QGraphicsRectItem* backgroundBehindText;
@@ -52,18 +53,18 @@ class CImageViewer : public QWidget
 public:
     CImageViewer(QWidget* parent = 0);
     ~CImageViewer(void);
-    virtual void setButtonsEnabled(bool state);
+    virtual void SetButtonsEnabled(bool state);
 
     virtual void SetImage(const QImage& nSrc, const QPoint pos = {0, 0});
     void SetImageIndex(int imageIndex)
     {
         fImageIndex = imageIndex;
-        fImageIndexEdit->setValue(imageIndex);
+        fImageIndexSpin->setValue(imageIndex);
         UpdateButtons();
     }
     auto GetImageIndex() const -> int { return fImageIndex; }
     void SetNumImages(int num);
-    auto GetNumImages() const -> int { return fImageIndexEdit->maximum(); }
+    auto GetNumImages() const -> int { return fImageIndexSpin->maximum(); }
     void SetScanRange(int scanRange);
     auto GetImageSize() const -> QSize { return fBaseImageItem->pixmap().size(); }
     void ScaleImage(double nFactor);
@@ -71,22 +72,26 @@ public:
     auto GetView() const -> CImageViewerView* { return fGraphicsView; }
     auto GetImage() const -> QImage* { return fImgQImage; }
 
+    void SetRotation(int degress);
+    void Rotate(int delta);
+    void ResetRotation();
+
     void ResetView();
     void ScheduleChunkUpdate();
 
     virtual bool CanChangeImage() const { return fPrevBtn->isEnabled(); }
     virtual bool ShouldHighlightImageIndex(const int imageIndex) { return false; }
 
-protected:
-    bool eventFilter(QObject* watched, QEvent* event);
-
-public slots:
     void OnZoomInClicked(void);
     void OnZoomOutClicked(void);
     void OnResetClicked(void);
     void OnNextClicked(void);
     void OnPrevClicked(void);
-    void OnImageIndexEditTextChanged(void);
+    void OnImageIndexSpinChanged(void);
+    void OnImageRotationSpinChanged(void);
+
+protected:
+    bool eventFilter(QObject* watched, QEvent* event);
 
 signals:
     void SendSignalOnNextImageShift(int shift);
@@ -119,7 +124,8 @@ protected:
     QPushButton* fZoomInBtn;
     QPushButton* fZoomOutBtn;
     QPushButton* fResetBtn;
-    QSpinBox* fImageIndexEdit;
+    QSpinBox* fImageIndexSpin;
+    QSpinBox* fImageRotationSpin;
     QHBoxLayout* fButtonsLayout;
     QSpacerItem* fSpacer;
 
@@ -127,9 +133,14 @@ protected:
     QImage* fImgQImage;
     double fScaleFactor;
     int fImageIndex;
-    int fScanRange;  // how many images a mouse wheel step will jump
+    int fScanRange;
+    // Required to be able to reset the rotation without also resetting the scaling
+    int currentRotation{0};
 
+    // user settings
     bool fCenterOnZoomEnabled;
+    int fScrollSpeed{-1};
+    bool fSkipImageFormatConv;
 
     // pan handling
     bool wantsPanning{false};

@@ -15,16 +15,21 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent)
     QSettings settings("VC.ini", QSettings::IniFormat);
 
     edtDefaultPathVolpkg->setText(settings.value("volpkg/default_path").toString());
-    chkAutoOpenVolpkg->setChecked(settings.value("volpkg/auto_open", false).toInt() != 0);
+    chkAutoOpenVolpkg->setChecked(settings.value("volpkg/auto_open", true).toInt() != 0);
 
     spinFwdBackStepMs->setValue(settings.value("viewer/fwd_back_step_ms", 25).toInt());
     chkCenterOnZoom->setChecked(settings.value("viewer/center_on_zoom", false).toInt() != 0);
-    edtImpactRange->setText(settings.value("viewer/impact_range_steps", "1-20").toString());
-    edtScanRange->setText(settings.value("viewer/scan_range_steps", "1, 2, 5, 10, 20, 50, 100").toString());
+    edtImpactRange->setText(settings.value("viewer/impact_range_steps", "1-3, 5, 8, 11, 15, 20, 28, 40, 60, 100, 200").toString());
+    edtScanRange->setText(settings.value("viewer/scan_range_steps", "1, 2, 5, 10, 20, 50, 100, 200, 500, 1000").toString());
+    spinScrollSpeed->setValue(settings.value("viewer/scroll_speed", -1).toInt());
+    spinDisplayOpacity->setValue(settings.value("viewer/display_segment_opacity", 70).toInt());
     chkPlaySoundAfterSegRun->setChecked(settings.value("viewer/play_sound_after_seg_run", true).toInt() != 0);
 
     spinPreloadedSlices->setValue(settings.value("perf/preloaded_slices", 200).toInt());
+    chkSkipImageFormatConvExp->setChecked(settings.value("perf/chkSkipImageFormatConvExp", false).toBool());
 
+    connect(btnHelpScrollSpeed, &QPushButton::clicked, this, [this]{ QToolTip::showText(QCursor::pos(), btnHelpScrollSpeed->toolTip()); });
+    connect(btnHelpDisplayOpacity, &QPushButton::clicked, this, [this]{ QToolTip::showText(QCursor::pos(), btnHelpDisplayOpacity->toolTip()); });
     connect(btnHelpPreloadedSlices, &QPushButton::clicked, this, [this]{ QToolTip::showText(QCursor::pos(), btnHelpPreloadedSlices->toolTip()); });
 }
 
@@ -40,9 +45,12 @@ void SettingsDialog::accept()
     settings.setValue("viewer/center_on_zoom", chkCenterOnZoom->isChecked() ? "1" : "0");
     settings.setValue("viewer/impact_range_steps", edtImpactRange->text());
     settings.setValue("viewer/scan_range_steps", edtScanRange->text());
+    settings.setValue("viewer/scroll_speed", spinScrollSpeed->value());
+    settings.setValue("viewer/display_segment_opacity", spinDisplayOpacity->value());
     settings.setValue("viewer/play_sound_after_seg_run", chkPlaySoundAfterSegRun->isChecked() ? "1" : "0");
 
     settings.setValue("perf/preloaded_slices", spinPreloadedSlices->value());
+    settings.setValue("perf/chkSkipImageFormatConvExp", chkSkipImageFormatConvExp->isChecked() ? "1" : "0");
 
     QMessageBox::information(this, tr("Restart required"), tr("Note: Some settings only take effect once you restarted the app."));
 

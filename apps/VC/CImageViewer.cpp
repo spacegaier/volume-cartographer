@@ -47,6 +47,9 @@ void CImageViewerView::keyPressEvent(QKeyEvent* event)
     } else if (event->key() == Qt::Key_R) {
         curvePanKeyPressed = true;
         event->accept();
+    } else if (event->key() == Qt::Key_S) {
+        rotateKeyPressed = true;
+        event->accept();
     }
 }
 
@@ -57,6 +60,9 @@ void CImageViewerView::keyReleaseEvent(QKeyEvent* event)
         event->accept();
     } else if (event->key() == Qt::Key_R) {
         curvePanKeyPressed = false;
+        event->accept();
+    } else if (event->key() == Qt::Key_S) {
+        rotateKeyPressed = false;
         event->accept();
     }
 }
@@ -133,13 +139,20 @@ CImageViewer::CImageViewer(QWidget* parent)
     fResetBtn = new QPushButton(tr("Reset"), this);
     fNextBtn = new QPushButton(tr("Next Image"), this);
     fPrevBtn = new QPushButton(tr("Previous Image"), this);
+    
+    // Image index spin box
+    fImageIndexSpin = new QSpinBox(this);
+    fImageIndexSpin->setMinimum(0);
+    fImageIndexSpin->setEnabled(true);
+    fImageIndexSpin->setMinimumWidth(100);
+    connect(fImageIndexSpin, &QSpinBox::editingFinished, this, &CImageViewer::OnImageIndexSpinChanged);
 
-    // Image index edit
-    fImageIndexEdit = new QSpinBox(this);
-    fImageIndexEdit->setMinimum(0);
-    fImageIndexEdit->setEnabled(true);
-    fImageIndexEdit->setMinimumWidth(100);
-    connect(fImageIndexEdit, &QSpinBox::editingFinished, this, &CImageViewer::OnImageIndexEditTextChanged);
+    fImageRotationSpin = new QSpinBox(this);
+    fImageRotationSpin->setMinimum(-360);
+    fImageRotationSpin->setMaximum(360);
+    fImageRotationSpin->setSuffix("°");
+    fImageRotationSpin->setEnabled(true);
+    connect(fImageRotationSpin, &QSpinBox::editingFinished, this, &CImageViewer::OnImageRotationSpinChanged);
 
     // Create graphics view
     fGraphicsView = new CImageViewerView(this);
@@ -161,7 +174,8 @@ CImageViewer::CImageViewer(QWidget* parent)
     fButtonsLayout->addWidget(fResetBtn);
     fButtonsLayout->addWidget(fPrevBtn);
     fButtonsLayout->addWidget(fNextBtn);
-    fButtonsLayout->addWidget(fImageIndexEdit);
+    fButtonsLayout->addWidget(fImageIndexSpin);
+    fButtonsLayout->addWidget(fImageRotationSpin);
     // Add some space between the image spin box and the curve tools (color, checkboxes, ...)
     fSpacer = new QSpacerItem(1, 0, QSizePolicy::Expanding, QSizePolicy::Fixed);
     fButtonsLayout->addSpacerItem(fSpacer);
@@ -174,6 +188,8 @@ CImageViewer::CImageViewer(QWidget* parent)
 
     QSettings settings("VC.ini", QSettings::IniFormat);
     fCenterOnZoomEnabled = settings.value("viewer/center_on_zoom", false).toInt() != 0;
+    fScrollSpeed = settings.value("viewer/scroll_speed", false).toInt();
+    fSkipImageFormatConv = settings.value("perf/chkSkipImageFormatConvExp", false).toBool();
 
     QVBoxLayout* aWidgetLayout = new QVBoxLayout;
     aWidgetLayout->addWidget(fGraphicsView);
@@ -205,16 +221,18 @@ CImageViewer::~CImageViewer(void)
     deleteNULL(fResetBtn);
     deleteNULL(fPrevBtn);
     deleteNULL(fNextBtn);
-    deleteNULL(fImageIndexEdit);
+    deleteNULL(fImageIndexSpin);
+    deleteNULL(fImageRotationSpin);
 }
 
-void CImageViewer::setButtonsEnabled(bool state)
+void CImageViewer::SetButtonsEnabled(bool state)
 {
     fZoomOutBtn->setEnabled(state);
     fZoomInBtn->setEnabled(state);
     fPrevBtn->setEnabled(state);
     fNextBtn->setEnabled(state);
-    fImageIndexEdit->setEnabled(state);
+    fImageIndexSpin->setEnabled(state);
+    fImageRotationSpin->setEnabled(state);
 }
 
 void CImageViewer::SetImage(const QImage& nSrc, const QPoint pos)
@@ -226,8 +244,9 @@ void CImageViewer::SetImage(const QImage& nSrc, const QPoint pos)
     }
 
     // Create a QPixmap from the QImage
-    QPixmap pixmap = QPixmap::fromImage(*fImgQImage, Qt::NoFormatConversion);
+    QPixmap pixmap = QPixmap::fromImage(*fImgQImage, fSkipImageFormatConv ? Qt::NoFormatConversion : Qt::AutoColor);
 
+    // Add the QPixmap to the scene as a QGraphicsPixmapItem
     if (!fBaseImageItem) {
         fBaseImageItem = fScene->addPixmap(pixmap);
     } else {
@@ -243,7 +262,7 @@ void CImageViewer::SetImage(const QImage& nSrc, const QPoint pos)
 
 void CImageViewer::SetNumImages(int num)
 {
-    fImageIndexEdit->setMaximum(num);
+    fImageIndexSpin->setMaximum(num);
 }
 
 // Set the scan range
@@ -330,6 +349,39 @@ bool CImageViewer::eventFilter(QObject* watched, QEvent* event)
             }
             return true;
         }
+        // Rotate key pressed
+        else if (fGraphicsView->isRotateKyPressed()) {
+            int delta = wheelEvent->angleDelta().y() / 22;
+            fGraphicsView->rotate(delta);
+            currentRotation += delta;
+            currentRotation = currentRotation % 360;
+            fImageRotationSpin->setValue(currentRotation);
+            return true;
+        } 
+        // View scrolling
+        else {
+            // If there is no valid scroll speed override value set, we rely
+            // on the default handling of Qt, so we pass on the event.
+            if (fScrollSpeed > 0) {
+                // We have to add the two values since when pressing AltGr as the modifier, 
+                // the X component seems to be set by Qt
+                int delta = wheelEvent->angleDelta().x() + wheelEvent->angleDelta().y();
+                if (delta == 0) {
+                    return true;
+                }
+
+                // Taken from QGraphicsView Qt source logic
+                const bool horizontal = qAbs(wheelEvent->angleDelta().x()) > qAbs(wheelEvent->angleDelta().y());
+                if (QApplication::keyboardModifiers() == Qt::AltModifier || horizontal) {
+                    fGraphicsView->horizontalScrollBar()->setValue(
+                        fGraphicsView->horizontalScrollBar()->value() + fScrollSpeed * ((delta < 0) ? 1 : -1));
+                } else {
+                    fGraphicsView->verticalScrollBar()->setValue(
+                        fGraphicsView->verticalScrollBar()->value() + fScrollSpeed * ((delta < 0) ? 1 : -1));
+                }
+                return true;
+            }
+        }
     }
     return QWidget::eventFilter(watched, event);
 }
@@ -345,6 +397,29 @@ void CImageViewer::ScaleImage(double nFactor)
 void CImageViewer::CenterOn(const QPointF& point)
 {
     fGraphicsView->centerOn(point);
+}
+
+void CImageViewer::SetRotation(int degrees)
+{
+    if (currentRotation != degrees) {
+        auto delta = (currentRotation - degrees) * -1;
+        fGraphicsView->rotate(delta);
+        currentRotation += delta;
+        currentRotation = currentRotation % 360;
+        fImageRotationSpin->setValue(currentRotation);
+    }
+}
+
+void CImageViewer::Rotate(int delta)
+{
+    SetRotation(currentRotation + delta);
+}
+
+void CImageViewer::ResetRotation()
+{
+    fGraphicsView->rotate(-currentRotation);
+    currentRotation = 0;
+    fImageRotationSpin->setValue(currentRotation);
 }
 
 // Handle zoom in click
@@ -368,6 +443,8 @@ void CImageViewer::OnResetClicked(void)
 {
     fGraphicsView->resetTransform();
     fScaleFactor = 1.0;
+    currentRotation = 0;
+    fImageRotationSpin->setValue(currentRotation);
 
     UpdateButtons();
 }
@@ -399,12 +476,27 @@ void CImageViewer::OnPrevClicked(void)
 }
 
 // Handle image index change
-void CImageViewer::OnImageIndexEditTextChanged(void)
+void CImageViewer::OnImageIndexSpinChanged(void)
 {
     // send signal to controller in order to update the content
-    if (fImageIndexEdit->value() != fImageIndex) {
-        SendSignalOnLoadAnyImage(fImageIndexEdit->value());
+    SendSignalOnLoadAnyImage(fImageIndexSpin->value());
+}
+
+// Handle image rotation change
+void CImageViewer::OnImageRotationSpinChanged(void)
+{
+    SetRotation(fImageRotationSpin->value());
+}
+
+// Reset the viewer
+void CImageViewer::ResetView()
+{    
+    if (fBaseImageItem) {
+        delete fBaseImageItem;
+        fBaseImageItem = nullptr;
     }
+
+    OnResetClicked(); // to reset zoom
 }
 
 // Update the status of the buttons
@@ -479,16 +571,6 @@ auto CImageViewer::GetScrollPosition() const -> cv::Vec2f
 
     // Return as cv::Vec2f
     return cv::Vec2f(horizontalPos, verticalPos);
-}
-
-void CImageViewer::ResetView()
-{
-    // Remove all existing items
-    QList<QGraphicsItem*> allItems = fScene->items();
-    for (QGraphicsItem* item : allItems) {
-        fScene->removeItem(item);
-        delete item;
-    }
 }
 
 // Handle mouse press event

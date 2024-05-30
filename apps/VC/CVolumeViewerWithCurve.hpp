@@ -48,7 +48,7 @@ public:
     void SetShowCurve(bool b) { showCurve = b; }
     void toggleShowCurveBox();
 
-    void setButtonsEnabled(bool state);
+    void SetButtonsEnabled(bool state);
 
 protected:
     bool eventFilter(QObject* watched, QEvent* event);
@@ -88,6 +88,7 @@ private:
     QCheckBox* fShowCurveBox;
     bool showCurve;
     int fwdBackMsJump;
+    int displaySegmentOpacity;
     std::unordered_map<std::string, SegmentationStruct>& fSegStructMapRef;
     CBSpline* fSplineCurveRef;
     std::vector<cv::Vec2f> fControlPoints;

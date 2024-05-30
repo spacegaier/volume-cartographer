@@ -15,9 +15,9 @@ CVolumeCrossSectionViewer::CVolumeCrossSectionViewer(CVolumeViewerWithCurve* vie
     : QWidget(parent), volumeCurveViewer(viewer)
 {
     volumeViewerCrossSide = new CImageViewer(this);
-    volumeViewerCrossSide->setButtonsEnabled(true);
+    volumeViewerCrossSide->SetButtonsEnabled(true);
     volumeViewerCrossFront = new CImageViewer(this);
-    volumeViewerCrossFront->setButtonsEnabled(true);
+    volumeViewerCrossFront->SetButtonsEnabled(true);
     setLayout(new QVBoxLayout(this));
     layout()->addWidget(volumeViewerCrossSide);
     layout()->addWidget(volumeViewerCrossFront);
