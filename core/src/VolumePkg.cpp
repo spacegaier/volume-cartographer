@@ -620,7 +620,7 @@ auto VolumePkg::hasTransforms() const -> bool
     return not transforms_.empty();
 }
 
-auto VolumePkg::hasTransform(Volume::Identifier id) const -> bool
+auto VolumePkg::hasTransform(Transform3D::Identifier id) const -> bool
 {
     // Don't allow empty IDs
     if (id.empty()) {

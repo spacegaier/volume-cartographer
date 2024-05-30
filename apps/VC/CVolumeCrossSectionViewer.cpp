@@ -154,10 +154,14 @@ void CVolumeCrossSectionViewer::updateImage(vc::VolumeAxis axis)
     
     QImage aImgQImage;
     cv::Mat aImgMat;
-    if (currentVolume != nullptr) {
-        auto rect = getViewerForAxis(axis)->GetView()->mapToScene(getViewerForAxis(axis)->GetView()->viewport()->rect());
+    auto polygon = getViewerForAxis(axis)->GetView()->mapToScene(getViewerForAxis(axis)->GetView()->viewport()->rect());
+    QRect rect(std::max(0, static_cast<int>(polygon.at(0).x())), 
+               std::max(0, static_cast<int>(polygon.at(0).y())), 
+               polygon.at(2).x() - polygon.at(0).x(), polygon.at(2).y() - polygon.at(0).y());
+
+    if (currentVolume != nullptr) {  
         aImgMat = currentVolume->getSliceDataDefault(getViewerForAxis(axis)->GetImageIndex(),
-            cv::Rect(rect.at(0).x(), rect.at(0).y(), rect.at(2).x() - rect.at(0).x(), rect.at(2).y() - rect.at(0).y()), 
+            cv::Rect(rect.x(), rect.y(), rect.width(), rect.height()),
             axis);
     } else {
         aImgMat = cv::Mat::zeros(10, 10, CV_8UC1);
@@ -170,7 +174,7 @@ void CVolumeCrossSectionViewer::updateImage(vc::VolumeAxis axis)
         aImgQImage = Mat2QImage(aImgMat);
     }
 
-    getViewerForAxis(axis)->SetImage(aImgQImage);
+    getViewerForAxis(axis)->SetImage(aImgQImage, QPoint(rect.x(), rect.y()));
 }
 
 void CVolumeCrossSectionViewer::drawCrossSectionMarkers()

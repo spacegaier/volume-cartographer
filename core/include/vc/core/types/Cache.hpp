@@ -34,6 +34,9 @@ public:
     /** @brief Get an item from the cache by key */
     virtual TValue get(const TKey& k) = 0;
 
+    /** @brief Get an item pointer from the cache by key */
+    virtual TValue* getPointer(const TKey& k) = 0;
+
     /** @brief Put an item into the cache */
     virtual void put(const TKey& k, const TValue& v) = 0;
 

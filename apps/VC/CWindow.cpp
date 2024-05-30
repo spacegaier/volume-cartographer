@@ -236,17 +236,17 @@ void CWindow::CreateWidgets(void)
     connect(ui.btnRemovePath, SIGNAL(clicked()), this, SLOT(OnRemovePathClicked()));
 
     fVolumeCrossSectionViewer = new CVolumeCrossSectionViewer(fVolumeViewerWidget, this);
-    dockWidgetVolumeCross = new QDockWidget(tr("Volume Cross Sections"), this);
-    dockWidgetVolumeCross->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetFloatable | QDockWidget::DockWidgetMovable);
-    dockWidgetVolumeCross->setAllowedAreas(Qt::AllDockWidgetAreas);
-    dockWidgetVolumeCross->setFloating(true);
-    dockWidgetVolumeCross->hide();
-    dockWidgetVolumeCross->setWidget(fVolumeCrossSectionViewer);
-    connect(dockWidgetVolumeCross, &QDockWidget::visibilityChanged, this, [this](bool visible) { if (visible) { 
-        fVolumeCrossSectionViewer->initViewer();
-        fVolumeCrossSectionViewer->setVolume(currentVolume);
-        dockWidgetVolumeCross->setMinimumSize({200, 800});
-    }});    
+    // dockWidgetVolumeCross = new QDockWidget(tr("Volume Cross Sections"), this);
+    // dockWidgetVolumeCross->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetFloatable | QDockWidget::DockWidgetMovable);
+    // dockWidgetVolumeCross->setAllowedAreas(Qt::AllDockWidgetAreas);
+    // dockWidgetVolumeCross->setFloating(true);
+    // dockWidgetVolumeCross->hide();
+    // dockWidgetVolumeCross->setWidget(fVolumeCrossSectionViewer);
+    // connect(dockWidgetVolumeCross, &QDockWidget::visibilityChanged, this, [this](bool visible) { if (visible) { 
+    //     fVolumeCrossSectionViewer->initViewer();
+    //     fVolumeCrossSectionViewer->setVolume(currentVolume);
+    //     dockWidgetVolumeCross->setMinimumSize({200, 800});
+    // }});
 
     // TODO CHANGE VOLUME LOADING; FIRST CHECK FOR OTHER VOLUMES IN THE STRUCTS
     volSelect = this->findChild<QComboBox*>("volSelect");
@@ -276,13 +276,12 @@ void CWindow::CreateWidgets(void)
         }
 
         fVolumeViewerWidget->OnResetClicked();
-        //fVolumeViewerWidget->ResetView();
         fVolumeViewerWidget->GetView()->centerOn(0, 0);
 
         if (newVolume->format() == vc::VolumeFormat::ZARR) {
+            static_cast<vc::VolumeZARR*>(newVolume.get())->cachePurge();
             static_cast<vc::VolumeZARR*>(newVolume.get())->setZarrLevel(zarrLevel.toInt());
             static_cast<vc::VolumeZARR*>(newVolume.get())->openZarr();
-            // fVolumeViewerWidget->GetView()->fitInView(QRect(0, 0, newVolume->sliceWidth(), newVolume->sliceHeight()));
            
             // fVolumeViewerWidget->SetcrossSectionIndexSide(newVolume->sliceWidth() / 2);
             // fVolumeViewerWidget->SetcrossSectionIndexFront(newVolume->sliceWidth() / 2);
@@ -618,7 +617,7 @@ void CWindow::CreateMenus(void)
     fViewMenu->addAction(ui.dockWidgetVolumes->toggleViewAction());
     fViewMenu->addAction(ui.dockWidgetSegmentation->toggleViewAction());
     fViewMenu->addAction(ui.dockWidgetAnnotations->toggleViewAction());
-    fViewMenu->addAction(dockWidgetVolumeCross->toggleViewAction());
+    // fViewMenu->addAction(dockWidgetVolumeCross->toggleViewAction());
 
     fHelpMenu = new QMenu(tr("&Help"), this);
     fHelpMenu->addAction(fKeybinds);
@@ -1016,8 +1015,35 @@ void CWindow::ChangePathItem(std::string segID)
         fSegStructMap[fSegmentationId] = SegmentationStruct(fVpkg, segID, fPathOnSliceIndex);
     }
 
-    if (fSegStructMap[fSegmentationId].currentVolume != nullptr && fSegStructMap[fSegmentationId].fSegmentation->hasVolumeID()) {
-        currentVolume = fSegStructMap[fSegmentationId].currentVolume;
+    auto matchingTransforms = fVpkg->transform(fSegStructMap[fSegmentationId].currentVolume->id(), currentVolume->id());
+
+    // Check if we have a matching transform
+    if (matchingTransforms.size() == 0) {
+
+        if (fSegStructMap[fSegmentationId].currentVolume != nullptr && fSegStructMap[fSegmentationId].fSegmentation->hasVolumeID()) {
+            currentVolume = fSegStructMap[fSegmentationId].currentVolume;
+        }
+    } else if (matchingTransforms.size() == 1) {
+        // Not sure what to do if we have multiple matching transforms, so limit to 1 for now
+        // TODO Handle invertible transforms
+        auto tfm = matchingTransforms.at(0).second;
+
+        if (currentVolume->format() == vc::VolumeFormat::ZARR) {
+            auto zarrVol = static_cast<vc::VolumeZARR*>(currentVolume.get());
+            auto scale = zarrVol->getScaleForLevel(zarrVol->getZarrLevel());
+
+            auto scaleTfm = vc::AffineTransform::New();
+            scaleTfm->scale(1/scale, 1/scale, 1/scale);
+
+            // std::cout << "Point before: " << fSegStructMap[fSegmentationId].fMasterCloud[20][0] << "|" << fSegStructMap[fSegmentationId].fMasterCloud[20][1] << "|"
+            //           << fSegStructMap[fSegmentationId].fMasterCloud[20][2] << std::endl;
+            fSegStructMap[fSegmentationId].fMasterCloud = ApplyTransform(fSegStructMap[fSegmentationId].fMasterCloud, scaleTfm);
+            // std::cout << "Point after: " << fSegStructMap[fSegmentationId].fMasterCloud[20][0] << "|" << fSegStructMap[fSegmentationId].fMasterCloud[20][1] << "|"
+            //           << fSegStructMap[fSegmentationId].fMasterCloud[20][2] << std::endl;
+
+            fSegStructMap[fSegmentationId].SetUpCurves();
+            fSegStructMap[fSegmentationId].SetCurrentCurve(fPathOnSliceIndex);
+        }
     }
 
     // Only change slices if no other segmentations are being displayed
@@ -1719,7 +1745,7 @@ void CWindow::OpenSlice(void)
         aImgQImage = Mat2QImage(aImgMat);
     }
 
-    fVolumeViewerWidget->SetImage(aImgQImage, (currentVolume && currentVolume->isChunked()) ? QPoint(rect.x(), rect.y()) : QPoint(-1, -1));
+    fVolumeViewerWidget->SetImage(aImgQImage, (currentVolume && currentVolume->isChunked()) ? QPoint(rect.x(), rect.y()) : QPoint(0, 0));
     fVolumeViewerWidget->SetImageIndex(fPathOnSliceIndex);
     fVolumeCrossSectionViewer->setcrossSectionIndexTop(fPathOnSliceIndex);
 }
@@ -2276,7 +2302,6 @@ void CWindow::OnPathItemClicked(QTreeWidgetItem* item, int column)
         std::string aSegID = item->text(0).toStdString();
         // qDebug() << "Item clicked: " << item->text(0) << " Column: " << column;
 
-        // If the first checkbox (in column 1) is clicked
         if (column == 0) // Highlight the curve
         {
             // If nothing really changed, leave directly (especially since we have two listeners active and

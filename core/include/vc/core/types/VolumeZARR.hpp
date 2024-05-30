@@ -11,31 +11,19 @@
 namespace volcart
 {
 
-typedef cv::Vec<unsigned long, 3> ChunkID;
-typedef std::vector<cv::Vec2d> ChunkSlice;
-typedef xt::xtensor<uint16_t, 3> Chunck;
-
-struct cmpChunkID {
-    bool operator()(const ChunkID& a, const ChunkID& b) const
+struct KeyHasher {
+    // Taken from https://stackoverflow.com/a/72073933
+    std::size_t operator()(z5::types::ShapeType const& vec) const
     {
-        return a[0] < b[0] || (a[0] == b[0] && a[1] < b[1]) || (a[0] == b[0] && a[1] == b[1] && a[2] < b[2]);
+        std::size_t seed = vec.size();
+        for (auto x : vec) {
+            x = ((x >> 16) ^ x) * 0x45d9f3b;
+            x = ((x >> 16) ^ x) * 0x45d9f3b;
+            x = (x >> 16) ^ x;
+            seed ^= x + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+        }
+        return seed;
     }
-};
-
-typedef std::map<ChunkID, Chunck*, cmpChunkID> ChunkData;
-typedef std::map<ChunkID, std::vector<std::string>, cmpChunkID> ChunkFiles;
-
-typedef z5::types::ShapeType ChunkRequest;
-typedef std::vector<ChunkRequest> ChunkRequests;
-
-struct ChunkDataSettings {
-    std::string path;
-    int xAxis;
-    int yAxis;
-    int zAxis;
-    int offset;
-    float scale;
-    int chunkSize; // logical chunk size on disk before applying "scale"
 };
 
 /**
@@ -51,6 +39,8 @@ class VolumeZARR : public Volume
 public:
     /** Shared pointer type */
     using Pointer = std::shared_ptr<VolumeZARR>;
+
+    using DefaultCache = LRUCache<z5::types::ShapeType, std::vector<std::uint16_t>, KeyHasher>;
 
     /** @brief Load the Volume from a directory path */
     explicit VolumeZARR(volcart::filesystem::path path);
@@ -78,24 +68,19 @@ public:
 
     /**@{*/
     /** @brief Set desired ZARR level */
-    void setZarrLevel(int level);
+    void setZarrLevel(int level) { zarrLevel_ = level; }
+    /** @brief Get the currently used ZARR level */
+    auto getZarrLevel() const -> int { return zarrLevel_; }
+    /** @brief Get scale factor for ZARR level*/
+    auto getScaleForLevel(int level) const -> float;
     /**@}*/
 
     void openZarr();
 
-    void setChunkSettings(ChunkDataSettings chunkSettings);
-    auto determineChunksForRect(int index, cv::Rect2i rect) const -> ChunkData;
-    auto determineNotLoadedChunks(int index, cv::Rect2i rect) const -> ChunkRequests;
-    void loadChunkFiles(ChunkRequests requests, VolumeAxis axis) const;
-    auto getChunkData(int index, cv::Rect rect, VolumeAxis axis) -> ChunkData;
-    auto getChunkSliceData(int index, cv::Rect2i rect) const -> ChunkSlice;
-
-    void loadSingleChunkFile(std::string file, ChunkID chunkID, int threadNum) const;
-    void mergeThreadData(ChunkData threadData) const;
+    void* getCacheChunk(z5::types::ShapeType chunkId) const;
+    void putCacheChunk(z5::types::ShapeType chunkId, void* chunk) const;
 
 protected:
-    ChunkDataSettings settings;
-
     /** ZARR file*/
     z5::filesystem::handle::File zarrFile_;
     /** ZARR data set*/
@@ -105,7 +90,8 @@ protected:
 
     nlohmann::json groupAttr_;
 
-    mutable ChunkData chunkData;
+    /** Chunk cache */
+    mutable DefaultCache::Pointer cache_{DefaultCache::New(1000L)};
 
     /** Load slice from disk */
     cv::Mat load_slice_(int index, cv::Rect2i rect = cv::Rect2i(), VolumeAxis axis = Z) const;

@@ -255,8 +255,6 @@ protected:
     bool cacheSlices_{true};
     /** Slice cache */
     mutable SliceCache::Pointer cache_{DefaultCache::New(DEFAULT_CAPACITY)};
-    /** Cache mutex for thread-safe access */
-    mutable std::mutex cacheMutex_;
     mutable std::vector<std::mutex> slice_mutexes_;
 
     /** Shared mutex for thread-safe access */

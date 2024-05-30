@@ -263,7 +263,7 @@ public:
      * transform can be inverted.
      */
 
-    [[nodiscard]] auto hasTransform(Volume::Identifier id) const -> bool;
+    [[nodiscard]] auto hasTransform(Transform3D::Identifier id) const -> bool;
 
     /** @brief Add a transform to the VolPkg */
     auto addTransform(const Transform3D::Pointer& transform)

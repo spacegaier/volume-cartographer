@@ -33,7 +33,7 @@ namespace volcart
  *
  * @ingroup Types
  */
-template <typename TKey, typename TValue>
+template <typename TKey, typename TValue, typename THasher = std::hash<TKey>>
 class LRUCache final : public Cache<TKey, TValue>
 {
 public:
@@ -55,7 +55,7 @@ public:
     using TListIterator = typename std::list<TPair>::iterator;
 
     /** Shared pointer type */
-    using Pointer = std::shared_ptr<LRUCache<TKey, TValue>>;
+    using Pointer = std::shared_ptr<LRUCache<TKey, TValue, THasher>>;
 
     /**@{*/
     /** @brief Default constructor */
@@ -67,13 +67,13 @@ public:
     /** @overload LRUCache() */
     static auto New() -> Pointer
     {
-        return std::make_shared<LRUCache<TKey, TValue>>();
+        return std::make_shared<LRUCache<TKey, TValue, THasher>>();
     }
 
     /** @overload LRUCache(std::size_t) */
     static auto New(std::size_t capacity) -> Pointer
     {
-        return std::make_shared<LRUCache<TKey, TValue>>(capacity);
+        return std::make_shared<LRUCache<TKey, TValue, THasher>>(capacity);
     }
     /**@}*/
 
@@ -115,6 +115,19 @@ public:
         } else {
             items_.splice(std::begin(items_), items_, lookupIter->second);
             return lookupIter->second->second;
+        }
+    }
+
+        /** @brief Get an item pointer from the cache by key */
+    auto getPointer(const TKey& k) -> TValue* override
+    {
+        std::unique_lock<std::shared_mutex> lock(cache_mutex_);
+        auto lookupIter = lookup_.find(k);
+        if (lookupIter == std::end(lookup_)) {
+            throw std::invalid_argument("Key not in cache");
+        } else {
+            items_.splice(std::begin(items_), items_, lookupIter->second);
+            return &lookupIter->second->second;
         }
     }
 
@@ -160,7 +173,7 @@ private:
     /** Cache data storage */
     std::list<TPair> items_;
     /** Cache usage information */
-    std::unordered_map<TKey, TListIterator> lookup_;
+    std::unordered_map<TKey, TListIterator, THasher> lookup_;
     /** Shared mutex for thread-safe access */
     mutable std::shared_mutex cache_mutex_;
 };

@@ -492,16 +492,10 @@ void CVolumeViewerWithCurve::OnShowCurveStateChanged(int state)
 void CVolumeViewerWithCurve::WidgetLoc2ImgLoc(
     const cv::Vec2f& nWidgetLoc, cv::Vec2f& nImgLoc)
 {
-    // Step 1: Convert widget coordinates to scene coordinates
+    // Convert widget coordinates to scene coordinates
     QPointF widgetPoint(nWidgetLoc[0] - (fGraphicsView->pos()).x() - 2, nWidgetLoc[1] - (fGraphicsView->pos()).y() - 2);
-    //widgetPoint = widgetPoint - fGraphicsView->pos();
 
     QPointF scenePoint = fGraphicsView->mapToScene(widgetPoint.toPoint());
-
-    std::cout << "Scene Point: " << scenePoint.x() << ", " << scenePoint.y() << std::endl;
-
-    // // Step 2: Convert scene coordinates to item coordinates
-    // QPointF itemPoint = fBaseImageItem->mapFromScene(scenePoint);
 
     nImgLoc[0] = static_cast<float>(scenePoint.x());
     nImgLoc[1] = static_cast<float>(scenePoint.y());
