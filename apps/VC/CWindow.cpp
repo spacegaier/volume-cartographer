@@ -290,7 +290,11 @@ void CWindow::CreateWidgets(void)
             bool accepted;
             zarrLevel = dialog->getItem(0, "Select ZARR level", "ZARR Level:", list, 0, false, &accepted);
             if (!accepted || zarrLevel.isEmpty()) {
-                // Process cancelled => stick with current volume
+                // Process cancelled => stick with current volume if we already have one, otherwise
+                // properly close this ZARR volume to end up in a deterministic state
+                if (currentVolume->format() == vc::ZARR) {
+                    CloseVolume();
+                }
                 return;
             }
             zarrLevel = zarrLevel.split("(")[0];
@@ -1061,6 +1065,8 @@ void CWindow::ChangePathItem(std::string segID)
             //           << fSegStructMap[fSegmentationId].fMasterCloud[20][2] << std::endl;
             fSegStructMap[fSegmentationId].fMasterCloud =
                 ApplyTransform(fSegStructMap[fSegmentationId].fMasterCloud, tfm);
+            fSegStructMap[fSegmentationId].fAnnotationCloud =
+                ApplyTransform(fSegStructMap[fSegmentationId].fAnnotationCloud, tfm);
             // std::cout << "Point after: " << fSegStructMap[fSegmentationId].fMasterCloud[20][0] << "|" <<
             // fSegStructMap[fSegmentationId].fMasterCloud[20][1] << "|"
             //           << fSegStructMap[fSegmentationId].fMasterCloud[20][2] << std::endl;
@@ -1765,7 +1771,7 @@ void CWindow::OpenSlice(void)
         aImgQImage = QImage(
             aImgMat.ptr(), aImgMat.cols, aImgMat.rows, aImgMat.step,
             QImage::Format_Grayscale16);
-    } else {
+    } else if (!aImgMat.empty()) {
         aImgQImage = Mat2QImage(aImgMat);
     }
 
@@ -1855,7 +1861,8 @@ void CWindow::SetPathPointCloud(void)
 
     for (const auto& pt : aSamplePts) {
         points.emplace_back(pt[0], pt[1], fPathOnSliceIndex);
-        annotations.emplace_back(vc::Segmentation::Annotation((long)fPathOnSliceIndex, (long)(AnnotationBits::ANO_ANCHOR | AnnotationBits::ANO_MANUAL), initialPos, initialPos));
+        annotations.emplace_back(vc::Segmentation::Annotation((long)fPathOnSliceIndex, 
+            (long)(volcart::Segmentation::ANO_ANCHOR | volcart::Segmentation::ANO_MANUAL), initialPos, initialPos));
     }
 
     /// Evenly space the points on the initial drawn curve
@@ -2066,7 +2073,7 @@ void CWindow::PrintDebugInfo()
         std::cout << "I ";
         std::cout << std::defaultfloat << std::setfill('0') << std::setw(4) << i;
         std::cout << " : S ";
-        std::cout << std::defaultfloat << std::setfill('0') << std::setw(4) << std::get<long>(row[0][ANO_EL_SLICE]);
+        std::cout << std::defaultfloat << std::setfill('0') << std::setw(4) << std::get<long>(row[0][volcart::Segmentation::ANO_EL_SLICE]);
         std::cout << " (M: ";
         if (i < fSegStructMap[fHighlightedSegmentationId].fMasterCloud.height()) {
             auto masterRow = fSegStructMap[fHighlightedSegmentationId].fMasterCloud.getRow(i);
@@ -2078,12 +2085,12 @@ void CWindow::PrintDebugInfo()
 
         // Print lags & coordinates
         for (auto ano : row) {
-            std::cout << std::get<long>(ano[ANO_EL_FLAGS]);
+            std::cout << std::get<long>(ano[volcart::Segmentation::ANO_EL_FLAGS]);
 
             // Print coordinates
             if (printCoordinates) {
-                std::cout << " (" << QString("%1").arg(std::get<double>(ano[ANO_EL_POS_X]), 6, 'f', 2, '0').toStdString()
-                          << ", " << QString("%1").arg(std::get<double>(ano[ANO_EL_POS_Y]), 6, 'f', 2, '0').toStdString() << ")";
+                std::cout << " (" << QString("%1").arg(std::get<double>(ano[volcart::Segmentation::ANO_EL_POS_X]), 6, 'f', 2, '0').toStdString()
+                          << ", " << QString("%1").arg(std::get<double>(ano[volcart::Segmentation::ANO_EL_POS_Y]), 6, 'f', 2, '0').toStdString() << ")";
             }
 
             std::cout << " | ";
@@ -2109,6 +2116,7 @@ void CWindow::SavePointCloud()
         try {
 
             auto pointCloud = segStruct.fMasterCloud;
+            auto annotationCloud = segStruct.fAnnotationCloud;
             // If we had applied a scaling factor during loading, revert that now for the saving process
             if (currentVolume->format() == vc::VolumeFormat::ZARR) {
                 auto zarrVol = static_cast<vc::VolumeZARR*>(currentVolume.get());
@@ -2117,10 +2125,11 @@ void CWindow::SavePointCloud()
                 auto tfm = vc::AffineTransform::New();
                 tfm->scale(scale, scale, scale);
                 pointCloud = ApplyTransform(pointCloud, tfm);
+                annotationCloud = ApplyTransform(annotationCloud, tfm);
             }
 
             segStruct.fSegmentation->setPointSet(pointCloud);
-            segStruct.fSegmentation->setAnnotationSet(segStruct.fAnnotationCloud);
+            segStruct.fSegmentation->setAnnotationSet(annotationCloud);
             segStruct.fSegmentation->setVolumeID(segStruct.fOriginalVolumeId);
         } catch (std::exception& e) {
             QMessageBox::warning(

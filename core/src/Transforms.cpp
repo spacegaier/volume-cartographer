@@ -550,3 +550,21 @@ auto vc::ApplyTransform(
 {
     return PerPixelMap::New(ApplyTransform(*ppm, transform, normalize));
 }
+
+auto vc::ApplyTransform(const Segmentation::AnnotationSet& as, const Transform3D::Pointer& transform)
+    -> Segmentation::AnnotationSet
+{
+    Segmentation::AnnotationSet output(as);
+    std::transform(
+        output.begin(), output.end(), output.begin(),
+        [transform](const auto& a) { 
+            Segmentation::Annotation transformedA(a);
+            auto appliedPoint = transform->applyPoint(cv::Vec3d(0.0, 
+                std::get<double>(a[Segmentation::ANO_EL_POS_X]), 
+                std::get<double>(a[Segmentation::ANO_EL_POS_Y])));
+            transformedA[Segmentation::ANO_EL_POS_X] = appliedPoint[1];
+            transformedA[Segmentation::ANO_EL_POS_Y] = appliedPoint[2];
+            return transformedA;
+    });
+    return output;
+}

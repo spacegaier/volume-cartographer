@@ -42,19 +42,6 @@ struct AnnotationStruct {
     bool usedInRun{false};
 };
 
-enum AnnotationElement {
-    ANO_EL_SLICE = 0,
-    ANO_EL_FLAGS = 1,
-    ANO_EL_POS_X = 2,
-    ANO_EL_POS_Y = 3
-};
-
-enum AnnotationBits {
-    ANO_ANCHOR = (long)(1 << 0),
-    ANO_MANUAL = (long)(1 << 1),
-    ANO_USED_IN_RUN = (long)(1 << 2)
-};
-
 struct PathChangePoint {
     int pointIndex; // index in curve
     Vec2<double> position; // X and Y on slice
@@ -297,17 +284,17 @@ struct SegmentationStruct {
             for (size_t j = 0; j < fAnnotationCloud.width(); ++j) {
                 pointIndex = j + (i * fAnnotationCloud.width());
 
-                if (std::get<long>(fAnnotationCloud[pointIndex][ANO_EL_FLAGS]) & AnnotationBits::ANO_ANCHOR)
+                if (std::get<long>(fAnnotationCloud[pointIndex][volcart::Segmentation::ANO_EL_FLAGS]) & volcart::Segmentation::ANO_ANCHOR)
                     an.anchor = true;
 
-                if (std::get<long>(fAnnotationCloud[pointIndex][ANO_EL_FLAGS]) & AnnotationBits::ANO_MANUAL)
+                if (std::get<long>(fAnnotationCloud[pointIndex][volcart::Segmentation::ANO_EL_FLAGS]) & volcart::Segmentation::ANO_MANUAL)
                     an.manual = true;
 
-                if (std::get<long>(fAnnotationCloud[pointIndex][ANO_EL_FLAGS]) & AnnotationBits::ANO_USED_IN_RUN)
+                if (std::get<long>(fAnnotationCloud[pointIndex][volcart::Segmentation::ANO_EL_FLAGS]) & volcart::Segmentation::ANO_USED_IN_RUN)
                     an.usedInRun = true;
             }
 
-            fAnnotations[std::get<long>(fAnnotationCloud[pointIndex][ANO_EL_SLICE])] = an;
+            fAnnotations[std::get<long>(fAnnotationCloud[pointIndex][volcart::Segmentation::ANO_EL_SLICE])] = an;
         }
     }
 
@@ -425,13 +412,13 @@ struct SegmentationStruct {
             const AnnotationStruct defaultAnnotation;
             long defaultAnnotationFlags = 0;
             if (defaultAnnotation.anchor) {
-                defaultAnnotationFlags |= AnnotationBits::ANO_ANCHOR;
+                defaultAnnotationFlags |= volcart::Segmentation::ANO_ANCHOR;
             }
             if (defaultAnnotation.manual) {
-                defaultAnnotationFlags |= AnnotationBits::ANO_MANUAL;
+                defaultAnnotationFlags |= volcart::Segmentation::ANO_MANUAL;
             }
             if (defaultAnnotation.usedInRun) {
-                defaultAnnotationFlags |= AnnotationBits::ANO_USED_IN_RUN;
+                defaultAnnotationFlags |= volcart::Segmentation::ANO_USED_IN_RUN;
             }
 
             // Create an initial annotation point set that matches the dimensions of the input "ps"
@@ -445,7 +432,7 @@ struct SegmentationStruct {
                 annotations.clear();
                 for (int ja = 0; ja < ps.width(); ja++) {
                     // We have no annotation info for the new points, so just create initial entries
-                    long sliceIndex = frontGrowth ? ps[0][2] + ia : std::get<long>(fAnnotationCloud[fAnnotationCloud.size() - 1][ANO_EL_SLICE]) + 1 + ia;
+                    long sliceIndex = frontGrowth ? ps[0][2] + ia : std::get<long>(fAnnotationCloud[fAnnotationCloud.size() - 1][volcart::Segmentation::ANO_EL_SLICE]) + 1 + ia;
                     annotations.emplace_back(volcart::Segmentation::Annotation((long)sliceIndex, defaultAnnotationFlags, initialPos, initialPos));
                 }
                 as.pushRow(annotations);
@@ -497,13 +484,13 @@ struct SegmentationStruct {
         const AnnotationStruct defaultAnnotation;
         long defaultAnnotationFlags = 0;
         if (defaultAnnotation.anchor) {
-            defaultAnnotationFlags |= AnnotationBits::ANO_ANCHOR;
+            defaultAnnotationFlags |= volcart::Segmentation::ANO_ANCHOR;
         }
         if (defaultAnnotation.manual) {
-            defaultAnnotationFlags |= AnnotationBits::ANO_MANUAL;
+            defaultAnnotationFlags |= volcart::Segmentation::ANO_MANUAL;
         }
         if (defaultAnnotation.usedInRun) {
-            defaultAnnotationFlags |= AnnotationBits::ANO_USED_IN_RUN;
+            defaultAnnotationFlags |= volcart::Segmentation::ANO_USED_IN_RUN;
         }
 
         std::vector<volcart::Segmentation::Annotation> annotations;
@@ -529,7 +516,7 @@ struct SegmentationStruct {
         if (fMasterCloud.size() != fAnnotationCloud.size()) {
             volcart::Segmentation::AnnotationSet newCloud(fAnnotationCloud.width());
 
-            int delta = std::abs(fMasterCloud[0][2] - std::get<long>(fAnnotationCloud[0][ANO_EL_SLICE]));
+            int delta = std::abs(fMasterCloud[0][2] - std::get<long>(fAnnotationCloud[0][volcart::Segmentation::ANO_EL_SLICE]));
             // Check if we need to add rows at the start
             if (delta > 0) {
                 newCloud.append(CreateInitialAnnotationSet(fMasterCloud[0][2], delta, fAnnotationCloud.width()));
@@ -538,9 +525,9 @@ struct SegmentationStruct {
             newCloud.append(fAnnotationCloud);
 
             // Check if we need to add rows at the end
-            delta = std::abs(fMasterCloud[fMasterCloud.size() - 1][2] - std::get<long>(fAnnotationCloud[fAnnotationCloud.size() - 1][ANO_EL_SLICE]));
+            delta = std::abs(fMasterCloud[fMasterCloud.size() - 1][2] - std::get<long>(fAnnotationCloud[fAnnotationCloud.size() - 1][volcart::Segmentation::ANO_EL_SLICE]));
             if (delta > 0) {
-                newCloud.append(CreateInitialAnnotationSet(std::get<long>(fAnnotationCloud[fAnnotationCloud.size() - 1][ANO_EL_SLICE]) + 1, delta, fAnnotationCloud.width()));
+                newCloud.append(CreateInitialAnnotationSet(std::get<long>(fAnnotationCloud[fAnnotationCloud.size() - 1][volcart::Segmentation::ANO_EL_SLICE]) + 1, delta, fAnnotationCloud.width()));
             }
 
             fAnnotationCloud = newCloud;
@@ -557,9 +544,9 @@ struct SegmentationStruct {
 
         for(int i = pointIndex; i < (pointIndex + fAnnotationCloud.width()); i++) {
             if (anchor) {
-                std::get<long>(fAnnotationCloud[i][ANO_EL_FLAGS]) |= AnnotationBits::ANO_ANCHOR;
+                std::get<long>(fAnnotationCloud[i][volcart::Segmentation::ANO_EL_FLAGS]) |= volcart::Segmentation::ANO_ANCHOR;
             } else {
-                std::get<long>(fAnnotationCloud[i][ANO_EL_FLAGS]) &= ~AnnotationBits::ANO_ANCHOR;
+                std::get<long>(fAnnotationCloud[i][volcart::Segmentation::ANO_EL_FLAGS]) &= ~volcart::Segmentation::ANO_ANCHOR;
             }
         }
 
@@ -616,7 +603,7 @@ struct SegmentationStruct {
         // Determine the first point index from the annotation cloud that belongs to the provided
         // slice index.
         for (int i = 0; i < fAnnotationCloud.height(); i++) {
-            if (sliceIndex == std::get<long>(fAnnotationCloud[i * fAnnotationCloud.width()][ANO_EL_SLICE])) {
+            if (sliceIndex == std::get<long>(fAnnotationCloud[i * fAnnotationCloud.width()][volcart::Segmentation::ANO_EL_SLICE])) {
                 return i * fAnnotationCloud.width();
             }
         }
@@ -634,7 +621,7 @@ struct SegmentationStruct {
 
         if (fBufferedChangedPoints.size() > 0) {
             for (auto index : fBufferedChangedPoints) {
-                std::get<long>(fAnnotationCloud[pointIndex + index][ANO_EL_FLAGS]) |= AnnotationBits::ANO_MANUAL;
+                std::get<long>(fAnnotationCloud[pointIndex + index][volcart::Segmentation::ANO_EL_FLAGS]) |= volcart::Segmentation::ANO_MANUAL;
             }
 
             auto it = fAnnotations.find(sliceIndex);
@@ -657,9 +644,9 @@ struct SegmentationStruct {
 
         for(int i = pointIndex; i < (pointIndex + fAnnotationCloud.width()); i++) {
             if (used) {
-                std::get<long>(fAnnotationCloud[i][ANO_EL_FLAGS]) |= AnnotationBits::ANO_USED_IN_RUN;
+                std::get<long>(fAnnotationCloud[i][volcart::Segmentation::ANO_EL_FLAGS]) |= volcart::Segmentation::ANO_USED_IN_RUN;
             } else {
-                std::get<long>(fAnnotationCloud[i][ANO_EL_FLAGS]) &= ~AnnotationBits::ANO_USED_IN_RUN;
+                std::get<long>(fAnnotationCloud[i][volcart::Segmentation::ANO_EL_FLAGS]) &= ~volcart::Segmentation::ANO_USED_IN_RUN;
             }
         }
 
@@ -684,8 +671,8 @@ struct SegmentationStruct {
             auto pointIndex = GetAnnotationIndexForSliceIndex(psRow[0][2]);
 
             for(int j = 0; j < ps.width(); j++) {
-                fAnnotationCloud[pointIndex + j][ANO_EL_POS_X] = psRow[j][0];
-                fAnnotationCloud[pointIndex + j][ANO_EL_POS_Y] = psRow[j][1];
+                fAnnotationCloud[pointIndex + j][volcart::Segmentation::ANO_EL_POS_X] = psRow[j][0];
+                fAnnotationCloud[pointIndex + j][volcart::Segmentation::ANO_EL_POS_Y] = psRow[j][1];
             }
         }
     }
@@ -714,9 +701,9 @@ struct SegmentationStruct {
         // In the future with new annotations being added, some of them might need to remain after a segmentation run.
         // In that case we might have to create more specialized logic to determine which flags to reset.
         for(int i = startPointIndex; i != endPointIndex; directionUp ? i++ : i--) {
-            std::get<long>(fAnnotationCloud[i][ANO_EL_FLAGS]) &= ~AnnotationBits::ANO_ANCHOR;
-            std::get<long>(fAnnotationCloud[i][ANO_EL_FLAGS]) &= ~AnnotationBits::ANO_MANUAL;
-            std::get<long>(fAnnotationCloud[i][ANO_EL_FLAGS]) &= ~AnnotationBits::ANO_USED_IN_RUN;
+            std::get<long>(fAnnotationCloud[i][volcart::Segmentation::ANO_EL_FLAGS]) &= ~volcart::Segmentation::ANO_ANCHOR;
+            std::get<long>(fAnnotationCloud[i][volcart::Segmentation::ANO_EL_FLAGS]) &= ~volcart::Segmentation::ANO_MANUAL;
+            std::get<long>(fAnnotationCloud[i][volcart::Segmentation::ANO_EL_FLAGS]) &= ~volcart::Segmentation::ANO_USED_IN_RUN;
         }
     }
 

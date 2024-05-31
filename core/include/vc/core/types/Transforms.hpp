@@ -13,6 +13,7 @@
 #include "vc/core/filesystem.hpp"
 #include "vc/core/types/ITKMesh.hpp"
 #include "vc/core/types/PerPixelMap.hpp"
+#include "vc/core/types/Segmentation.hpp"
 
 namespace volcart
 {
@@ -512,6 +513,10 @@ auto ApplyTransform(
 template <class PointSetT>
 auto ApplyTransform(const PointSetT& ps, const Transform3D::Pointer& transform)
     -> PointSetT;
+
+/** @brief Apply a transform to a AnnotationSet */
+auto ApplyTransform(const Segmentation::AnnotationSet& as, const Transform3D::Pointer& transform)
+    -> Segmentation::AnnotationSet;
 
 }  // namespace volcart
 

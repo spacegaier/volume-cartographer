@@ -66,6 +66,19 @@ public:
     static Pointer New(
         filesystem::path path, Identifier uuid, std::string name);
 
+    enum AnnotationElement {
+        ANO_EL_SLICE = 0,
+        ANO_EL_FLAGS = 1,
+        ANO_EL_POS_X = 2,
+        ANO_EL_POS_Y = 3
+    };
+
+    enum AnnotationBits {
+        ANO_ANCHOR = (long)(1 << 0),
+        ANO_MANUAL = (long)(1 << 1),
+        ANO_USED_IN_RUN = (long)(1 << 2)
+    };
+
     /** @brief Return if this Segmentation has an associated PointSet file */
     bool hasPointSet() const
     {

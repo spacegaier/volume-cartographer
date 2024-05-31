@@ -583,8 +583,12 @@ void CVolumeViewerWithCurve::DrawIntersectionCurve() {
             // We only want to highlight manually moved points if they are on the highlighted curve
             bool manualPoint = false;
             if (segStruct.highlighted) {
-                manualPoint = (hasAnnotations && (std::get<long>(segStruct.fAnnotationCloud[pointIndex + i][ANO_EL_FLAGS]) & AnnotationBits::ANO_MANUAL))
-                || (segStruct.fPathOnSliceIndex == sliceIndexToolStart && segStruct.fBufferedChangedPoints.find(i) != segStruct.fBufferedChangedPoints.end());
+                manualPoint =
+                    (hasAnnotations &&
+                     (std::get<long>(segStruct.fAnnotationCloud[pointIndex + i][volcart::Segmentation::ANO_EL_FLAGS]) &
+                      volcart::Segmentation::ANO_MANUAL)) ||
+                    (segStruct.fPathOnSliceIndex == sliceIndexToolStart &&
+                     segStruct.fBufferedChangedPoints.find(i) != segStruct.fBufferedChangedPoints.end());
             }
 
             // Determine pen and brush colors
