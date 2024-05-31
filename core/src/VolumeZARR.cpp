@@ -177,7 +177,6 @@ void VolumeZARR::openZarr()
             width_ = zarrDs_->shape()[1];
             height_ = zarrDs_->shape()[2];
 
-            int threads = static_cast<int>(std::thread::hardware_concurrency());
             zarrDs_->enableCaching(
                 true, [&](z5::types::ShapeType chunkId) -> void* { return getCacheChunk(chunkId); },
                 [&](z5::types::ShapeType chunkId, void* chunk) -> void { putCacheChunk(chunkId, chunk); });

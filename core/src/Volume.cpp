@@ -118,7 +118,7 @@ auto Volume::isInBounds(const cv::Vec3d& v) const -> bool
 auto Volume::getSliceDataDefault(int index, cv::Rect rect, VolumeAxis axis) const -> cv::Mat
 {
     // ToDo use "isChunkedFormat" variable
-    if (format_ == ZARR) {
+    if (isChunked()) {
         return getSliceDataRect(index, rect, axis);
     } else {
         return getSliceData(index, axis);

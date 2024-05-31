@@ -297,17 +297,22 @@ void CWindow::CreateWidgets(void)
         }
 
         fVolumeViewerWidget->OnResetClicked();
-        fVolumeViewerWidget->GetView()->centerOn(0, 0);
-
+                    
         if (newVolume->format() == vc::VolumeFormat::ZARR) {
-            static_cast<vc::VolumeZARR*>(newVolume.get())->cachePurge();
-            static_cast<vc::VolumeZARR*>(newVolume.get())->setZarrLevel(zarrLevel.toInt());
-            static_cast<vc::VolumeZARR*>(newVolume.get())->openZarr();
-           
+            auto zarrVol = static_cast<vc::VolumeZARR*>(newVolume.get());
+            zarrVol->cachePurge();
+            zarrVol->setZarrLevel(zarrLevel.toInt());
+            zarrVol->openZarr();
+
             // fVolumeViewerWidget->SetcrossSectionIndexSide(newVolume->sliceWidth() / 2);
             // fVolumeViewerWidget->SetcrossSectionIndexFront(newVolume->sliceWidth() / 2);
             // fVolumeCrossSectionViewer->setVolume(newVolume);
         }
+
+        // To allow panning around, the graphics view needs to know that the scene is bigger than
+        // what is initially shown.
+        fVolumeViewerWidget->GetScene()->setSceneRect(0, 0, newVolume->sliceWidth(), newVolume->sliceHeight());
+        fVolumeViewerWidget->GetView()->centerOn(newVolume->sliceWidth() / 2, newVolume->sliceHeight() / 2);
 
         currentVolume = newVolume;
         SegmentationStruct::currentVolume = currentVolume;
