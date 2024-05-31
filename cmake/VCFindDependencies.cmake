@@ -87,6 +87,8 @@ if(VC_BUILD_APPS OR VC_BUILD_UTILS)
     include(BuildIndicators)
 endif()
 
+### ZARR ###
+include(BuildZARR)
 
 ############
 # Optional #

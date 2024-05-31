@@ -70,8 +70,6 @@ set(logging_srcs
 
 configure_file(src/Version.cpp.in Version.cpp)
 
-find_package(CURL REQUIRED)
-
 add_library(vc_core
     ${io_srcs}
     ${math_srcs}
@@ -88,9 +86,6 @@ target_include_directories(vc_core
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>
-        "/home/allgaier/git/xtensor-build/include/"
-        "/home/allgaier/git/xtl-build/include/"
-        "/home/allgaier/git/z5/include/"
 )
 target_link_libraries(vc_core
     PUBLIC
@@ -107,7 +102,9 @@ target_link_libraries(vc_core
         spdlog::spdlog
         nlohmann_json::nlohmann_json
         smgl::smgl
-        CURL::libcurl
+        xtl
+        xtensor
+        z5
     PRIVATE
         TIFF::TIFF
 )
