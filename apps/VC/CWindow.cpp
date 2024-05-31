@@ -78,6 +78,9 @@ auto CalculateOptimalTextParams(
     return p;
 }
 
+// Init static volume pointer
+volcart::Volume::Pointer SegmentationStruct::currentVolume = nullptr;
+
 // Constructor
 CWindow::CWindow()
     : fWindowState(EWindowState::WindowStateIdle)
@@ -307,6 +310,7 @@ void CWindow::CreateWidgets(void)
         }
 
         currentVolume = newVolume;
+        SegmentationStruct::currentVolume = currentVolume;
         OnLoadAnySlice(0);
         setDefaultWindowWidth(newVolume);        
         fVolumeViewerWidget->SetNumImages(currentVolume->numSlices());
@@ -1003,42 +1007,61 @@ void CWindow::ResetPointCloud(void)
 void CWindow::ChangePathItem(std::string segID)
 {
     statusBar->clearMessage();
-    fSegmentationId = segID;
 
-    // Load new Segment to fSegStructMap, but only if it is not present yet or empty (empty check required, since even
-    // after both "Display" and "Compute" checkboxes are off, an empty shell appears in the map, probably due to access attempts).
-    if (fSegStructMap.find(fSegmentationId) == fSegStructMap.end() || fSegStructMap[fSegmentationId].fMasterCloud.empty()) {
-        fSegStructMap[fSegmentationId] = SegmentationStruct(fVpkg, segID, fPathOnSliceIndex);
+    // Check if the segment we are attempting to load is linked to a different volume
+    // from the one we are currently using / rendering. If so, check if we have a
+    // matching transform that allows showing this segment also on the currently
+    /// used volume.
+    bool matchingTransformFound = false;
+    auto newSeg = fVpkg->segmentation(segID);
+    if (newSeg->hasVolumeID() && newSeg->getVolumeID() != currentVolume->id()) {
+        auto matchingTransforms = fVpkg->transform(newSeg->getVolumeID(), currentVolume->id());
+
+        // Check if we have a matching transform.
+        // Not sure what to do if we have multiple matching transforms, so limit to 1 for now.
+        // TODO Check for dimension/size match of volumes?
+        if (matchingTransforms.size() == 0 || (matchingTransforms.size() == 1 && matchingTransforms.front().second->type() != vc::IdentityTransform::TYPE)) {
+            QMessageBox::warning(
+                nullptr, QObject::tr("Cannot load segment"),
+                QObject::tr("Segment belongs to another volume %1 than the currently used one and there is no matching "
+                            "identity transform definition.")
+                    .arg(QString::fromStdString(newSeg->getVolumeID())));
+
+            return;
+        } else {
+            matchingTransformFound = true;
+        }
     }
 
-    auto matchingTransforms = fVpkg->transform(fSegStructMap[fSegmentationId].currentVolume->id(), currentVolume->id());
+    // Load new Segment to fSegStructMap, but only if it is not present yet or empty (empty check required, since even
+    // after both "Display" and "Compute" checkboxes are off, an empty shell appears in the map, probably due to access
+    // attempts).
+    if (fSegStructMap.find(segID) == fSegStructMap.end() || fSegStructMap[segID].fMasterCloud.empty()) {
+        fSegStructMap[segID] = SegmentationStruct(fVpkg, segID, fPathOnSliceIndex);
+        fSegmentationId = segID;
+    }    
 
-    // Check if we have a matching transform
-    if (matchingTransforms.size() == 0) {
-
-        if (fSegStructMap[fSegmentationId].currentVolume != nullptr && fSegStructMap[fSegmentationId].fSegmentation->hasVolumeID()) {
-            currentVolume = fSegStructMap[fSegmentationId].currentVolume;
-        }
-    } else if (matchingTransforms.size() == 1) {
-        // Not sure what to do if we have multiple matching transforms, so limit to 1 for now
-        // TODO Handle invertible transforms
-        auto tfm = matchingTransforms.at(0).second;
+    if (matchingTransformFound) {
 
         if (currentVolume->format() == vc::VolumeFormat::ZARR) {
+            // We are using a ZARR => we protentially need to scale the point cloud to match the ZARR detail level
             auto zarrVol = static_cast<vc::VolumeZARR*>(currentVolume.get());
             auto scale = zarrVol->getScaleForLevel(zarrVol->getZarrLevel());
 
-            auto scaleTfm = vc::AffineTransform::New();
-            scaleTfm->scale(1/scale, 1/scale, 1/scale);
+            auto tfm = vc::AffineTransform::New();
+            tfm->scale(1 / scale, 1 / scale, 1 / scale);
 
-            // std::cout << "Point before: " << fSegStructMap[fSegmentationId].fMasterCloud[20][0] << "|" << fSegStructMap[fSegmentationId].fMasterCloud[20][1] << "|"
+            // std::cout << "Point before: " << fSegStructMap[fSegmentationId].fMasterCloud[20][0] << "|" <<
+            // fSegStructMap[fSegmentationId].fMasterCloud[20][1] << "|"
             //           << fSegStructMap[fSegmentationId].fMasterCloud[20][2] << std::endl;
-            fSegStructMap[fSegmentationId].fMasterCloud = ApplyTransform(fSegStructMap[fSegmentationId].fMasterCloud, scaleTfm);
-            // std::cout << "Point after: " << fSegStructMap[fSegmentationId].fMasterCloud[20][0] << "|" << fSegStructMap[fSegmentationId].fMasterCloud[20][1] << "|"
+            fSegStructMap[fSegmentationId].fMasterCloud =
+                ApplyTransform(fSegStructMap[fSegmentationId].fMasterCloud, tfm);
+            // std::cout << "Point after: " << fSegStructMap[fSegmentationId].fMasterCloud[20][0] << "|" <<
+            // fSegStructMap[fSegmentationId].fMasterCloud[20][1] << "|"
             //           << fSegStructMap[fSegmentationId].fMasterCloud[20][2] << std::endl;
 
+            // Setup needs to run again, to reflect the now scaled point cloud
             fSegStructMap[fSegmentationId].SetUpCurves();
-            fSegStructMap[fSegmentationId].SetCurrentCurve(fPathOnSliceIndex);
         }
     }
 
@@ -1638,7 +1661,7 @@ void CWindow::SetCurrentCurve(int nCurrentSliceIndex)
     }
 
     // if (dockWidgetLayers->isVisible()) {
-    //     fLayerViewerWidget->showCurveForSlice(nCurrentSliceIndex);;
+    //     fLayerViewerWidget->showCurveForSlice(nCurrentSliceIndex);
     // }
 }
 
@@ -1891,6 +1914,7 @@ void CWindow::OpenVolume(const QString& path)
     fVpkgPath = aVpkgPath;
     fPathOnSliceIndex = 0;
     currentVolume = fVpkg->volume();
+    SegmentationStruct::currentVolume = currentVolume;
     // The cache should be at least as big as the number of preloaded slices, since otherwise,
     // many would immediately get purged again.
     // Note: This value might get overwritten by algorithm parameters.
@@ -1914,6 +1938,7 @@ void CWindow::CloseVolume(void)
     fVpkg = nullptr;
     fSegmentationId = "";
     currentVolume = nullptr;
+    SegmentationStruct::currentVolume = currentVolume;
     fWindowState = EWindowState::WindowStateIdle;  // Set Window State to Idle
     fPenTool->setChecked(false);                   // Reset Pen Tool Button
     fSegTool->setChecked(false);                   // Reset Segmentation Tool Button
@@ -2077,9 +2102,21 @@ void CWindow::SavePointCloud()
         }
         // Try to save point cloud and its annotations to volpkg
         try {
-            segStruct.fSegmentation->setPointSet(segStruct.fMasterCloud);
+
+            auto pointCloud = segStruct.fMasterCloud;
+            // If we had applied a scaling factor during loading, revert that now for the saving process
+            if (currentVolume->format() == vc::VolumeFormat::ZARR) {
+                auto zarrVol = static_cast<vc::VolumeZARR*>(currentVolume.get());
+                auto scale = zarrVol->getScaleForLevel(zarrVol->getZarrLevel());
+
+                auto tfm = vc::AffineTransform::New();
+                tfm->scale(scale, scale, scale);
+                pointCloud = ApplyTransform(pointCloud, tfm);
+            }
+
+            segStruct.fSegmentation->setPointSet(pointCloud);
             segStruct.fSegmentation->setAnnotationSet(segStruct.fAnnotationCloud);
-            segStruct.fSegmentation->setVolumeID(currentVolume->id());
+            segStruct.fSegmentation->setVolumeID(segStruct.fOriginalVolumeId);
         } catch (std::exception& e) {
             QMessageBox::warning(
                 this, "Error", "Failed to write cloud to volume package.");
@@ -2541,7 +2578,6 @@ void CWindow::ShowGoToSliceDlg() {
     if (currentVolume == nullptr || !fVolumeViewerWidget->CanChangeImage()) {
         return;
     }
-
 
     bool status;
     const int sliceIndex = QInputDialog::getInt(this, tr("Go to slice"), tr("Slice Index"), 0, 0, currentVolume->numSlices() - 1, 1, &status);

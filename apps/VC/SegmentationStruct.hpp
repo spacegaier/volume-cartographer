@@ -67,7 +67,11 @@ struct SegmentationStruct {
     volcart::VolumePkg::Pointer fVpkg;
     std::string fSegmentationId;
     volcart::Segmentation::Pointer fSegmentation;
-    volcart::Volume::Pointer currentVolume = nullptr;
+    // Note this might not be the original volume this segment was created with an references
+    // in its meta data, as we e.g. allow loading segments created on TIFF volume to be loaded
+    // for matching ZARR volume
+    static volcart::Volume::Pointer currentVolume;
+    volcart::Volume::Identifier fOriginalVolumeId;
     std::vector<CXCurve> fIntersections;
     std::map<int, CXCurve> fIntersectionsChanged; // manually changed curves that were not saved yet into the master cloud (key = slice index)
     CXCurve fIntersectionCurve; // current active/shown curve
@@ -100,7 +104,6 @@ struct SegmentationStruct {
         : fVpkg(vpkg),
           fSegmentationId(segID),
           fSegmentation(seg),
-          currentVolume(curVolume),
           fIntersections(intersections),
           fIntersectionCurve(intersectionCurve),
           fMaxSegIndex(maxSegIndex),
@@ -119,7 +122,6 @@ struct SegmentationStruct {
         fVpkg = nullptr;
         fSegmentationId.clear();
         fSegmentation = nullptr;
-        currentVolume = nullptr;
         fIntersections.clear();
         fIntersectionsChanged.clear();
         fMaxSegIndex = 0;
@@ -182,13 +184,11 @@ struct SegmentationStruct {
         }
 
         if (fSegmentation->hasVolumeID()) {
-            currentVolume = fVpkg->volume(fSegmentation->getVolumeID());
+            fOriginalVolumeId = fSegmentation->getVolumeID();
         }
 
         SetUpCurves();
         SetUpAnnotations();
-
-        SetCurrentCurve(fPathOnSliceIndex);
     }
 
     inline void SetPathOnSliceIndex(int nPathOnSliceIndex) {
