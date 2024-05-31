@@ -275,9 +275,12 @@ void CWindow::CreateWidgets(void)
 
         QString zarrLevel;
         if (newVolume->format() == vc::VolumeFormat::ZARR) {
+            auto zarrVol = static_cast<vc::VolumeZARR*>(newVolume.get());
             QStringList list;
-            for (auto level : static_cast<vc::VolumeZARR*>(newVolume.get())->zarrLevels()) {
-                list.append(QString::fromStdString(level));
+            for (auto level : zarrVol->zarrLevels()) {
+                list.append(
+                    QString::fromStdString(level) + " (Scale 1: " +
+                    QString::number(zarrVol->getScaleForLevel(std::stoi(level))) + ")");
             }
 
             QInputDialog* dialog = new QInputDialog();
@@ -287,6 +290,7 @@ void CWindow::CreateWidgets(void)
                 // Process cancelled => stick with current volume
                 return;
             }
+            zarrLevel = zarrLevel.split("(")[0];
         }
 
         fVolumeViewerWidget->OnResetClicked();

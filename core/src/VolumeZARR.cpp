@@ -17,6 +17,8 @@ VolumeZARR::VolumeZARR(fs::path path) : Volume(std::move(path)), zarrFile_(path)
 {
     format_ = ZARR;
     zarrFile_ = z5::filesystem::handle::File(path_);
+    z5::filesystem::handle::Group group(fs::path(path_), z5::FileMode::FileMode::r);
+    z5::readAttributes(group, groupAttr_);
 }
 
 // Setup a Volume from a folder of slices
@@ -179,13 +181,6 @@ void VolumeZARR::openZarr()
             zarrDs_->enableCaching(
                 true, [&](z5::types::ShapeType chunkId) -> void* { return getCacheChunk(chunkId); },
                 [&](z5::types::ShapeType chunkId, void* chunk) -> void { putCacheChunk(chunkId, chunk); });
-
-            z5::filesystem::handle::Group group(fs::path(path_), z5::FileMode::FileMode::r);
-            z5::readAttributes(group, groupAttr_);
-
-            std::vector<std::mutex> init_mutexes(slices_);
-
-            slice_mutexes_.swap(init_mutexes);
         }
     }
 }
