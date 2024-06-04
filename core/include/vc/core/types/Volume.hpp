@@ -236,7 +236,7 @@ public:
     std::size_t getCacheSize() const { return cache_->size(); }
 
     /** @brief Purge the slice cache */
-    void cachePurge() const;
+    virtual void cachePurge() const;
     /**@}*/
 
 protected:

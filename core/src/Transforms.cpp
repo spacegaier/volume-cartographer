@@ -559,11 +559,15 @@ auto vc::ApplyTransform(const Segmentation::AnnotationSet& as, const Transform3D
         output.begin(), output.end(), output.begin(),
         [transform](const auto& a) { 
             Segmentation::Annotation transformedA(a);
-            auto appliedPoint = transform->applyPoint(cv::Vec3d(0.0, 
+            auto point = cv::Vec3d(
+                0.0,  // do not change any slice numbers
                 std::get<double>(a[Segmentation::ANO_EL_POS_X]), 
-                std::get<double>(a[Segmentation::ANO_EL_POS_Y])));
-            transformedA[Segmentation::ANO_EL_POS_X] = appliedPoint[1];
-            transformedA[Segmentation::ANO_EL_POS_Y] = appliedPoint[2];
+                std::get<double>(a[Segmentation::ANO_EL_POS_Y]));
+            if (point != cv::Vec3d()) {
+                auto appliedPoint = transform->applyPoint(point);
+                transformedA[Segmentation::ANO_EL_POS_X] = appliedPoint[1];
+                transformedA[Segmentation::ANO_EL_POS_Y] = appliedPoint[2];
+            }
             return transformedA;
     });
     return output;

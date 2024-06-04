@@ -247,6 +247,9 @@ void CWindow::CreateWidgets(void)
     connect(
         fVolumeViewerWidget, &CVolumeViewerWithCurve::SendSignalAnnotationChanged, this,
         &CWindow::OnAnnotationChanged);
+    connect(
+        fVolumeViewerWidget, &CImageViewer::SendSignalZoomChange, this,
+        &CWindow::OnZoomChanged);
 
     // new and remove path buttons
     connect(ui.btnNewPath, SIGNAL(clicked()), this, SLOT(OnNewPathClicked()));
@@ -276,37 +279,38 @@ void CWindow::CreateWidgets(void)
             return;
         }
 
-        QString zarrLevel;
-        if (newVolume->format() == vc::VolumeFormat::ZARR) {
-            auto zarrVol = static_cast<vc::VolumeZARR*>(newVolume.get());
-            QStringList list;
-            for (auto level : zarrVol->zarrLevels()) {
-                list.append(
-                    QString::fromStdString(level) + " (Scale 1: " +
-                    QString::number(zarrVol->getScaleForLevel(std::stoi(level))) + ")");
-            }
+        // QString zarrLevel;
+        // if (newVolume->format() == vc::VolumeFormat::ZARR) {
+        //     auto zarrVol = static_cast<vc::VolumeZARR*>(newVolume.get());
+        //     QStringList list;
+        //     for (auto level : zarrVol->getZarrLevels()) {
+        //         list.append(
+        //             QString::number(level) + " (Scale 1: " +
+        //             QString::number(zarrVol->getScaleForLevel(level)) + ")");
+        //     }
 
-            QInputDialog* dialog = new QInputDialog();
-            bool accepted;
-            zarrLevel = dialog->getItem(0, "Select ZARR level", "ZARR Level:", list, 0, false, &accepted);
-            if (!accepted || zarrLevel.isEmpty()) {
-                // Process cancelled => stick with current volume if we already have one, otherwise
-                // properly close this ZARR volume to end up in a deterministic state
-                if (currentVolume->format() == vc::ZARR) {
-                    CloseVolume();
-                }
-                return;
-            }
-            zarrLevel = zarrLevel.split("(")[0];
-        }
+        //     QInputDialog* dialog = new QInputDialog();
+        //     bool accepted;
+        //     zarrLevel = dialog->getItem(0, "Select ZARR level", "ZARR Level:", list, 0, false, &accepted);
+        //     if (!accepted || zarrLevel.isEmpty()) {
+        //         // Process cancelled => stick with current volume if we already have one, otherwise
+        //         // properly close this ZARR volume to end up in a deterministic state
+        //         if (currentVolume->format() == vc::ZARR) {
+        //             CloseVolume();
+        //         }
+        //         return;
+        //     }
+        //     zarrLevel = zarrLevel.split("(")[0];
+        // }
 
         fVolumeViewerWidget->OnResetClicked();
                     
         if (newVolume->format() == vc::VolumeFormat::ZARR) {
             auto zarrVol = static_cast<vc::VolumeZARR*>(newVolume.get());
-            zarrVol->cachePurge();
-            zarrVol->setZarrLevel(zarrLevel.toInt());
+            zarrVol->setZarrLevel(zarrVol->getZarrLevels().front());
             zarrVol->openZarr();
+            
+            sliceIndexScaleFactor = zarrVol->getScaleForLevel(zarrVol->getZarrLevels().front());
 
             // fVolumeViewerWidget->SetcrossSectionIndexSide(newVolume->sliceWidth() / 2);
             // fVolumeViewerWidget->SetcrossSectionIndexFront(newVolume->sliceWidth() / 2);
@@ -1021,7 +1025,6 @@ void CWindow::ChangePathItem(std::string segID)
     // from the one we are currently using / rendering. If so, check if we have a
     // matching transform that allows showing this segment also on the currently
     /// used volume.
-    bool matchingTransformFound = false;
     auto newSeg = fVpkg->segmentation(segID);
     if (newSeg->hasVolumeID() && newSeg->getVolumeID() != currentVolume->id()) {
         auto matchingTransforms = fVpkg->transform(newSeg->getVolumeID(), currentVolume->id());
@@ -1037,8 +1040,6 @@ void CWindow::ChangePathItem(std::string segID)
                     .arg(QString::fromStdString(newSeg->getVolumeID())));
 
             return;
-        } else {
-            matchingTransformFound = true;
         }
     }
 
@@ -1048,17 +1049,17 @@ void CWindow::ChangePathItem(std::string segID)
     if (fSegStructMap.find(segID) == fSegStructMap.end() || fSegStructMap[segID].fMasterCloud.empty()) {
         fSegStructMap[segID] = SegmentationStruct(fVpkg, segID, fPathOnSliceIndex);
         fSegmentationId = segID;
-    }    
+    }
 
-    if (matchingTransformFound) {
+    if (currentVolume->format() == vc::VolumeFormat::ZARR) {
+        // We are using a ZARR => we potentially need to scale the point cloud to match the ZARR detail level
 
-        if (currentVolume->format() == vc::VolumeFormat::ZARR) {
-            // We are using a ZARR => we protentially need to scale the point cloud to match the ZARR detail level
-            auto zarrVol = static_cast<vc::VolumeZARR*>(currentVolume.get());
-            auto scale = zarrVol->getScaleForLevel(zarrVol->getZarrLevel());
+        auto zarrVol = static_cast<vc::VolumeZARR*>(currentVolume.get());
+        auto scale = zarrVol->getScaleForLevel(zarrVol->getZarrLevel());
 
+        if (scale > 1) {
             auto tfm = vc::AffineTransform::New();
-            tfm->scale(1 / scale, 1 / scale, 1 / scale);
+            tfm->scale(1 / scale, 1 / scale, 1);
 
             // std::cout << "Point before: " << fSegStructMap[fSegmentationId].fMasterCloud[20][0] << "|" <<
             // fSegStructMap[fSegmentationId].fMasterCloud[20][1] << "|"
@@ -1733,20 +1734,25 @@ void CWindow::startPrefetching(int index) {
 // Open slice
 void CWindow::OpenSlice(void)
 {
+    std::cout << "====== Open slice ======" << std::endl;
+    
     QImage aImgQImage;
     cv::Mat aImgMat;
     auto polygon = fVolumeViewerWidget->GetView()->mapToScene(fVolumeViewerWidget->GetView()->viewport()->rect());
-    QRect rect(std::max(0, static_cast<int>(polygon.at(0).x())), 
-               std::max(0, static_cast<int>(polygon.at(0).y())), 
-               polygon.at(2).x() - polygon.at(0).x(), polygon.at(2).y() - polygon.at(0).y());
+    int x = static_cast<int>(std::floor(polygon.at(0).x()));
+    int y = static_cast<int>(std::floor(polygon.at(0).y()));
+    QRect rect(std::max(0, x), std::max(0, y), std::ceil(polygon.at(2).x() - x), std::ceil(polygon.at(2).y() - y));
+    std::cout << "Orig Poly: " << polygon.at(0).x() << ", " << polygon.at(0).y() << ", " << polygon.at(2).x() << ", " << polygon.at(2).y() << std::endl;
 
     if (fVpkg != nullptr) {
         // Stop prefetching
         prefetchSliceIndex = -1;
         cv.notify_one();
-        
-        aImgMat = currentVolume->getSliceDataDefault(fPathOnSliceIndex, 
-            cv::Rect(rect.x(), rect.y(), rect.width(), rect.height()));
+
+        std::cout << "Rect: " << rect.x() << ", " << rect.y() << ", " << rect.bottomRight().x() << ", "
+                  << rect.bottomRight().y() << std::endl;
+        aImgMat = currentVolume->getSliceDataDefault(
+            fPathOnSliceIndex, cv::Rect(rect.x(), rect.y(), rect.width(), rect.height()));
     } else {
         aImgMat = cv::Mat::zeros(10, 10, CV_8UC1);
     }
@@ -2122,10 +2128,12 @@ void CWindow::SavePointCloud()
                 auto zarrVol = static_cast<vc::VolumeZARR*>(currentVolume.get());
                 auto scale = zarrVol->getScaleForLevel(zarrVol->getZarrLevel());
 
-                auto tfm = vc::AffineTransform::New();
-                tfm->scale(scale, scale, scale);
-                pointCloud = ApplyTransform(pointCloud, tfm);
-                annotationCloud = ApplyTransform(annotationCloud, tfm);
+                if (scale > 1) {
+                    auto tfm = vc::AffineTransform::New();
+                    tfm->scale(scale, scale, 1);
+                    pointCloud = ApplyTransform(pointCloud, tfm);
+                    annotationCloud = ApplyTransform(annotationCloud, tfm);
+                }
             }
 
             segStruct.fSegmentation->setPointSet(pointCloud);
@@ -2150,6 +2158,11 @@ void CWindow::SavePointCloud()
 // Create new path
 void CWindow::OnNewPathClicked(void)
 {
+    if (currentVolume->isChunked()) {
+        QMessageBox::information(this, tr("Info"), tr("Currently not yet supported for chunked formats"));
+        return;
+    }
+    
     // Save if we need to
     if (SaveDialog() == SaveResponse::Cancelled) {
         return;
@@ -2690,6 +2703,11 @@ void CWindow::TogglePenTool(void)
 // Toggle the status of the segmentation tool
 void CWindow::ToggleSegmentationTool(void)
 {
+    if (currentVolume->isChunked()) {
+        QMessageBox::information(this, tr("Info"), tr("Currently not yet supported for chunked formats"));
+        return;
+    }
+    
     if (fSegTool->isChecked()) {
         // If the prefetching worker is not yet running, start it
         if (!prefetchWorker.joinable()) {
@@ -2973,15 +2991,16 @@ void CWindow::OnLoadAnySlice(int slice)
 
 void CWindow::OnLoadNextSliceShift(int shift)
 {
-    if (fPathOnSliceIndex + shift >= currentVolume->numSlices()) {
-        shift = currentVolume->numSlices() - fPathOnSliceIndex - 1;
+    int adjustedShift = shift * sliceIndexScaleFactor;
+    if (fPathOnSliceIndex + adjustedShift >= currentVolume->numSlices()) {
+        adjustedShift = currentVolume->numSlices() - fPathOnSliceIndex - 1;
     }
 
     if (!fVolumeViewerWidget->CanChangeImage()) {
         statusBar->showMessage(
             tr("Changing slices is deactivated in the Pen Tool!"), 10000);
-    } else if (shift != 0) {
-        fPathOnSliceIndex += shift;
+    } else if (adjustedShift != 0) {
+        fPathOnSliceIndex += adjustedShift;
         OpenSlice();
         SetCurrentCurve(fPathOnSliceIndex);
         UpdateView();
@@ -2992,15 +3011,16 @@ void CWindow::OnLoadNextSliceShift(int shift)
 
 void CWindow::OnLoadPrevSliceShift(int shift)
 {
-    if (fPathOnSliceIndex - shift < 0) {
-        shift = fPathOnSliceIndex;
+    int adjustedShift = shift * sliceIndexScaleFactor;
+    if (fPathOnSliceIndex - adjustedShift < 0) {
+        adjustedShift = fPathOnSliceIndex;
     }
 
     if (!fVolumeViewerWidget->CanChangeImage()) {
         statusBar->showMessage(
             tr("Changing slices is deactivated in the Pen Tool!"), 10000);
-    } else if (shift != 0) {
-        fPathOnSliceIndex -= shift;
+    } else if (adjustedShift != 0) {
+        fPathOnSliceIndex -= adjustedShift;
         OpenSlice();
         SetCurrentCurve(fPathOnSliceIndex);
         UpdateView();
@@ -3029,6 +3049,81 @@ void CWindow::OnPathChanged(std::string segID, PathChangePointVector before, Pat
 void CWindow::OnAnnotationChanged(void)
 {
     UpdateAnnotationList();
+}
+
+void CWindow::OnZoomChanged()
+{
+    std::cout << "====== Zoom Changed ======" << std::endl;
+    if (currentVolume->format() == vc::VolumeFormat::ZARR) {
+        auto zarrVol = static_cast<vc::VolumeZARR*>(currentVolume.get());
+        auto polygon = fVolumeViewerWidget->GetView()->mapToScene(fVolumeViewerWidget->GetView()->viewport()->rect());
+        // QRect rect(
+        //     std::max(0, static_cast<int>(polygon.at(0).x())), std::max(0, static_cast<int>(polygon.at(0).y())),
+        //     polygon.at(2).x() - polygon.at(0).x(), polygon.at(2).y() - polygon.at(0).y());
+        // std::cout << "Orig Poly: " << polygon.at(0).x() << ", " << polygon.at(0).y() << ", " << polygon.at(2).x()
+        //           << ", " << polygon.at(2).y() << std::endl;
+
+        QRectF relative(
+            QPointF(polygon.at(0).x() / zarrVol->getCurrentSize()[0], polygon.at(0).y() / zarrVol->getCurrentSize()[1]),
+            QPointF(polygon.at(2).x() / zarrVol->getCurrentSize()[0], polygon.at(2).y() / zarrVol->getCurrentSize()[1]));
+        std::cout << "Relative: " << relative.x() << ", " << relative.y() << ", " << relative.bottomRight().x() << ", "
+                  << relative.bottomRight().y() << std::endl;
+        auto widthPercent = std::clamp(relative.width(), 0., 1.);
+        std::cout << "% Width " << widthPercent << std::endl;
+
+        // Determine best ZARR detail level
+        auto levels = zarrVol->getZarrLevels();
+        
+        // //------------- Variant matching shown % with detail level slice size        
+        // // Invert order
+        // std::sort(levels.begin(), levels.end(), std::greater<>());
+        // auto widthMaxDelta = zarrVol->getSize(levels.back())[0] - zarrVol->getSize(levels.front())[0];
+        // int newLevel = levels.back();  // as default set the most high-res level
+        // auto sizeRefrence = widthMaxDelta * (1 - widthPercent);
+        // for (auto level : levels) {
+        //     if (sizeRefrence <= zarrVol->getSize(level)[0]) {
+        //         std::cout << "Size ref: " << sizeRefrence << ", ZARR compare: " << zarrVol->getSize(level)[0]
+        //                   << std::endl;
+        //         newLevel = level;
+        //         break;
+        //     }
+        // }
+
+        //------------- Variant matching shown % with linear spread across available levels       
+        float percentPerLevel = 1.f / zarrVol->getZarrLevels().size();
+        int level = widthPercent / percentPerLevel;
+        auto newLevel = zarrVol->getZarrLevels().at(level);
+
+        if (newLevel != fVolumeViewerWidget->GetDetailLevel()) {
+
+            auto oldZarrScale = zarrVol->getScaleForLevel(zarrVol->getZarrLevel());
+
+            std::cout << "====== Detail level change to " << newLevel << " ======" << std::endl;
+            zarrVol->setZarrLevel(newLevel);
+            auto rect = QRect(
+                QPoint(
+                    std::floor(zarrVol->getCurrentSize()[0] * relative.x()) - 1,
+                    std::floor(zarrVol->getCurrentSize()[1] * relative.y()) - 1),
+                QPoint(
+                    std::floor(zarrVol->getCurrentSize()[0] * relative.bottomRight().x()) + 1,
+                    std::floor(zarrVol->getCurrentSize()[1] * relative.bottomRight().y()) + 1));
+            std::cout << "Rect: " << rect.x() << ", " << rect.y() << ", " << rect.bottomRight().x() << ", "
+                      << rect.bottomRight().y() << std::endl;
+
+            fVolumeViewerWidget->GetScene()->setSceneRect(
+                0, 0, zarrVol->getCurrentSize()[0], zarrVol->getCurrentSize()[1]);
+            fVolumeViewerWidget->GetView()->centerOn(rect.center());
+            
+            auto newZarrScale = zarrVol->getScaleForLevel(zarrVol->getZarrLevel());
+
+            fVolumeViewerWidget->ScaleImage(newZarrScale / oldZarrScale);
+            fVolumeViewerWidget->SetDetailLevel(newLevel);
+
+            OnLoadAnySlice(fPathOnSliceIndex);
+
+            // sliceIndexScaleFactor = newZarrScale;
+        }
+    }
 }
 
 auto CWindow::can_change_volume_() -> bool

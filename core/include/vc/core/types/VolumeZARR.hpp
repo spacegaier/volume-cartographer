@@ -63,7 +63,7 @@ public:
 
     /**@{*/
     /** @brief Get ZARR file levels*/
-    std::vector<std::string> zarrLevels() const;
+    std::vector<int> getZarrLevels() const;
     /**@}*/
 
     /**@{*/
@@ -77,21 +77,34 @@ public:
 
     void openZarr();
 
+        /** @brief Purge the slice cache */
+    void cachePurge() const override;
+
     void* getCacheChunk(z5::types::ShapeType chunkId) const;
     void putCacheChunk(z5::types::ShapeType chunkId, void* chunk) const;
+
+    /** Format: X, Y, Z */
+    auto getSize(int level) -> cv::Vec3i { return cv::Vec3i(
+        zarrDs_[level]->shape()[1],
+        zarrDs_[level]->shape()[2],
+        zarrDs_[level]->shape()[0]); }
+
+    auto getCurrentSize() -> cv::Vec3i { return getSize(zarrLevel_); }
+
 
 protected:
     /** ZARR file*/
     z5::filesystem::handle::File zarrFile_;
     /** ZARR data set*/
-    std::unique_ptr<z5::Dataset> zarrDs_{nullptr};
+    std::map<int, std::unique_ptr<z5::Dataset>> zarrDs_;
     /** Active ZARR level */
     int zarrLevel_{-1};
 
     nlohmann::json groupAttr_;
 
     /** Chunk cache */
-    mutable DefaultCache::Pointer cache_{DefaultCache::New(1000L)};
+    // mutable DefaultCache::Pointer cache_{DefaultCache::New(1000L)};
+    mutable std::map<int, DefaultCache::Pointer> caches_;
 
     /** Load slice from disk */
     cv::Mat load_slice_(int index, cv::Rect2i rect = cv::Rect2i(), VolumeAxis axis = Z) const;

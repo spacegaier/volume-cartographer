@@ -213,7 +213,7 @@ void CVolumeViewerWithCurve::panAlongCurve(double speed, bool forward)
     }
     // fIntersectionCurveRef from the fSelectedSegID
     int numCurvePoints = fSegStructMapRef[fSelectedSegID].fIntersectionCurve.GetPointsNum();
-    int pointDifference = static_cast<int>(speed / fScaleFactor);
+    int pointDifference = static_cast<int>(speed / fZoomFactor);
     if (!forward) {
         fSelectedPointIndex -= pointDifference;
     }
@@ -225,8 +225,8 @@ void CVolumeViewerWithCurve::panAlongCurve(double speed, bool forward)
     auto v = cv::Vec2f(p1[0] - p2[0], p1[1] - p2[1]);
     auto v2 = v * 0.1;
 
-    if (0 < std::sqrt(v2[0]*v2[0] + v2[1]*v2[1]) && std::sqrt(v2[0]*v2[0] + v2[1]*v2[1]) < (10.0 / fScaleFactor)) {
-        v2 *= (10.0 / fScaleFactor) / std::sqrt(v2[0]*v2[0] + v2[1]*v2[1]);
+    if (0 < std::sqrt(v2[0]*v2[0] + v2[1]*v2[1]) && std::sqrt(v2[0]*v2[0] + v2[1]*v2[1]) < (10.0 / fZoomFactor)) {
+        v2 *= (10.0 / fZoomFactor) / std::sqrt(v2[0]*v2[0] + v2[1]*v2[1]);
         // check that the v2 is not overshooting p1
         if (std::abs(v2[0]) > std::abs(v[0])) {
             v2[0] = v[0];
@@ -278,7 +278,7 @@ void CVolumeViewerWithCurve::mousePressEvent(QMouseEvent* event)
         // Handle draw and edit
         if (fViewState == EViewState::ViewStateDraw && event->buttons() == Qt::LeftButton) {
             // With left click, add control points to the curve
-            std::cout << "Draw Point : " << aImgLoc[0] << ", " << aImgLoc[1] << std::endl;
+            // std::cout << "Draw Point : " << aImgLoc[0] << ", " << aImgLoc[1] << std::endl;
             fControlPoints.push_back(aImgLoc);
             UpdateSplineCurve();
             UpdateView();
@@ -506,7 +506,7 @@ void CVolumeViewerWithCurve::WidgetLoc2ImgLoc(
 std::pair<int, std::string> CVolumeViewerWithCurve::SelectPointOnCurves(
     const cv::Vec2f& nPt, bool snapMode, bool selectGlobally)
 {
-    const double DIST_THRESHOLD = 1.5 * fScaleFactor;
+    const double DIST_THRESHOLD = 1.5 * fZoomFactor;
 
     double minDistance = std::numeric_limits<double>::max();
     std::string best_id = "";
@@ -645,10 +645,9 @@ void CVolumeViewerWithCurve::DrawCrossSectionMarkers()
 // Update the status of the buttons
 void CVolumeViewerWithCurve::UpdateButtons(void)
 {
-    fZoomInBtn->setEnabled(fImgQImage != nullptr && fScaleFactor < 10.);
-    fZoomOutBtn->setEnabled(fImgQImage != nullptr && fScaleFactor > 0.05);
-    fResetBtn->setEnabled(
-        fImgQImage != nullptr && fabs(fScaleFactor - 1.0) > 1e-6);
+    fZoomInBtn->setEnabled(fImgQImage != nullptr && fZoomFactor < 10.);
+    fZoomOutBtn->setEnabled(fImgQImage != nullptr && fZoomFactor > 0.05);
+    fResetBtn->setEnabled(fImgQImage != nullptr && fabs(fZoomFactor - 1.0) > 1e-6);
     fNextBtn->setEnabled(
         fImgQImage != nullptr && (fViewState == EViewState::ViewStateIdle || fViewState == EViewState::ViewStateEdit));
     fPrevBtn->setEnabled(

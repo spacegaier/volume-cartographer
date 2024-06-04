@@ -51,12 +51,16 @@ void VolumeZARR::setSliceData(int index, const cv::Mat& slice, bool compress)
     // Not implemented yet
 }
 
-auto VolumeZARR::zarrLevels() const -> std::vector<std::string>
+auto VolumeZARR::getZarrLevels() const -> std::vector<int>
 { 
     std::vector<std::string> keys;
     zarrFile_.keys(keys);
     std::sort(keys.begin(), keys.end());
-    return keys;
+    std::vector<int> levels;
+    for(auto key : keys) {
+        levels.push_back(std::stoi(key));
+    }
+    return levels;
 }
 
 auto VolumeZARR::getScaleForLevel(int level) const -> float
@@ -66,8 +70,8 @@ auto VolumeZARR::getScaleForLevel(int level) const -> float
 
 void* VolumeZARR::getCacheChunk(z5::types::ShapeType chunkId) const
 {
-    if (cache_->contains(chunkId)) {
-        return cache_->getPointer(chunkId)->data();
+    if (caches_[zarrLevel_]->contains(chunkId)) {
+        return caches_[zarrLevel_]->getPointer(chunkId)->data();
     } else {
         return nullptr;
     }
@@ -75,8 +79,8 @@ void* VolumeZARR::getCacheChunk(z5::types::ShapeType chunkId) const
 
 void VolumeZARR::putCacheChunk(z5::types::ShapeType chunkId, void* chunk) const
 {
-    if (!cache_->contains(chunkId)) {
-        cache_->put(chunkId, *static_cast<std::vector<std::uint16_t>*>(chunk));
+    if (!caches_[zarrLevel_]->contains(chunkId)) {
+        caches_[zarrLevel_]->put(chunkId, *static_cast<std::vector<std::uint16_t>*>(chunk));
     }
 }
 
@@ -84,10 +88,11 @@ auto VolumeZARR::load_slice_(int index, cv::Rect2i rect, VolumeAxis axis) const 
 {
     {
         std::unique_lock<std::shared_mutex> lock(print_mutex_);
-        std::cout << "Requested to load slice " << index << std::endl;
+        std::cout << "Requested to load slice " << index << ", level " << zarrLevel_ << std::endl;
     }
 
-    if (zarrDs_) {
+    auto itDs = zarrDs_.find(zarrLevel_);
+    if (itDs != zarrDs_.end()) {
 
         xt::xtensor<std::uint16_t, 3>* data = nullptr;
         auto offsetShape = (axis == Z)   ? z5::types::ShapeType({(size_t)index, (size_t)rect.y, (size_t)rect.x})
@@ -96,7 +101,7 @@ auto VolumeZARR::load_slice_(int index, cv::Rect2i rect, VolumeAxis axis) const 
         // std::cout << "Offset Shape: " << offsetShape[0] << ", " << offsetShape[1] << ", " << offsetShape[2] << std::endl;
 
         // Prepare desired read shape to control how many slices get loaded
-        auto shape = zarrDs_->shape();
+        auto shape = itDs->second->shape();
         // in a single chunk
         xt::xtensor<std::uint16_t, 3>::shape_type tensorShape;
         size_t maxWidth = shape[2] - rect.x;
@@ -115,7 +120,7 @@ auto VolumeZARR::load_slice_(int index, cv::Rect2i rect, VolumeAxis axis) const 
 
         // auto t1 = std::chrono::high_resolution_clock::now();
         try {
-            z5::multiarray::readSubarray<std::uint16_t>(*zarrDs_, *data, offsetShape.begin(), threads);
+            z5::multiarray::readSubarray<std::uint16_t>(*itDs->second, *data, offsetShape.begin(), threads);
         } catch (std::runtime_error) {
             std::cout << "Runtime error in readSubarray()" << std::endl;
         }
@@ -162,24 +167,29 @@ auto VolumeZARR::load_slice_(int index, cv::Rect2i rect, VolumeAxis axis) const 
 
 void VolumeZARR::openZarr()
 {
-    if (zarrLevel_ >= 0) 
-    {
-        // Check that we have a valid level (>= 0 and in keys list)
-        std::vector<std::string> keys;
-        zarrFile_.keys(keys);
-        if (std::find(keys.begin(), keys.end(), std::to_string(zarrLevel_)) != keys.end()) {
-            z5::filesystem::handle::Dataset hndl(
-                fs::path(path_ / std::to_string(zarrLevel_)), z5::FileMode::FileMode::r);
-            hndl.setZarrDelimiter(std::string("/"));
-            zarrDs_ = z5::filesystem::openDataset(hndl);
+    for(auto level : getZarrLevels()) {
+        z5::filesystem::handle::Dataset hndl(
+            fs::path(path_ / std::to_string(level)), z5::FileMode::FileMode::r);
+        hndl.setZarrDelimiter(std::string("/"));
+        zarrDs_[level] = z5::filesystem::openDataset(hndl);
 
-            slices_ = zarrDs_->shape()[0];
-            width_ = zarrDs_->shape()[1];
-            height_ = zarrDs_->shape()[2];
-
-            zarrDs_->enableCaching(
-                true, [&](z5::types::ShapeType chunkId) -> void* { return getCacheChunk(chunkId); },
-                [&](z5::types::ShapeType chunkId, void* chunk) -> void { putCacheChunk(chunkId, chunk); });
+        if (level == 0) {
+            slices_ = zarrDs_[level]->shape()[0];
+            width_ = zarrDs_[level]->shape()[1];
+            height_ = zarrDs_[level]->shape()[2];
         }
+        
+        caches_[level] = DefaultCache::New(1000L);
+
+        zarrDs_[level]->enableCaching(
+            true, [&](z5::types::ShapeType chunkId) -> void* { return getCacheChunk(chunkId); },
+            [&](z5::types::ShapeType chunkId, void* chunk) -> void { putCacheChunk(chunkId, chunk); });
+    }
+}
+
+void VolumeZARR::cachePurge() const
+{
+    for(auto cache : caches_) {
+        cache.second->purge();
     }
 }

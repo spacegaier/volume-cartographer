@@ -222,6 +222,7 @@ private slots:
 
     void OnPathChanged(std::string segID, PathChangePointVector before, PathChangePointVector after);
     void OnAnnotationChanged(void);
+    void OnZoomChanged();
 
     void UpdateSegmentCheckboxes(std::string aSegID);
     void toggleDisplayAll(bool checked);
@@ -257,6 +258,7 @@ private:
     std::vector<int> impactRangeSteps;
     std::vector<int> scanRangeSteps;
     int strideWidth;
+    int sliceIndexScaleFactor{1}; // to account for lower resolutions e.g. from a ZARR volume
 
     // for drawing mode
     CBSpline fSplineCurve;  // the curve at current slice

@@ -130,6 +130,7 @@ CImageViewer::CImageViewer(QWidget* parent)
     , fImgQImage(nullptr)
     , fBaseImageItem(nullptr)
     , fScaleFactor(1.0)
+    , fZoomFactor(1.0)
     , fImageIndex(0)
     , fScanRange(1)
 {
@@ -234,7 +235,6 @@ void CImageViewer::SetButtonsEnabled(bool state)
     fImageIndexSpin->setEnabled(state);
     fImageRotationSpin->setEnabled(state);
 }
-
 void CImageViewer::SetImage(const QImage& nSrc, const QPoint pos)
 {
     if (fImgQImage == nullptr) {
@@ -394,6 +394,15 @@ void CImageViewer::ScaleImage(double nFactor)
     UpdateButtons();
 }
 
+void CImageViewer::SetScaleFactor(double nFactor)
+{
+    auto inverse = (1 / fScaleFactor) * nFactor;
+    fScaleFactor *= inverse;
+    fGraphicsView->scale(inverse, inverse);
+
+    UpdateButtons();
+}
+
 void CImageViewer::CenterOn(const QPointF& point)
 {
     fGraphicsView->centerOn(point);
@@ -427,6 +436,11 @@ void CImageViewer::OnZoomInClicked(void)
 {
     if (fZoomInBtn->isEnabled()) {
         ScaleImage(ZOOM_FACTOR);
+        
+        auto oldZoomFactor = fZoomFactor;
+        fZoomFactor *= ZOOM_FACTOR;
+        // Call to trigger a slice load with potentially new chunk detail level
+        SendSignalZoomChange();
     }
 }
 
@@ -435,6 +449,13 @@ void CImageViewer::OnZoomOutClicked(void)
 {
     if (fZoomOutBtn->isEnabled()) {
         ScaleImage(1 / ZOOM_FACTOR);
+
+        auto oldZoomFactor = fZoomFactor;
+        fZoomFactor *= 1 / ZOOM_FACTOR;
+        // Call to trigger a slice load with potentially new chunk detail level
+        SendSignalZoomChange();
+        
+        // More of the slice is now visible => trigger a load to actually show it
         ScheduleChunkUpdate();
     }
 }
@@ -443,6 +464,7 @@ void CImageViewer::OnResetClicked(void)
 {
     fGraphicsView->resetTransform();
     fScaleFactor = 1.0;
+    fZoomFactor = 1.0;
     currentRotation = 0;
     fImageRotationSpin->setValue(currentRotation);
 
@@ -502,10 +524,9 @@ void CImageViewer::ResetView()
 // Update the status of the buttons
 void CImageViewer::UpdateButtons(void)
 {
-    fZoomInBtn->setEnabled(fImgQImage != nullptr && fScaleFactor < 10.0);
-    fZoomOutBtn->setEnabled(fImgQImage != nullptr && fScaleFactor > 0.05);
-    fResetBtn->setEnabled(
-        fImgQImage != nullptr && fabs(fScaleFactor - 1.0) > 1e-6);
+    fZoomInBtn->setEnabled(fImgQImage != nullptr && fZoomFactor < 10.0);
+    fZoomOutBtn->setEnabled(fImgQImage != nullptr && fZoomFactor > 0.05);
+    fResetBtn->setEnabled(fImgQImage != nullptr && fabs(fZoomFactor - 1.0) > 1e-6);
     fNextBtn->setEnabled(fImgQImage != nullptr);
     fPrevBtn->setEnabled(fImgQImage != nullptr);
 }

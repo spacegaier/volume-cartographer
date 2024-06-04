@@ -55,7 +55,7 @@ public:
     ~CImageViewer(void);
     virtual void SetButtonsEnabled(bool state);
 
-    virtual void SetImage(const QImage& nSrc, const QPoint pos = {0, 0});
+    void SetImage(const QImage& nSrc, const QPoint pos = {0, 0});
     void SetImageIndex(int imageIndex)
     {
         fImageIndex = imageIndex;
@@ -68,9 +68,14 @@ public:
     void SetScanRange(int scanRange);
     auto GetImageSize() const -> QSize { return fBaseImageItem->pixmap().size(); }
     void ScaleImage(double nFactor);
+    void SetScaleFactor(double nFactor);
+    auto GetScaleFactor() const -> double { return fScaleFactor; }
+    auto GetZoomFactor() const -> double { return fZoomFactor; }
     auto GetScene() const -> QGraphicsScene* { return fScene; }
     auto GetView() const -> CImageViewerView* { return fGraphicsView; }
     auto GetImage() const -> QImage* { return fImgQImage; }
+    void SetDetailLevel(int level) { detailLevel = level; }
+    auto GetDetailLevel() const -> int { return detailLevel; }
 
     void SetRotation(int degress);
     void Rotate(int delta);
@@ -100,6 +105,7 @@ signals:
     void SendSignalStatusMessageAvailable(QString text, int timeout);
     void SendSignalImpactRangeUp(void);
     void SendSignalImpactRangeDown(void);
+    void SendSignalZoomChange();
 
 protected:
     void CenterOn(const QPointF& point);
@@ -131,11 +137,18 @@ protected:
 
     // data
     QImage* fImgQImage;
-    double fScaleFactor;
+    // Technical scaling factor of the shown image
+    double fScaleFactor; 
+    // Logical zoom level which can be separate from the scale factor, as with
+    // chunked formats that have different level of details, we have to scale the image
+    // to gradually switch detail levels, where as the zoom factor should be continous
+    double fZoomFactor; 
     int fImageIndex;
     int fScanRange;
     // Required to be able to reset the rotation without also resetting the scaling
     int currentRotation{0};
+    // Level of shown details (relevant for chunked formats with levels)
+    int detailLevel{0};
 
     // user settings
     bool fCenterOnZoomEnabled;
