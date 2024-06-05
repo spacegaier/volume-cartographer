@@ -303,8 +303,6 @@ void CWindow::CreateWidgets(void)
         //     }
         //     zarrLevel = zarrLevel.split("(")[0];
         // }
-
-        fVolumeViewerWidget->OnResetClicked();
                     
         if (newVolume->format() == vc::VolumeFormat::ZARR) {
             auto zarrVol = static_cast<vc::VolumeZARR*>(newVolume.get());
@@ -316,6 +314,7 @@ void CWindow::CreateWidgets(void)
             // fVolumeCrossSectionViewer->setVolume(newVolume);
         }
 
+        fVolumeViewerWidget->OnResetClicked();
         // To allow panning around, the graphics view needs to know that the scene is bigger than
         // what is initially shown.
         fVolumeViewerWidget->GetScene()->setSceneRect(0, 0, newVolume->sliceWidth(), newVolume->sliceHeight());
@@ -3027,7 +3026,7 @@ void CWindow::OnAnnotationChanged(void)
 void CWindow::OnZoomChanged()
 {
     std::cout << "====== Zoom Changed ======" << std::endl;
-    if (currentVolume->format() == vc::VolumeFormat::ZARR) {
+    if (currentVolume && currentVolume->format() == vc::VolumeFormat::ZARR) {
         auto zarrVol = static_cast<vc::VolumeZARR*>(currentVolume.get());
         auto polygon = fVolumeViewerWidget->GetView()->mapToScene(fVolumeViewerWidget->GetView()->viewport()->rect());
         // QRect rect(
@@ -3042,7 +3041,8 @@ void CWindow::OnZoomChanged()
         std::cout << "Relative: " << relative.x() << ", " << relative.y() << ", " << relative.bottomRight().x() << ", "
                   << relative.bottomRight().y() << std::endl;
         auto widthPercent = std::clamp(relative.width(), 0., 1.);
-        std::cout << "% Width " << widthPercent << std::endl;
+        auto heightPercent = std::clamp(relative.height(), 0., 1.);
+        std::cout << "% Width " << widthPercent << ", % Height " << heightPercent << std::endl;
 
         // Determine best ZARR detail level
         auto levels = zarrVol->getZarrLevels();
@@ -3057,7 +3057,7 @@ void CWindow::OnZoomChanged()
             for (auto level : levels) {
 
                 std::cout << "Test level " << level;
-                std::cout << " | Width %: " << widthPercent << ", viewport size: " << viewportSize
+                std::cout << " | Viewport width: " << viewportSize
                           << ", ZARR pixels for view %: " << zarrVol->getSize(level)[0] * widthPercent << std::endl;
 
                 if (zarrVol->getSize(level)[0] * widthPercent >= viewportSize) {
@@ -3068,10 +3068,40 @@ void CWindow::OnZoomChanged()
                     break;
                 }
             }
-        } else {
+        } else if (zarrDetailLevelLogic == 3) {
+            //------------- Variant matching shown % with detail level slice size
+            // Invert order
+            std::sort(levels.begin(), levels.end(), std::greater<>());
+            auto viewportSize = fVolumeViewerWidget->GetView()->viewport()->rect().height();
+            newLevel = levels.back();  // as default set the most high-res level
+            for (auto level : levels) {
+
+                std::cout << "Test level " << level;
+                std::cout << " | Viewport height: " << viewportSize
+                          << ", ZARR pixels for view %: " << zarrVol->getSize(level)[1] * heightPercent << std::endl;
+
+                if (zarrVol->getSize(level)[1] * heightPercent >= viewportSize) {
+                    // std::cout << "Shown pixels: " << shownPixels << ", ZARR pixels for view %: " <<
+                    // zarrVol->getSize(level)[0] * widthPercent
+                    //           << std::endl;
+                    newLevel = level;
+                    break;
+                }
+            }
+        } else if (zarrDetailLevelLogic == 1) {
             //------------- Variant matching shown % with linear spread across available levels
             float percentPerLevel = 1.f / zarrVol->getZarrLevels().size();
             int level = widthPercent / percentPerLevel;
+            newLevel = zarrVol->getZarrLevels().at(level);
+        } else if (zarrDetailLevelLogic == 4) {
+            //------------- Variant matching shown % with linear spread across available levels
+            float percentPerLevel = 1.f / zarrVol->getZarrLevels().size();
+            int level = widthPercent / (percentPerLevel + 0.05);
+            newLevel = zarrVol->getZarrLevels().at(level);
+        } else if (zarrDetailLevelLogic == 5) {
+            //------------- Variant matching shown % with linear spread across available levels
+            float percentPerLevel = 1.f / zarrVol->getZarrLevels().size();
+            int level = widthPercent / (percentPerLevel + 0.1);
             newLevel = zarrVol->getZarrLevels().at(level);
         }
 

@@ -468,6 +468,9 @@ void CImageViewer::OnResetClicked(void)
     currentRotation = 0;
     fImageRotationSpin->setValue(currentRotation);
 
+    // Call to trigger a slice load with potentially new chunk detail level
+    SendSignalZoomChange();
+
     UpdateButtons();
 }
 
