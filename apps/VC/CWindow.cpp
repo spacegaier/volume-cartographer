@@ -1706,15 +1706,25 @@ void CWindow::startPrefetching(int index) {
 // Open slice
 void CWindow::OpenSlice(void)
 {
-    std::cout << "====== Open slice ======" << std::endl;
+    // std::cout << "====== Open slice ======" << std::endl;
     
     QImage aImgQImage;
     cv::Mat aImgMat;
     auto polygon = fVolumeViewerWidget->GetView()->mapToScene(fVolumeViewerWidget->GetView()->viewport()->rect());
     int x = static_cast<int>(std::floor(polygon.at(0).x()));
     int y = static_cast<int>(std::floor(polygon.at(0).y()));
-    QRect rect(std::max(0, x), std::max(0, y), std::ceil(polygon.at(2).x() - x), std::ceil(polygon.at(2).y() - y));
-    std::cout << "Orig Poly: " << polygon.at(0).x() << ", " << polygon.at(0).y() << ", " << polygon.at(2).x() << ", " << polygon.at(2).y() << std::endl;
+    int w = std::ceil(polygon.at(2).x() - x);
+    int h = std::ceil(polygon.at(2).y() - y);
+    
+    // Load a bit more around the actually needed rect, so we prevent/minimize white bars when panning
+    auto marginPercent = 0.2;
+    x -= w * marginPercent;
+    y -= h * marginPercent;
+    w += 2 * w * marginPercent; // 2 times, because we also moved x
+    h += 2 * h * marginPercent; // 2 times, because we also moved y
+    
+    QRect rect(std::max(0, x), std::max(0, y), w, h);
+    // std::cout << "Orig Poly: " << polygon.at(0).x() << ", " << polygon.at(0).y() << ", " << polygon.at(2).x() << ", " << polygon.at(2).y() << std::endl;
 
     if (fVpkg != nullptr) {
         // Stop prefetching
@@ -1723,13 +1733,13 @@ void CWindow::OpenSlice(void)
 
         auto ajustedSlice = fPathOnSliceIndex;
         if (currentVolume->format() == vc::VolumeFormat::ZARR) {
-            // Adjust the shown slice based on hte chunk level of detail scale
+            // Adjust the shown slice based on the chunk level of detail scale
             auto zarrVol = static_cast<vc::VolumeZARR*>(currentVolume.get());
             ajustedSlice /= zarrVol->getScaleForLevel(zarrVol->getZarrLevel());
         }
 
-        std::cout << "Rect: " << rect.x() << ", " << rect.y() << ", " << rect.bottomRight().x() << ", "
-                  << rect.bottomRight().y() << std::endl;
+        // std::cout << "Rect: " << rect.x() << ", " << rect.y() << ", " << rect.bottomRight().x() << ", "
+        //          << rect.bottomRight().y() << std::endl;
         aImgMat = currentVolume->getSliceDataDefault(
             ajustedSlice, cv::Rect(rect.x(), rect.y(), rect.width(), rect.height()));
     } else {

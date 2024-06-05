@@ -68,17 +68,21 @@ auto VolumeZARR::getScaleForLevel(int level) const -> float
     return groupAttr_["multiscales"][0]["datasets"][level]["coordinateTransformations"][0]["scale"][0].get<float>();
 }
 
-void VolumeZARR::putCacheChunk(z5::types::ShapeType chunkId, void* chunk) const
+void VolumeZARR::putCacheChunk(z5::types::ShapeType chunkId, void* chunk, z5::types::ShapeType chunkShape, std::size_t chunkSize) const
 {
     if (!caches_[zarrLevel_]->contains(chunkId)) {
-        caches_[zarrLevel_]->put(chunkId, *static_cast<std::vector<std::uint16_t>*>(chunk));
+        CacheEntry entry = {*static_cast<std::vector<std::uint16_t>*>(chunk), chunkShape, chunkSize};
+        caches_[zarrLevel_]->put(chunkId, entry);
     }
 }
 
-void* VolumeZARR::getCacheChunk(z5::types::ShapeType chunkId) const
+void* VolumeZARR::getCacheChunk(z5::types::ShapeType chunkId, z5::types::ShapeType& chunkShape, std::size_t& chunkSize) const
 {
     if (caches_[zarrLevel_]->contains(chunkId)) {
-        return caches_[zarrLevel_]->getPointer(chunkId);
+        auto entry = caches_[zarrLevel_]->getPointer(chunkId);
+        chunkShape = entry->shape;
+        chunkSize = entry->size;
+        return &entry->data;
     } else {
         return nullptr;
     }
@@ -182,8 +186,8 @@ void VolumeZARR::openZarr()
         caches_[level] = DefaultCache::New(1000L);
 
         zarrDs_[level]->enableCaching(true,
-            [&](z5::types::ShapeType chunkId, void* chunk) -> void { putCacheChunk(chunkId, chunk); },
-            [&](z5::types::ShapeType chunkId) -> void* { return getCacheChunk(chunkId); });
+            [&](z5::types::ShapeType chunkId, void* chunk, z5::types::ShapeType shape, std::size_t size) -> void { putCacheChunk(chunkId, chunk, shape, size); },
+            [&](z5::types::ShapeType chunkId, z5::types::ShapeType& shape, std::size_t& size) -> void* { return getCacheChunk(chunkId, shape, size); });
     }
 }
 

@@ -653,5 +653,7 @@ void CImageViewer::mouseReleaseEvent(QMouseEvent* event)
 
 void CImageViewer::ScheduleChunkUpdate()
 {
-    timerChunkUpdate->start(50);
+    // Acts as a rate limiter for the rendering, so not every slightest panning
+    // immediatly triggers a redraw.
+    timerChunkUpdate->start(2);
 }

@@ -40,7 +40,13 @@ public:
     /** Shared pointer type */
     using Pointer = std::shared_ptr<VolumeZARR>;
 
-    using DefaultCache = LRUCache<z5::types::ShapeType, std::vector<std::uint16_t>, KeyHasher>;
+    using CacheEntry = struct {
+        std::vector<std::uint16_t> data;
+        z5::types::ShapeType shape;
+        std::size_t size;
+    };
+
+    using DefaultCache = LRUCache<z5::types::ShapeType, CacheEntry, KeyHasher>;
 
     /** @brief Load the Volume from a directory path */
     explicit VolumeZARR(volcart::filesystem::path path);
@@ -80,8 +86,8 @@ public:
         /** @brief Purge the slice cache */
     void cachePurge() const override;
 
-    void putCacheChunk(z5::types::ShapeType chunkId, void* chunk) const;
-    void* getCacheChunk(z5::types::ShapeType chunkId) const;
+    void putCacheChunk(z5::types::ShapeType chunkId, void* chunk, z5::types::ShapeType chunkShape, std::size_t chunkSize) const;
+    void* getCacheChunk(z5::types::ShapeType chunkId, z5::types::ShapeType& chunkShape, std::size_t& chunkSize) const;
 
     /** Format: X, Y, Z */
     auto getSize(int level) -> cv::Vec3i { return cv::Vec3i(
