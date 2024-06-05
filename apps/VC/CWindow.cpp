@@ -132,6 +132,7 @@ CWindow::CWindow()
     // Process the raw impact and scan ranges string and convert to step vectors
     impactRangeSteps = SettingsDialog::expandSettingToIntRange(settings.value("viewer/impact_range_steps", "1-3, 5, 8, 11, 15, 20, 28, 40, 60, 100, 200").toString());
     scanRangeSteps = SettingsDialog::expandSettingToIntRange(settings.value("viewer/scan_range_steps", "1, 2, 5, 10, 20, 50, 100, 200, 500, 1000").toString());
+    zarrDetailLevelLogic = settings.value("zarr/logic", 1).toInt();
 
     // create UI widgets
     CreateWidgets();
@@ -3045,26 +3046,34 @@ void CWindow::OnZoomChanged()
 
         // Determine best ZARR detail level
         auto levels = zarrVol->getZarrLevels();
-        
-        // //------------- Variant matching shown % with detail level slice size        
-        // // Invert order
-        // std::sort(levels.begin(), levels.end(), std::greater<>());
-        // auto widthMaxDelta = zarrVol->getSize(levels.back())[0] - zarrVol->getSize(levels.front())[0];
-        // int newLevel = levels.back();  // as default set the most high-res level
-        // auto sizeRefrence = widthMaxDelta * (1 - widthPercent);
-        // for (auto level : levels) {
-        //     if (sizeRefrence <= zarrVol->getSize(level)[0]) {
-        //         std::cout << "Size ref: " << sizeRefrence << ", ZARR compare: " << zarrVol->getSize(level)[0]
-        //                   << std::endl;
-        //         newLevel = level;
-        //         break;
-        //     }
-        // }
+        int newLevel = -1;
 
-        //------------- Variant matching shown % with linear spread across available levels       
-        float percentPerLevel = 1.f / zarrVol->getZarrLevels().size();
-        int level = widthPercent / percentPerLevel;
-        auto newLevel = zarrVol->getZarrLevels().at(level);
+        if (zarrDetailLevelLogic == 2) {
+            //------------- Variant matching shown % with detail level slice size
+            // Invert order
+            std::sort(levels.begin(), levels.end(), std::greater<>());
+            auto viewportSize = fVolumeViewerWidget->GetView()->viewport()->rect().width();
+            newLevel = levels.back();  // as default set the most high-res level
+            for (auto level : levels) {
+
+                std::cout << "Test level " << level;
+                std::cout << " | Width %: " << widthPercent << ", viewport size: " << viewportSize
+                          << ", ZARR pixels for view %: " << zarrVol->getSize(level)[0] * widthPercent << std::endl;
+
+                if (zarrVol->getSize(level)[0] * widthPercent >= viewportSize) {
+                    // std::cout << "Shown pixels: " << shownPixels << ", ZARR pixels for view %: " <<
+                    // zarrVol->getSize(level)[0] * widthPercent
+                    //           << std::endl;
+                    newLevel = level;
+                    break;
+                }
+            }
+        } else {
+            //------------- Variant matching shown % with linear spread across available levels
+            float percentPerLevel = 1.f / zarrVol->getZarrLevels().size();
+            int level = widthPercent / percentPerLevel;
+            newLevel = zarrVol->getZarrLevels().at(level);
+        }
 
         if (newLevel != fVolumeViewerWidget->GetDetailLevel()) {
 

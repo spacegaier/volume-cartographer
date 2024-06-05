@@ -258,6 +258,7 @@ private:
     std::vector<int> impactRangeSteps;
     std::vector<int> scanRangeSteps;
     int strideWidth;
+    int zarrDetailLevelLogic{1};
 
     // for drawing mode
     CBSpline fSplineCurve;  // the curve at current slice
