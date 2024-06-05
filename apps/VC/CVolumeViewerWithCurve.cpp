@@ -222,6 +222,8 @@ void CVolumeViewerWithCurve::panAlongCurve(double speed, bool forward)
     }
     fSelectedPointIndex = std::max(0, std::min(numCurvePoints - 1, fSelectedPointIndex));
     auto p1 = fSegStructMapRef[fSelectedSegID].fIntersectionCurve.GetPoint(fSelectedPointIndex);
+    p1[0] /= detailScale;
+    p1[1] /= detailScale;
     auto v = cv::Vec2f(p1[0] - p2[0], p1[1] - p2[1]);
     auto v2 = v * 0.1;
 
@@ -577,8 +579,8 @@ void CVolumeViewerWithCurve::DrawIntersectionCurve() {
 
         for (int i = 0; i < pointsNum; ++i) {
             // Create new ellipse points
-            auto p0 = segStruct.fIntersectionCurve.GetPoint(i)[0] - 0.5;
-            auto p1 = segStruct.fIntersectionCurve.GetPoint(i)[1] - 0.5;
+            auto p0 = (segStruct.fIntersectionCurve.GetPoint(i)[0] / detailScale) - 0.5;
+            auto p1 = (segStruct.fIntersectionCurve.GetPoint(i)[1] / detailScale) - 0.5;
 
             // We only want to highlight manually moved points if they are on the highlighted curve
             bool manualPoint = false;

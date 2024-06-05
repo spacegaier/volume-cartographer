@@ -258,7 +258,6 @@ private:
     std::vector<int> impactRangeSteps;
     std::vector<int> scanRangeSteps;
     int strideWidth;
-    int sliceIndexScaleFactor{1}; // to account for lower resolutions e.g. from a ZARR volume
 
     // for drawing mode
     CBSpline fSplineCurve;  // the curve at current slice

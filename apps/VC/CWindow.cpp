@@ -309,8 +309,6 @@ void CWindow::CreateWidgets(void)
             auto zarrVol = static_cast<vc::VolumeZARR*>(newVolume.get());
             zarrVol->setZarrLevel(zarrVol->getZarrLevels().front());
             zarrVol->openZarr();
-            
-            sliceIndexScaleFactor = zarrVol->getScaleForLevel(zarrVol->getZarrLevels().front());
 
             // fVolumeViewerWidget->SetcrossSectionIndexSide(newVolume->sliceWidth() / 2);
             // fVolumeViewerWidget->SetcrossSectionIndexFront(newVolume->sliceWidth() / 2);
@@ -1051,32 +1049,6 @@ void CWindow::ChangePathItem(std::string segID)
         fSegmentationId = segID;
     }
 
-    if (currentVolume->format() == vc::VolumeFormat::ZARR) {
-        // We are using a ZARR => we potentially need to scale the point cloud to match the ZARR detail level
-
-        auto zarrVol = static_cast<vc::VolumeZARR*>(currentVolume.get());
-        auto scale = zarrVol->getScaleForLevel(zarrVol->getZarrLevel());
-
-        if (scale > 1) {
-            auto tfm = vc::AffineTransform::New();
-            tfm->scale(1 / scale, 1 / scale, 1);
-
-            // std::cout << "Point before: " << fSegStructMap[fSegmentationId].fMasterCloud[20][0] << "|" <<
-            // fSegStructMap[fSegmentationId].fMasterCloud[20][1] << "|"
-            //           << fSegStructMap[fSegmentationId].fMasterCloud[20][2] << std::endl;
-            fSegStructMap[fSegmentationId].fMasterCloud =
-                ApplyTransform(fSegStructMap[fSegmentationId].fMasterCloud, tfm);
-            fSegStructMap[fSegmentationId].fAnnotationCloud =
-                ApplyTransform(fSegStructMap[fSegmentationId].fAnnotationCloud, tfm);
-            // std::cout << "Point after: " << fSegStructMap[fSegmentationId].fMasterCloud[20][0] << "|" <<
-            // fSegStructMap[fSegmentationId].fMasterCloud[20][1] << "|"
-            //           << fSegStructMap[fSegmentationId].fMasterCloud[20][2] << std::endl;
-
-            // Setup needs to run again, to reflect the now scaled point cloud
-            fSegStructMap[fSegmentationId].SetUpCurves();
-        }
-    }
-
     // Only change slices if no other segmentations are being displayed
     bool setPathIndex = true;
     for (auto& seg : fSegStructMap) {
@@ -1749,10 +1721,17 @@ void CWindow::OpenSlice(void)
         prefetchSliceIndex = -1;
         cv.notify_one();
 
+        auto ajustedSlice = fPathOnSliceIndex;
+        if (currentVolume->format() == vc::VolumeFormat::ZARR) {
+            // Adjust the shown slice based on hte chunk level of detail scale
+            auto zarrVol = static_cast<vc::VolumeZARR*>(currentVolume.get());
+            ajustedSlice /= zarrVol->getScaleForLevel(zarrVol->getZarrLevel());
+        }
+
         std::cout << "Rect: " << rect.x() << ", " << rect.y() << ", " << rect.bottomRight().x() << ", "
                   << rect.bottomRight().y() << std::endl;
         aImgMat = currentVolume->getSliceDataDefault(
-            fPathOnSliceIndex, cv::Rect(rect.x(), rect.y(), rect.width(), rect.height()));
+            ajustedSlice, cv::Rect(rect.x(), rect.y(), rect.width(), rect.height()));
     } else {
         aImgMat = cv::Mat::zeros(10, 10, CV_8UC1);
     }
@@ -2118,26 +2097,11 @@ void CWindow::SavePointCloud()
             qDebug() << "Empty cloud or segmentation ID to save for ID " << segStruct.fSegmentationId.c_str();
             continue;
         }
+
         // Try to save point cloud and its annotations to volpkg
         try {
-
-            auto pointCloud = segStruct.fMasterCloud;
-            auto annotationCloud = segStruct.fAnnotationCloud;
-            // If we had applied a scaling factor during loading, revert that now for the saving process
-            if (currentVolume->format() == vc::VolumeFormat::ZARR) {
-                auto zarrVol = static_cast<vc::VolumeZARR*>(currentVolume.get());
-                auto scale = zarrVol->getScaleForLevel(zarrVol->getZarrLevel());
-
-                if (scale > 1) {
-                    auto tfm = vc::AffineTransform::New();
-                    tfm->scale(scale, scale, 1);
-                    pointCloud = ApplyTransform(pointCloud, tfm);
-                    annotationCloud = ApplyTransform(annotationCloud, tfm);
-                }
-            }
-
-            segStruct.fSegmentation->setPointSet(pointCloud);
-            segStruct.fSegmentation->setAnnotationSet(annotationCloud);
+            segStruct.fSegmentation->setPointSet(segStruct.fMasterCloud);
+            segStruct.fSegmentation->setAnnotationSet(segStruct.fAnnotationCloud);
             segStruct.fSegmentation->setVolumeID(segStruct.fOriginalVolumeId);
         } catch (std::exception& e) {
             QMessageBox::warning(
@@ -2991,16 +2955,15 @@ void CWindow::OnLoadAnySlice(int slice)
 
 void CWindow::OnLoadNextSliceShift(int shift)
 {
-    int adjustedShift = shift * sliceIndexScaleFactor;
-    if (fPathOnSliceIndex + adjustedShift >= currentVolume->numSlices()) {
-        adjustedShift = currentVolume->numSlices() - fPathOnSliceIndex - 1;
+    if (fPathOnSliceIndex + shift >= currentVolume->numSlices()) {
+        shift = currentVolume->numSlices() - fPathOnSliceIndex - 1;
     }
 
     if (!fVolumeViewerWidget->CanChangeImage()) {
         statusBar->showMessage(
             tr("Changing slices is deactivated in the Pen Tool!"), 10000);
-    } else if (adjustedShift != 0) {
-        fPathOnSliceIndex += adjustedShift;
+    } else if (shift != 0) {
+        fPathOnSliceIndex += shift;
         OpenSlice();
         SetCurrentCurve(fPathOnSliceIndex);
         UpdateView();
@@ -3011,16 +2974,15 @@ void CWindow::OnLoadNextSliceShift(int shift)
 
 void CWindow::OnLoadPrevSliceShift(int shift)
 {
-    int adjustedShift = shift * sliceIndexScaleFactor;
-    if (fPathOnSliceIndex - adjustedShift < 0) {
-        adjustedShift = fPathOnSliceIndex;
+    if (fPathOnSliceIndex - shift < 0) {
+        shift = fPathOnSliceIndex;
     }
 
     if (!fVolumeViewerWidget->CanChangeImage()) {
         statusBar->showMessage(
             tr("Changing slices is deactivated in the Pen Tool!"), 10000);
-    } else if (adjustedShift != 0) {
-        fPathOnSliceIndex -= adjustedShift;
+    } else if (shift != 0) {
+        fPathOnSliceIndex -= shift;
         OpenSlice();
         SetCurrentCurve(fPathOnSliceIndex);
         UpdateView();
@@ -3118,10 +3080,9 @@ void CWindow::OnZoomChanged()
 
             fVolumeViewerWidget->ScaleImage(newZarrScale / oldZarrScale);
             fVolumeViewerWidget->SetDetailLevel(newLevel);
+            fVolumeViewerWidget->SetDetailScale(newZarrScale);
 
             OnLoadAnySlice(fPathOnSliceIndex);
-
-            // sliceIndexScaleFactor = newZarrScale;
         }
     }
 }

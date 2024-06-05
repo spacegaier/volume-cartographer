@@ -76,6 +76,8 @@ public:
     auto GetImage() const -> QImage* { return fImgQImage; }
     void SetDetailLevel(int level) { detailLevel = level; }
     auto GetDetailLevel() const -> int { return detailLevel; }
+    void SetDetailScale(int scale) { detailScale = scale; }
+    auto GetDetailScale() const -> int { return detailScale; }
 
     void SetRotation(int degress);
     void Rotate(int delta);
@@ -149,6 +151,8 @@ protected:
     int currentRotation{0};
     // Level of shown details (relevant for chunked formats with levels)
     int detailLevel{0};
+    // Detail scale (relevant for chunked formats with levels where we might have to scale the segment curves)
+    int detailScale{1};
 
     // user settings
     bool fCenterOnZoomEnabled;
