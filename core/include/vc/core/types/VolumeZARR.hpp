@@ -80,8 +80,8 @@ public:
         /** @brief Purge the slice cache */
     void cachePurge() const override;
 
-    void* getCacheChunk(z5::types::ShapeType chunkId) const;
     void putCacheChunk(z5::types::ShapeType chunkId, void* chunk) const;
+    void* getCacheChunk(z5::types::ShapeType chunkId) const;
 
     /** Format: X, Y, Z */
     auto getSize(int level) -> cv::Vec3i { return cv::Vec3i(
