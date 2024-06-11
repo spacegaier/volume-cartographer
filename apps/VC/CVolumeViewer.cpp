@@ -254,12 +254,18 @@ void CVolumeViewer::SetImage(const QImage& nSrc)
     }
     fBaseImageItem = fScene->addPixmap(pixmap);
 
-    UpdateOverlay();
     UpdateButtons();
     update();
 }
 
-void CVolumeViewer::setNumSlices(int num)
+void CVolumeViewer::SetImageIndex(int nImageIndex)
+{
+    fImageIndex = nImageIndex;
+    fImageIndexEdit->setValue(nImageIndex);
+    UpdateOverlay();
+}
+
+void CVolumeViewer::SetNumSlices(int num)
 {
     fImageIndexEdit->setMaximum(num);
 }
@@ -437,15 +443,14 @@ void CVolumeViewer::UpdateButtons(void)
 {
     fZoomInBtn->setEnabled(fImgQImage != nullptr && fScaleFactor < 10.0);
     fZoomOutBtn->setEnabled(fImgQImage != nullptr && fScaleFactor > 0.05);
-    fResetBtn->setEnabled(
-        fImgQImage != nullptr && fabs(fScaleFactor - 1.0) > 1e-6);
+    fResetBtn->setEnabled(fImgQImage != nullptr && fabs(fScaleFactor - 1.0) > 1e-6);
     fNextBtn->setEnabled(fImgQImage != nullptr);
     fPrevBtn->setEnabled(fImgQImage != nullptr);
 }
 
 void CVolumeViewer::ScheduleOverlayUpdate()
 {
-    timerOverlayUpdate->start(1000);
+    timerOverlayUpdate->start(20);
 }
 
 void CVolumeViewer::UpdateOverlay()
@@ -463,8 +468,22 @@ void CVolumeViewer::UpdateOverlay()
     fOverlayHandler->updateOverlayData();
     auto data = fOverlayHandler->getOverlayDataForView(fImageIndex);
 
-    const QRect viewportRect(QPoint(fGraphicsView->horizontalScrollBar()->value(), fGraphicsView->verticalScrollBar()->value()), fGraphicsView->viewport()->size());
-    auto sceneRect = fGraphicsView->transform().inverted().mapRect(viewportRect);
+    auto polygon = fGraphicsView->mapToScene(fGraphicsView->viewport()->rect());
+    auto sceneRect = QRect(polygon.at(0).x(), polygon.at(0).y(), polygon.at(2).x() - polygon.at(0).x(), polygon.at(2).y() - polygon.at(0).y());
+
+    // int x = static_cast<int>(std::floor(polygon.at(0).x()));
+    // int y = static_cast<int>(std::floor(polygon.at(0).y()));
+    // int w = std::ceil(polygon.at(2).x() - x);
+    // int h = std::ceil(polygon.at(2).y() - y);
+    
+    // // Load a bit more around the actually needed rect, so we prevent/minimize white bars when panning
+    // auto marginPercent = 0.2;
+    // x -= w * marginPercent;
+    // y -= h * marginPercent;
+    // w += 2 * w * marginPercent; // 2 times, because we also moved x
+    // h += 2 * h * marginPercent; // 2 times, because we also moved y
+    
+    // QRect sceneRect(std::max(0, x), std::max(0, y), w, h);
 
     // auto overlay1 = new COverlayGraphicsItem(fGraphicsView, this);
     // overlay1->setPen(QPen(QColor(80, 100, 210)));
@@ -484,7 +503,7 @@ void CVolumeViewer::UpdateOverlay()
         auto overlay3 = new COverlayGraphicsItem(fGraphicsView, data, sceneRect, this);
         overlay3->setPen(QPen(QColor(180, 90, 120)));
         overlay3->setBrush(QBrush(QColor(200, 110, 140, alpha)));
-        overlay3->setPos(sceneRect.left() + (sceneRect.right() - sceneRect.left()) / 2, sceneRect.top() + (sceneRect.bottom() - sceneRect.top()) / 2);
+        overlay3->setPos(sceneRect.left(), sceneRect.top());
         fScene->addItem(overlay3);
         overlayItems.append(overlay3);
     }

@@ -77,14 +77,9 @@ public:
     auto GetView() -> QGraphicsView* { return fGraphicsView; }
 
     virtual void SetImage(const QImage& nSrc);
-    void SetImageIndex(int nImageIndex)
-    {
-        fImageIndex = nImageIndex;
-        fImageIndexEdit->setValue(nImageIndex);
-        UpdateButtons();
-    }
+    void SetImageIndex(int nImageIndex);
     auto GetImageIndex() const -> int { return fImageIndex; }
-    void setNumSlices(int num);
+    void SetNumSlices(int num);
     void ResetRotation();
     void SetOverlaySettings(COverlayHandler::OverlaySettings settings);
 

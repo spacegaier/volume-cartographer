@@ -15,6 +15,7 @@ class CVolumeViewer;
 class COverlayGraphicsItem;
 
 typedef cv::Vec3i OverlayChunkID;
+typedef std::vector<OverlayChunkID> OverlayChunkIDs;
 typedef std::vector<cv::Vec2d> OverlaySliceData;
 typedef std::vector<cv::Vec3d> OverlayData;
 
@@ -26,6 +27,7 @@ struct cmpOverlayChunkID {
 };
 
 typedef std::map<OverlayChunkID, OverlayData, cmpOverlayChunkID> OverlayChunkData;
+typedef std::map<OverlayChunkID, OverlayData*, cmpOverlayChunkID> OverlayChunkDataRef;
 typedef std::map<OverlayChunkID, std::vector<QString>, cmpOverlayChunkID> OverlayChunkFiles;
 
 class COverlayHandler
@@ -44,15 +46,15 @@ public:
     };
 
     void setOverlaySettings(OverlaySettings overlaySettings);
-    auto determineChunksForView() const -> OverlayChunkData;
+    auto determineChunksForView() const -> OverlayChunkIDs;
     auto determineNotLoadedOverlayFiles() const -> OverlayChunkFiles;
     void loadOverlayData(OverlayChunkFiles files);
     auto getAllOverlayData() const -> OverlayChunkData { return chunkData; }
-    auto getOverlayDataForView() const -> OverlayChunkData;
+    auto getOverlayDataForView() const -> OverlayChunkDataRef;
     auto getOverlayDataForView(int zIndex = -1) const -> OverlaySliceData;
     void updateOverlayData();
 
-    void loadSingleOverlayFile(QString file, OverlayChunkID chunkID, int threadNum) const;
+    void loadSingleOverlayFile(const QString& file, OverlayChunkID chunkID, int threadNum) const;
     void mergeThreadData(OverlayChunkData threadData) const;
 
 protected:

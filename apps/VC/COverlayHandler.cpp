@@ -32,9 +32,9 @@ void COverlayHandler::setOverlaySettings(OverlaySettings overlaySettings)
     settings.chunkSize = 25;
 }
 
-auto COverlayHandler::determineChunksForView() const -> OverlayChunkData
+auto COverlayHandler::determineChunksForView() const -> OverlayChunkIDs
 {
-    OverlayChunkData res;
+    OverlayChunkIDs res;
     
     if (settings.path.isEmpty()) {
         return {};
@@ -42,7 +42,7 @@ auto COverlayHandler::determineChunksForView() const -> OverlayChunkData
 
     // Get the currently displayed region
     auto rect = viewer->GetView()->mapToScene(viewer->GetView()->viewport()->rect());
-
+ 
     auto xIndexStart = std::max(100, roundDownToNearestMultiple((rect.first().x() - 100) / settings.scale, settings.chunkSize) - settings.offset);
     xIndexStart -= settings.chunkSize; // due to the fact that file 000100 contains from -100 to 100, 000125 contains from 0 to 200, 000150 from 100 to 300
     auto yIndexStart = std::max(100, roundDownToNearestMultiple((rect.first().y() - 100) / settings.scale, settings.chunkSize) - settings.offset);
@@ -63,12 +63,7 @@ auto COverlayHandler::determineChunksForView() const -> OverlayChunkData
                 id[settings.yAxis] = y;
                 id[settings.zAxis] = z;
 
-                auto it = chunkData.find(id);
-                if (it != chunkData.end()) {
-                    res[id] = it->second;
-                } else {
-                    res[id] = {};
-                }
+                res.push_back(id);
             }
         }
     }
@@ -86,19 +81,19 @@ auto COverlayHandler::determineNotLoadedOverlayFiles() const -> OverlayChunkFile
     auto absPath = overlayMainFolder.absolutePath();
 
     for (auto chunk : chunks) {
-        if (chunkData.find(chunk.first) == chunkData.end()) {
+        if (chunkData.find(chunk) == chunkData.end()) {
             // TODO:Check if the settings logic for axis really works here
             folder = QStringLiteral("%1")
-                         .arg(chunk.first[settings.yAxis], 6, 10, QLatin1Char('0'))
-                         .append("_" + QStringLiteral("%1").arg(chunk.first[settings.zAxis], 6, 10, QLatin1Char('0')))
-                         .append("_" + QStringLiteral("%1").arg(chunk.first[settings.xAxis], 6, 10, QLatin1Char('0')));
+                         .arg(chunk[settings.yAxis], 6, 10, QLatin1Char('0'))
+                         .append("_" + QStringLiteral("%1").arg(chunk[settings.zAxis], 6, 10, QLatin1Char('0')))
+                         .append("_" + QStringLiteral("%1").arg(chunk[settings.xAxis], 6, 10, QLatin1Char('0')));
 
             QDir overlayFolder(absPath + QDir::separator() + folder);
             QStringList files = overlayFolder.entryList({"*.ply", "*.obj"}, QDir::NoDotAndDotDot | QDir::Files);
 
             for (auto file : files) {
                 file = overlayFolder.path() + QDir::separator() + file;
-                fileList[chunk.first].push_back(file);
+                fileList[chunk].push_back(file);
             }
         }
     }
@@ -126,22 +121,22 @@ void COverlayHandler::loadOverlayData(OverlayChunkFiles chunksToLoad)
         }
     }
 
-    int numThreads = static_cast<int>(std::thread::hardware_concurrency()) - 2;
-    for (int f = 0; f <= fileNames.size(); f += numThreads + 1) {
+    int numThreads = static_cast<int>(std::thread::hardware_concurrency());
+    int jobSize = 5;
+    for (int f = 0; f < fileNames.size(); f += numThreads * jobSize) {
         std::vector<std::thread> threads;
 
-        for (int i = 0; i <= numThreads && (f + i) < fileNames.size(); ++i) {
-            threads.emplace_back(&COverlayHandler::loadSingleOverlayFile, this, fileNames.at(f + i), chunks.at(f + i), i);
+        for (int i = 0; i < numThreads; ++i) {
+            threads.emplace_back([=]() {
+                for (int j = 0; j < jobSize && (f + i * jobSize + j) < fileNames.size(); ++j) {
+                    loadSingleOverlayFile(fileNames.at(f + i * jobSize + j), chunks.at(f + i * jobSize + j), i);
+                }
+            });
         }
 
         for (auto& t : threads) {
             t.join();
         }
-
-        // // Check if prefetching was stopped or slice index changed
-        // if (stopPrefetching.load() || prefetchSliceIndex.load() != currentSliceIndex) {
-        //     break;
-        // }
     }
 
     for (auto threadDataSet : threadData) {
@@ -151,12 +146,12 @@ void COverlayHandler::loadOverlayData(OverlayChunkFiles chunksToLoad)
     }
 }
 
-void COverlayHandler::loadSingleOverlayFile(QString file, OverlayChunkID chunkID, int threadNum) const
+void COverlayHandler::loadSingleOverlayFile(const QString& file, OverlayChunkID chunkID, int threadNum) const
 {
     vc::ITKMesh::Pointer mesh;
     itk::Point<double, 3> point;
 
-    std::cout << file.toStdString() << std::endl;
+    //std::cout << file.toStdString() << std::endl;
     if (file.endsWith(".ply")) {
         volcart::io::PLYReader reader(fs::path(file.toStdString()));
         reader.read();
@@ -208,9 +203,9 @@ void COverlayHandler::updateOverlayData()
     loadOverlayData(determineNotLoadedOverlayFiles());
 }
 
-auto COverlayHandler::getOverlayDataForView() const -> OverlayChunkData
+auto COverlayHandler::getOverlayDataForView() const -> OverlayChunkDataRef
 {
-    OverlayChunkData res;
+    OverlayChunkDataRef res;
     if (chunkData.size() == 0) { 
         return res;
     }
@@ -218,7 +213,7 @@ auto COverlayHandler::getOverlayDataForView() const -> OverlayChunkData
     auto chunks = determineChunksForView();
 
     for (auto chunk : chunks) {
-        res[chunk.first] = chunkData[chunk.first];
+        res[chunk] = &chunkData[chunk];
     }
 
     return res;
@@ -234,7 +229,7 @@ auto COverlayHandler::getOverlayDataForView(int zIndex) const -> OverlaySliceDat
     auto chunks = determineChunksForView();
 
     for (auto chunk : chunks) {
-        for (auto point : chunkData[chunk.first]) {
+        for (auto point : chunkData[chunk]) {
             if (point[settings.zAxis] == zIndex) {
                 res.push_back({point[settings.xAxis], point[settings.yAxis]});
             }

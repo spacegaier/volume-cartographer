@@ -261,7 +261,7 @@ void CWindow::CreateWidgets(void)
             currentVolume = newVolume;
             OnLoadAnySlice(0);
             setDefaultWindowWidth(newVolume);
-            fVolumeViewerWidget->setNumSlices(currentVolume->numSlices());
+            fVolumeViewerWidget->SetNumSlices(currentVolume->numSlices());
             ui.spinBackwardSlice->setMaximum(currentVolume->numSlices() - 1);
             ui.spinForwardSlice->setMaximum(currentVolume->numSlices() - 1);
         });
@@ -642,7 +642,7 @@ void CWindow::CreateActions(void)
     fSavePointCloudAct->setShortcut(QKeySequence::Save);
 
     fAddOverlay = new QAction(style()->standardIcon(QStyle::SP_DialogOpenButton), tr("Add overlay..."), this);
-    connect(fAddOverlay, SIGNAL(triggered()), this, SLOT(ShowOverlayImportDlg()));
+    connect(fAddOverlay, &QAction::triggered, this, [=]() { ShowOverlayImportDlg(); });
 
     fSettingsAct = new QAction(tr("Settings"), this);
     connect(fSettingsAct, SIGNAL(triggered()), this, SLOT(ShowSettings()));
@@ -1906,16 +1906,16 @@ void CWindow::ShowOverlayImportDlg(const QString& path)
     QSettings settings("VC.ini", QSettings::IniFormat);
     auto overlayPath = path;
 
-    // if (overlayPath.isEmpty()) {
-    //     overlayPath = QFileDialog::getOpenFileUrl(
-    //         this, tr("Open overlay file"), settings.value("volpkg/default_path").toString(), "*.ply *.obj", nullptr,
-    //         QFileDialog::DontUseNativeDialog).path();
-    //     // Dialog box cancelled
-    //     if (overlayPath.isEmpty()) {
-    //         vc::Logger()->info("Adding overlay canceled");
-    //         return;
-    //     }
-    // }
+    if (overlayPath.isEmpty()) {
+        overlayPath = QFileDialog::getOpenFileUrl(
+            this, tr("Open overlay file"), settings.value("volpkg/default_path").toString(), "*.ply *.obj", nullptr,
+            QFileDialog::DontUseNativeDialog).path();
+        // Dialog box cancelled
+        if (overlayPath.isEmpty()) {
+            vc::Logger()->info("Adding overlay canceled");
+            return;
+        }
+    }
 
     auto dlg = new QDialog(this);
     auto overlayImportDlg = new Ui::VCOverlayImportDlg();
