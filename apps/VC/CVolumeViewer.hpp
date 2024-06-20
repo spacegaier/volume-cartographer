@@ -39,9 +39,6 @@ class CVolumeViewerView : public QGraphicsView
         void showCurrentScanRange(int range);
         void showCurrentSliceIndex(int slice, bool highlight);
 
-        void updateCurrentRotation(int delta) { currentRotation += delta; }
-        auto getCurrentRotation() -> int { return currentRotation; }
-
     protected:
         bool rangeKeyPressed{false};
         bool curvePanKeyPressed{false};
@@ -50,9 +47,6 @@ class CVolumeViewerView : public QGraphicsView
         QGraphicsTextItem* textAboveCursor;
         QGraphicsRectItem* backgroundBehindText;
         QTimer* timerTextAboveCursor;
-
-        // Required to be able to reset the rotation without also resetting the scaling
-        int currentRotation{0};
 };
 
 class CVolumeViewer : public QWidget
@@ -70,22 +64,25 @@ public:
     QPushButton* fPrevBtn;
     CVolumeViewer(QWidget* parent = 0);
     ~CVolumeViewer(void);
-    virtual void setButtonsEnabled(bool state);
+    virtual void SetButtonsEnabled(bool state);
 
     void SetViewState(EViewState nViewState) { fViewState = nViewState; }
     EViewState GetViewState(void) { return fViewState; }
     auto GetView() -> QGraphicsView* { return fGraphicsView; }
+    virtual void UpdateView() {};
+    void Reset();
 
     virtual void SetImage(const QImage& nSrc);
     void SetImageIndex(int nImageIndex);
     auto GetImageIndex() const -> int { return fImageIndex; }
     void SetNumSlices(int num);
+    void SetRotation(int degress);
+    void Rotate(int delta);
     void ResetRotation();
-    void SetOverlaySettings(COverlayHandler::OverlaySettings settings);
 
+    void SetOverlaySettings(COverlayHandler::OverlaySettings settings);
     void ScheduleOverlayUpdate();
-    void UpdateOverlay();
-    virtual void UpdateView() {};
+    void UpdateOverlay();    
 
 protected:
     bool eventFilter(QObject* watched, QEvent* event);
@@ -96,7 +93,8 @@ public slots:
     void OnResetClicked(void);
     void OnNextClicked(void);
     void OnPrevClicked(void);
-    void OnImageIndexEditTextChanged(void);
+    void OnImageIndexSpinChanged(void);
+    void OnImageRotationSpinChanged(void);
 
 signals:
     void SendSignalOnNextSliceShift(int shift);
@@ -122,7 +120,8 @@ protected:
     QPushButton* fZoomInBtn;
     QPushButton* fZoomOutBtn;
     QPushButton* fResetBtn;
-    QSpinBox* fImageIndexEdit;
+    QSpinBox* fImageIndexSpin;
+    QSpinBox* fImageRotationSpin;
     QHBoxLayout* fButtonsLayout;
 
     // data
@@ -132,10 +131,13 @@ protected:
     int fImageIndex;
     int sliceIndexToolStart{-1};
     int fScanRange;  // how many slices a mouse wheel step will jump
+    // Required to be able to reset the rotation without also resetting the scaling
+    int currentRotation{0};
 
     // user settings
     bool fCenterOnZoomEnabled;
     int fScrollSpeed{-1};
+    bool fSkipImageFormatConv;
 
     QGraphicsPixmapItem* fBaseImageItem;
     QList<COverlayGraphicsItem*> overlayItems;

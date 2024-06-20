@@ -146,14 +146,19 @@ CVolumeViewer::CVolumeViewer(QWidget* parent)
     fNextBtn = new QPushButton(tr("Next Slice"), this);
     fPrevBtn = new QPushButton(tr("Previous Slice"), this);
 
-    // slice index edit
-    fImageIndexEdit = new QSpinBox(this);
-    fImageIndexEdit->setMinimum(0);
-    fImageIndexEdit->setEnabled(true);
-    fImageIndexEdit->setMinimumWidth(100);
-    connect(
-        fImageIndexEdit, SIGNAL(editingFinished()), this,
-        SLOT(OnImageIndexEditTextChanged()));
+    // slice index spin box
+    fImageIndexSpin = new QSpinBox(this);
+    fImageIndexSpin->setMinimum(0);
+    fImageIndexSpin->setEnabled(true);
+    fImageIndexSpin->setMinimumWidth(100);
+    connect(fImageIndexSpin, SIGNAL(editingFinished()), this, SLOT(OnImageIndexSpinChanged()));
+
+    fImageRotationSpin = new QSpinBox(this);
+    fImageRotationSpin->setMinimum(-360);
+    fImageRotationSpin->setMaximum(360);
+    fImageRotationSpin->setSuffix("°");
+    fImageRotationSpin->setEnabled(true);
+    connect(fImageRotationSpin, SIGNAL(editingFinished()), this, SLOT(OnImageRotationSpinChanged()));
 
     fBaseImageItem = nullptr;
 
@@ -179,7 +184,8 @@ CVolumeViewer::CVolumeViewer(QWidget* parent)
     fButtonsLayout->addWidget(fResetBtn);
     fButtonsLayout->addWidget(fPrevBtn);
     fButtonsLayout->addWidget(fNextBtn);
-    fButtonsLayout->addWidget(fImageIndexEdit);
+    fButtonsLayout->addWidget(fImageIndexSpin);
+    fButtonsLayout->addWidget(fImageRotationSpin);
     // Add some space between the slice spin box and the curve tools (color, checkboxes, ...)
     fButtonsLayout->addSpacerItem(new QSpacerItem(1, 0, QSizePolicy::Expanding, QSizePolicy::Fixed));
 
@@ -192,6 +198,7 @@ CVolumeViewer::CVolumeViewer(QWidget* parent)
     QSettings settings("VC.ini", QSettings::IniFormat);
     fCenterOnZoomEnabled = settings.value("viewer/center_on_zoom", false).toInt() != 0;
     fScrollSpeed = settings.value("viewer/scroll_speed", false).toInt();
+    fSkipImageFormatConv = settings.value("perf/chkSkipImageFormatConvExp", false).toBool();
 
     QVBoxLayout* aWidgetLayout = new QVBoxLayout;
     aWidgetLayout->addWidget(fGraphicsView);
@@ -223,16 +230,18 @@ CVolumeViewer::~CVolumeViewer(void)
     deleteNULL(fResetBtn);
     deleteNULL(fPrevBtn);
     deleteNULL(fNextBtn);
-    deleteNULL(fImageIndexEdit);
+    deleteNULL(fImageIndexSpin);
+    deleteNULL(fImageRotationSpin);
 }
 
-void CVolumeViewer::setButtonsEnabled(bool state)
+void CVolumeViewer::SetButtonsEnabled(bool state)
 {
     fZoomOutBtn->setEnabled(state);
     fZoomInBtn->setEnabled(state);
     fPrevBtn->setEnabled(state);
     fNextBtn->setEnabled(state);
-    fImageIndexEdit->setEnabled(state);
+    fImageIndexSpin->setEnabled(state);
+    fImageRotationSpin->setEnabled(state);
 }
 
 void CVolumeViewer::SetImage(const QImage& nSrc)
@@ -244,15 +253,14 @@ void CVolumeViewer::SetImage(const QImage& nSrc)
     }
 
     // Create a QPixmap from the QImage
-    QPixmap pixmap = QPixmap::fromImage(*fImgQImage);
+    QPixmap pixmap = QPixmap::fromImage(*fImgQImage, fSkipImageFormatConv ? Qt::NoFormatConversion : Qt::AutoColor);
 
     // Add the QPixmap to the scene as a QGraphicsPixmapItem
-    if (fBaseImageItem) {
-        // If the item already exists, remove it from the scene
-        fScene->removeItem(fBaseImageItem);
-        delete fBaseImageItem; // Delete the old item
+    if (!fBaseImageItem) {
+        fBaseImageItem = fScene->addPixmap(pixmap);
+    } else {
+        fBaseImageItem->setPixmap(pixmap);
     }
-    fBaseImageItem = fScene->addPixmap(pixmap);
 
     UpdateButtons();
     update();
@@ -261,13 +269,13 @@ void CVolumeViewer::SetImage(const QImage& nSrc)
 void CVolumeViewer::SetImageIndex(int nImageIndex)
 {
     fImageIndex = nImageIndex;
-    fImageIndexEdit->setValue(nImageIndex);
+    fImageIndexSpin->setValue(nImageIndex);
     UpdateOverlay();
 }
 
 void CVolumeViewer::SetNumSlices(int num)
 {
-    fImageIndexEdit->setMaximum(num);
+    fImageIndexSpin->setMaximum(num);
 }
 
 void CVolumeViewer::SetOverlaySettings(COverlayHandler::OverlaySettings overlaySettings)
@@ -328,7 +336,9 @@ bool CVolumeViewer::eventFilter(QObject* watched, QEvent* event)
         else if (fGraphicsView->isRotateKyPressed()) {
             int delta = wheelEvent->angleDelta().y() / 22;
             fGraphicsView->rotate(delta);
-            fGraphicsView->updateCurrentRotation(delta);
+            currentRotation += delta;
+            currentRotation = currentRotation % 360;
+            fImageRotationSpin->setValue(currentRotation);
             return true;
         }
         // View scrolling
@@ -372,11 +382,27 @@ void CVolumeViewer::CenterOn(const QPointF& point)
     fGraphicsView->centerOn(point);
 }
 
+void CVolumeViewer::SetRotation(int degrees)
+{
+    if (currentRotation != degrees) {
+        auto delta = (currentRotation - degrees) * -1;
+        fGraphicsView->rotate(delta);
+        currentRotation += delta;
+        currentRotation = currentRotation % 360;
+        fImageRotationSpin->setValue(currentRotation);
+    }
+}
+
+void CVolumeViewer::Rotate(int delta)
+{
+    SetRotation(currentRotation + delta);
+}
+
 void CVolumeViewer::ResetRotation()
 {
-    auto current = fGraphicsView->getCurrentRotation();
-    fGraphicsView->rotate(-current);
-    fGraphicsView->updateCurrentRotation(-current);
+    fGraphicsView->rotate(-currentRotation);
+    currentRotation = 0;
+    fImageRotationSpin->setValue(currentRotation);
 }
 
 // Handle zoom in click
@@ -399,6 +425,8 @@ void CVolumeViewer::OnResetClicked(void)
 {
     fGraphicsView->resetTransform();
     fScaleFactor = 1.0;
+    currentRotation = 0;
+    fImageRotationSpin->setValue(currentRotation);
 
     UpdateButtons();
 }
@@ -430,12 +458,19 @@ void CVolumeViewer::OnPrevClicked(void)
 }
 
 // Handle image index change
-void CVolumeViewer::OnImageIndexEditTextChanged(void)
+void CVolumeViewer::OnImageIndexSpinChanged(void)
 {
     // send signal to controller in order to update the content
-    if (fImageIndex != fImageIndexEdit->value()) {
-        SendSignalOnLoadAnyImage(fImageIndexEdit->value());
+    if (fImageIndex != fImageIndexSpin->value()) {
+        SendSignalOnLoadAnyImage(fImageIndexSpin->value());
     }
+    SendSignalOnLoadAnyImage(fImageIndexSpin->value());
+}
+
+// Handle image rotation change
+void CVolumeViewer::OnImageRotationSpinChanged(void)
+{
+    SetRotation(fImageRotationSpin->value());
 }
 
 // Update the status of the buttons
@@ -465,8 +500,7 @@ void CVolumeViewer::UpdateOverlay()
     overlayItems.clear();
 
     const int alpha = 120;
-    fOverlayHandler->updateOverlayData();
-    auto data = fOverlayHandler->getOverlayDataForView(fImageIndex);
+    fOverlayHandler->updateOverlayData();    
 
     auto polygon = fGraphicsView->mapToScene(fGraphicsView->viewport()->rect());
     auto sceneRect = QRect(polygon.at(0).x(), polygon.at(0).y(), polygon.at(2).x() - polygon.at(0).x(), polygon.at(2).y() - polygon.at(0).y());
@@ -492,13 +526,17 @@ void CVolumeViewer::UpdateOverlay()
     // fScene->addItem(overlay1);
     // overlayItems.append(overlay1);
 
-    // auto overlay2 = new COverlayGraphicsItem(fGraphicsView, this);
-    // overlay2->setPen(QPen(QColor(140, 100, 160)));
-    // overlay2->setBrush(QBrush(QColor(160, 120, 180, alpha)));
-    // overlay2->setPoints(data[fImageIndex - 1]);
-    // fScene->addItem(overlay2);
-    // overlayItems.append(overlay2);
+    auto dataM1 = fOverlayHandler->getOverlayDataForView(fImageIndex - 1);
+    if (dataM1.size() > 0) {
+        auto overlay2 = new COverlayGraphicsItem(fGraphicsView, dataM1, sceneRect, this);
+        overlay2->setPen(QPen(QColor(140, 100, 160)));
+        overlay2->setBrush(QBrush(QColor(160, 120, 180, alpha)));
+        overlay2->setPos(sceneRect.left(), sceneRect.top());
+        fScene->addItem(overlay2);
+        overlayItems.append(overlay2);
+    }
 
+    auto data = fOverlayHandler->getOverlayDataForView(fImageIndex);
     if (data.size() > 0) {
         auto overlay3 = new COverlayGraphicsItem(fGraphicsView, data, sceneRect, this);
         overlay3->setPen(QPen(QColor(180, 90, 120)));
@@ -508,23 +546,15 @@ void CVolumeViewer::UpdateOverlay()
         overlayItems.append(overlay3);
     }
 
-    // auto pen = QPen(QColor(180, 90, 120));
-    // auto brush = QBrush(QColor(200, 110, 140, alpha));
-    // const int pointWidth = 4;
-    // for (int i = 0; i < data.size(); ++i) {
-    //     // Create new ellipse points
-    //     auto p0 = data[i][0] - pointWidth / 2;
-    //     auto p1 = data[i][1] - pointWidth / 2;
-    //     auto item = fScene->addEllipse(p0, p1, pointWidth, pointWidth, pen, brush);
-    //     //item->setCacheMode(QGraphicsItem::DeviceCoordinateCache);
-    // }
-
-    // auto overlay4 = new COverlayGraphicsItem(fGraphicsView, this);
-    // overlay4->setPen(QPen(QColor(230, 100, 80)));
-    // overlay4->setBrush(QBrush(QColor(250, 120, 100, alpha)));
-    // overlay4->setPoints(data[fImageIndex + 1]);
-    // fScene->addItem(overlay4);
-    // overlayItems.append(overlay4);
+    auto dataP1 = fOverlayHandler->getOverlayDataForView(fImageIndex + 1);
+    if (dataP1.size() > 0) {
+        auto overlay4 = new COverlayGraphicsItem(fGraphicsView, dataP1, sceneRect, this);
+        overlay4->setPen(QPen(QColor(230, 100, 80)));
+        overlay4->setBrush(QBrush(QColor(250, 120, 100, alpha)));
+        overlay4->setPos(sceneRect.left(), sceneRect.top());
+        fScene->addItem(overlay4);
+        overlayItems.append(overlay4);
+    }
 
     // auto overlay5 = new COverlayGraphicsItem(fGraphicsView, this);
     // overlay5->setPen(QPen(QColor(220, 140, 10)));
@@ -532,8 +562,15 @@ void CVolumeViewer::UpdateOverlay()
     // overlay5->setPoints(data[fImageIndex + 2]);
     // fScene->addItem(overlay5);
     // overlayItems.append(overlay5);
+}
 
-    // qApp->processEvents();
-    // update();
-    // fGraphicsView->viewport()->repaint();
+// Reset the viewer
+void CVolumeViewer::Reset()
+{
+    if (fBaseImageItem) {
+        delete fBaseImageItem;
+        fBaseImageItem = nullptr;
+    }
+
+    OnResetClicked(); // to reset zoom
 }

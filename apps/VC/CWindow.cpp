@@ -117,20 +117,20 @@ CWindow::CWindow()
     fSegParams.targetIndex = 5;
     fSegParams.purge_cache = false;
     fSegParams.cache_slices = settings.value("perf/preloaded_slices", 200).toInt();
-    fSegParams.smoothen_by_brightness = 180;
-    fSegParams.outside_threshold = 60;
-    fSegParams.optical_flow_pixel_threshold = 80;
+    fSegParams.smoothen_by_brightness = 100;
+    fSegParams.outside_threshold = 80;
+    fSegParams.optical_flow_pixel_threshold = 50;
     fSegParams.optical_flow_displacement_threshold = 10;
     fSegParams.enable_smoothen_outlier = true;
     fSegParams.enable_edge = false;
     fSegParams.edge_jump_distance = 6;
     fSegParams.edge_bounce_distance = 3;
-    fSegParams.smoothness_interpolation_percent = 30;
+    fSegParams.smoothness_interpolation_percent = 40;
     fSegParams.step_size = 1;
 
     // Process the raw impact and scan ranges string and convert to step vectors
-    impactRangeSteps = SettingsDialog::expandSettingToIntRange(settings.value("viewer/impact_range_steps", "1-20").toString());
-    scanRangeSteps = SettingsDialog::expandSettingToIntRange(settings.value("viewer/scan_range_steps", "1, 2, 5, 10, 20, 50, 100").toString());
+    impactRangeSteps = SettingsDialog::expandSettingToIntRange(settings.value("viewer/impact_range_steps", "1-3, 5, 8, 11, 15, 20, 28, 40, 60, 100, 200").toString());
+    scanRangeSteps = SettingsDialog::expandSettingToIntRange(settings.value("viewer/scan_range_steps", "1, 2, 5, 10, 20, 50, 100, 200, 500, 1000").toString());
 
     // create UI widgets
     CreateWidgets();
@@ -141,18 +141,32 @@ CWindow::CWindow()
     UpdateRecentVolpkgActions();
     CreateBackend();
 
-    // stylesheets
-    const auto style = "QMenuBar { background: qlineargradient( x0:0 y0:0, x1:1 y1:0, stop:0 rgb(85, 110, 200), stop:0.8 rgb(255, 120, 110), stop:1 rgb(255, 180, 30)); }"
-        "QMenuBar::item { background: transparent; }"
-        "QMenuBar::item:selected { background: rgb(255, 200, 50); }"
-        "QWidget#dockWidgetVolumesContent { background: rgb(245, 245, 255); }"
-        "QWidget#dockWidgetSegmentationContent { background: rgb(245, 245, 255); }"
-        "QWidget#dockWidgetAnnotationsContent { background: rgb(245, 245, 255); }"
-        "QDockWidget::title { padding-top: 6px; background: rgb(205, 210, 240); }"
-        "QTabBar::tab { background: rgb(205, 210, 240); }"
-        "QWidget#tabSegment { background: rgb(245, 245, 255); }"
-        "QRadioButton:disabled { color: gray; }";
-    setStyleSheet(style);
+    if (QGuiApplication::styleHints()->colorScheme() == Qt::ColorScheme::Dark) {
+        // stylesheet
+        const auto style = "QMenuBar { background: qlineargradient( x0:0 y0:0, x1:1 y1:0, stop:0 rgb(55, 80, 170), stop:0.8 rgb(225, 90, 80), stop:1 rgb(225, 150, 0)); }"
+            "QMenuBar::item { background: transparent; }"
+            "QMenuBar::item:selected { background: rgb(235, 180, 30); }"
+            "QWidget#dockWidgetVolumesContent { background: rgb(55, 55, 55); }"
+            "QWidget#dockWidgetSegmentationContent { background: rgb(55, 55, 55); }"
+            "QWidget#dockWidgetAnnotationsContent { background: rgb(55, 55, 55); }"
+            "QDockWidget::title { padding-top: 6px; background: rgb(60, 60, 75); }"
+            "QTabBar::tab { background: rgb(60, 60, 75); }"
+            "QWidget#tabSegment { background: rgb(55, 55, 55); }";
+        setStyleSheet(style);
+    } else {
+        // stylesheet
+        const auto style = "QMenuBar { background: qlineargradient( x0:0 y0:0, x1:1 y1:0, stop:0 rgb(85, 110, 200), stop:0.8 rgb(255, 120, 110), stop:1 rgb(255, 180, 30)); }"
+            "QMenuBar::item { background: transparent; }"
+            "QMenuBar::item:selected { background: rgb(255, 200, 50); }"
+            "QWidget#dockWidgetVolumesContent { background: rgb(245, 245, 255); }"
+            "QWidget#dockWidgetSegmentationContent { background: rgb(245, 245, 255); }"
+            "QWidget#dockWidgetAnnotationsContent { background: rgb(245, 245, 255); }"
+            "QDockWidget::title { padding-top: 6px; background: rgb(205, 210, 240); }"
+            "QTabBar::tab { background: rgb(205, 210, 240); }"
+            "QWidget#tabSegment { background: rgb(245, 245, 255); }"
+            "QRadioButton:disabled { color: gray; }";
+        setStyleSheet(style);
+    }
 
     OpenSlice();
     UpdateView();
@@ -318,18 +332,18 @@ void CWindow::CreateWidgets(void)
     auto* edtOutsideThreshold = new QSpinBox();
     edtOutsideThreshold->setMinimum(0);
     edtOutsideThreshold->setMaximum(255);
-    edtOutsideThreshold->setValue(60);
+    edtOutsideThreshold->setValue(80);
     auto* edtOpticalFlowPixelThreshold = new QSpinBox();
     edtOpticalFlowPixelThreshold->setMinimum(0);
     edtOpticalFlowPixelThreshold->setMaximum(255);
-    edtOpticalFlowPixelThreshold->setValue(80);
+    edtOpticalFlowPixelThreshold->setValue(50);
     auto* edtOpticalFlowDisplacementThreshold = new QSpinBox();
     edtOpticalFlowDisplacementThreshold->setMinimum(0);
     edtOpticalFlowDisplacementThreshold->setValue(10);
     auto* edtSmoothenPixelThreshold = new QSpinBox();
     edtSmoothenPixelThreshold->setMinimum(0);
     edtSmoothenPixelThreshold->setMaximum(256);
-    edtSmoothenPixelThreshold->setValue(180);
+    edtSmoothenPixelThreshold->setValue(100);
     auto* chkEnableSmoothenOutlier = new QCheckBox(tr("Smoothen Outlier Points"));
     chkEnableSmoothenOutlier->setChecked(true);
     auto* chkEnableEdgeDetection = new QCheckBox(tr("Enable Edge Detection"));
@@ -344,7 +358,7 @@ void CWindow::CreateWidgets(void)
     edtInterpolationPercent = new QSpinBox();
     edtInterpolationPercent->setMinimum(0);
     edtInterpolationPercent->setMaximum(100);
-    edtInterpolationPercent->setValue(30);
+    edtInterpolationPercent->setValue(40);
     auto* chkPurgeCache = new QCheckBox(tr("Purge Cache"));
     chkPurgeCache->setChecked(false);
     auto* edtCacheSize = new QSpinBox();
@@ -375,18 +389,18 @@ void CWindow::CreateWidgets(void)
     opticalFlowParamsLayout->addWidget(edtOutsideThreshold);
     opticalFlowParamsLayout->addWidget(new QLabel(tr("Smoothen Curve at Bright Points")));
     opticalFlowParamsLayout->addWidget(edtSmoothenPixelThreshold);
-    opticalFlowParamsLayout->addWidget(chkEnableSmoothenOutlier);
-    opticalFlowParamsLayout->addWidget(chkEnableEdgeDetection);
-    opticalFlowParamsLayout->addWidget(new QLabel(tr("Edge Max Jump Distance")));
-    opticalFlowParamsLayout->addWidget(edtEdgeJumpDistance);
-    opticalFlowParamsLayout->addWidget(new QLabel(tr("Edge Bounce Distance")));
-    opticalFlowParamsLayout->addWidget(edtEdgeBounceDistance);
+    opticalFlowParamsLayout->addWidget(chkEnableSmoothenOutlier);    
     lblInterpolationPercent = new QLabel(tr("Interpolation Percent"));
     opticalFlowParamsLayout->addWidget(lblInterpolationPercent);
     opticalFlowParamsLayout->addWidget(edtInterpolationPercent);
     opticalFlowParamsLayout->addWidget(chkPurgeCache);
     opticalFlowParamsLayout->addWidget(new QLabel(tr("Maximum Cache Size")));
     opticalFlowParamsLayout->addWidget(edtCacheSize);
+    opticalFlowParamsLayout->addWidget(chkEnableEdgeDetection);
+    opticalFlowParamsLayout->addWidget(new QLabel(tr("Edge Max Jump Distance")));
+    opticalFlowParamsLayout->addWidget(edtEdgeJumpDistance);
+    opticalFlowParamsLayout->addWidget(new QLabel(tr("Edge Bounce Distance")));
+    opticalFlowParamsLayout->addWidget(edtEdgeBounceDistance);
 
     ui.segParamsStack->addWidget(opticalFlowParamsContainer);
     // set the default segmentation method as Optical Flow Segmentation
@@ -405,25 +419,14 @@ void CWindow::CreateWidgets(void)
     fEdtWindowWidth->setMinimum(3);
     fEdtWindowWidth->setValue(5);
     fOptIncludeMiddle = this->findChild<QCheckBox*>("includeMiddleOpt");
-    connect(
-        fEdtAlpha, SIGNAL(editingFinished()), this,
-        SLOT(OnEdtAlphaValChange()));
-    connect(
-        fEdtBeta, SIGNAL(editingFinished()), this, SLOT(OnEdtBetaValChange()));
-    connect(
-        fEdtDelta, SIGNAL(editingFinished()), this,
-        SLOT(OnEdtDeltaValChange()));
+    connect(fEdtAlpha, SIGNAL(editingFinished()), this, SLOT(OnEdtAlphaValChange()));
+    connect(fEdtBeta, SIGNAL(editingFinished()), this, SLOT(OnEdtBetaValChange()));
+    connect(fEdtDelta, SIGNAL(editingFinished()), this, SLOT(OnEdtDeltaValChange()));
     connect(fEdtK1, SIGNAL(editingFinished()), this, SLOT(OnEdtK1ValChange()));
     connect(fEdtK2, SIGNAL(editingFinished()), this, SLOT(OnEdtK2ValChange()));
-    connect(
-        fEdtDistanceWeight, SIGNAL(editingFinished()), this,
-        SLOT(OnEdtDistanceWeightChange()));
-    connect(
-        fEdtWindowWidth, &QSpinBox::valueChanged, this,
-        &CWindow::OnEdtWindowWidthChange);
-    connect(
-        fOptIncludeMiddle, SIGNAL(clicked(bool)), this,
-        SLOT(OnOptIncludeMiddleClicked(bool)));
+    connect(fEdtDistanceWeight, SIGNAL(editingFinished()), this, SLOT(OnEdtDistanceWeightChange()));
+    connect(fEdtWindowWidth, &QSpinBox::valueChanged, this, &CWindow::OnEdtWindowWidthChange);
+    connect(fOptIncludeMiddle, SIGNAL(clicked(bool)), this, SLOT(OnOptIncludeMiddleClicked(bool)));
 
     ui.spinBackwardSlice->setMinimum(0);
     ui.spinBackwardSlice->setEnabled(false);
@@ -450,11 +453,11 @@ void CWindow::CreateWidgets(void)
     fEdtImpactRng->setValue(impactRangeSteps.size() / 2);
 
     ui.btnEvenlySpacePoints->setDisabled(true);
-    // Add both Y and Z to account for QWERZT and QWERTY keyboard.
+    // Add both Y, Z and V to account for QWERZT and QWERTY keyboards.
     // Long-term, a more flexible and robust setup would be good
     // in general, to also account for AZERTY and others.
     auto action = new QAction(this);
-    action->setShortcuts({Qt::Key_Y, Qt::Key_Z});
+    action->setShortcuts({Qt::Key_Y, Qt::Key_Z, Qt::Key_V});
     addAction(action);
     auto button = ui.btnEvenlySpacePoints;
     connect(action, &QAction::triggered, [button]() {
@@ -481,12 +484,12 @@ void CWindow::CreateWidgets(void)
     penToolShortcut = new QShortcut(QKeySequence(Qt::Key_P), this);
     prev1 = new QShortcut(QKeySequence(Qt::Key_1), this);
     next1 = new QShortcut(QKeySequence(Qt::Key_2), this);
-    prev2 = new QShortcut(QKeySequence(Qt::Key_3), this);
-    next2 = new QShortcut(QKeySequence(Qt::Key_4), this);
-    prev5 = new QShortcut(QKeySequence(Qt::Key_5), this);
-    next5 = new QShortcut(QKeySequence(Qt::Key_6), this);
-    prev10 = new QShortcut(QKeySequence(Qt::Key_7), this);
-    next10 = new QShortcut(QKeySequence(Qt::Key_8), this);
+    prev5 = new QShortcut(QKeySequence(Qt::Key_3), this);
+    next5 = new QShortcut(QKeySequence(Qt::Key_4), this);
+    prev10 = new QShortcut(QKeySequence(Qt::Key_5), this);
+    next10 = new QShortcut(QKeySequence(Qt::Key_6), this);
+    prev50 = new QShortcut(QKeySequence(Qt::Key_7), this);
+    next50 = new QShortcut(QKeySequence(Qt::Key_8), this);
     prev100 = new QShortcut(QKeySequence(Qt::Key_9), this);
     next100 = new QShortcut(QKeySequence(Qt::Key_0), this);
     prevSelectedId = new QShortcut(QKeySequence(Qt::Key_K), this);
@@ -497,6 +500,9 @@ void CWindow::CreateWidgets(void)
     returnToEditSlice = new QShortcut(QKeySequence(Qt::Key_F), this);
     toggleAnchor = new QShortcut(QKeySequence(Qt::Key_L), this);
     resetRotation = new QShortcut(QKeySequence(Qt::Key_X), this);
+    resetRotationAlternative = new QShortcut(QKeySequence(Qt::Key_I), this);
+    rotateCW = new QShortcut(QKeySequence(Qt::Key_O), this);
+    rotateCCW = new QShortcut(QKeySequence(Qt::Key_U), this);
 
     connect(
         slicePrev, &QShortcut::activated, fVolumeViewerWidget,
@@ -522,46 +528,16 @@ void CWindow::CreateWidgets(void)
     connect(impactDwn_old, &QShortcut::activated, this, &CWindow::onImpactRangeDown);
     connect(segmentationToolShortcut, &QShortcut::activated, this, &CWindow::ActivateSegmentationTool);
     connect(penToolShortcut, &QShortcut::activated, this, &CWindow::ActivatePenTool);
-    connect(next1, &QShortcut::activated, [this]() {
-        int shift = 1;
-        OnLoadNextSliceShift(shift);
-    });
-    connect(prev1, &QShortcut::activated, [this]() {
-        int shift = 1;
-        OnLoadPrevSliceShift(shift);
-    });
-    connect(next2, &QShortcut::activated, [this]() {
-        int shift = 2;
-        OnLoadNextSliceShift(shift);
-    });
-    connect(prev2, &QShortcut::activated, [this]() {
-        int shift = 2;
-        OnLoadPrevSliceShift(shift);
-    });
-    connect(next5, &QShortcut::activated, [this]() {
-        int shift = 5;
-        OnLoadNextSliceShift(shift);
-    });
-    connect(prev5, &QShortcut::activated, [this]() {
-        int shift = 5;
-        OnLoadPrevSliceShift(shift);
-    });
-    connect(next10, &QShortcut::activated, [this]() {
-        int shift = 10;
-        OnLoadNextSliceShift(shift);
-    });
-    connect(prev10, &QShortcut::activated, [this]() {
-        int shift = 10;
-        OnLoadPrevSliceShift(shift);
-    });
-    connect(next100, &QShortcut::activated, [this]() {
-        int shift = 100;
-        OnLoadNextSliceShift(shift);
-    });
-    connect(prev100, &QShortcut::activated, [this]() {
-        int shift = 100;
-        OnLoadPrevSliceShift(shift);
-    });
+    connect(next1, &QShortcut::activated, [this]() { OnLoadNextSliceShift(1); });
+    connect(prev1, &QShortcut::activated, [this]() { OnLoadPrevSliceShift(1); });
+    connect(next5, &QShortcut::activated, [this]() { OnLoadNextSliceShift(5); });
+    connect(prev5, &QShortcut::activated, [this]() { OnLoadPrevSliceShift(5); });
+    connect(next10, &QShortcut::activated, [this]() { OnLoadNextSliceShift(10); });
+    connect(prev10, &QShortcut::activated, [this]() { OnLoadPrevSliceShift(10); });
+    connect(next50, &QShortcut::activated, [this]() { OnLoadNextSliceShift(50); });
+    connect(prev50, &QShortcut::activated, [this]() { OnLoadPrevSliceShift(50); });
+    connect(next100, &QShortcut::activated, [this]() { OnLoadNextSliceShift(100); });
+    connect(prev100, &QShortcut::activated, [this]() { OnLoadPrevSliceShift(100); });
     connect(prevSelectedId, &QShortcut::activated, this, &CWindow::PreviousSelectedId);
     connect(nextSelectedId, &QShortcut::activated, this, &CWindow::NextSelectedId);
     connect(goToSlice, &QShortcut::activated, this, &CWindow::ShowGoToSliceDlg);
@@ -570,6 +546,9 @@ void CWindow::CreateWidgets(void)
     connect(returnToEditSlice, &QShortcut::activated, this, &CWindow::ReturnToEditSlice);
     connect(toggleAnchor, &QShortcut::activated, this, &CWindow::ToggleAnchor);
     connect(resetRotation, &QShortcut::activated, fVolumeViewerWidget, &CVolumeViewer::ResetRotation);
+    connect(resetRotationAlternative, &QShortcut::activated, fVolumeViewerWidget, &CVolumeViewer::ResetRotation);
+    connect(rotateCW, &QShortcut::activated, fVolumeViewerWidget, [this]() { fVolumeViewerWidget->Rotate(5); });
+    connect(rotateCCW, &QShortcut::activated, fVolumeViewerWidget, [this]() { fVolumeViewerWidget->Rotate(-5); });
 }
 
 // Create menus
@@ -803,7 +782,7 @@ void CWindow::setWidgetsEnabled(bool state)
     this->findChild<QPushButton*>("btnSegTool")->setEnabled(state);
     this->findChild<QPushButton*>("btnPenTool")->setEnabled(state);
     this->findChild<QGroupBox*>("grpEditing")->setEnabled(state);
-    fVolumeViewerWidget->setButtonsEnabled(state);
+    fVolumeViewerWidget->SetButtonsEnabled(state);
 }
 
 auto CWindow::InitializeVolumePkg(const std::string& nVpkgPath) -> bool
@@ -1818,7 +1797,7 @@ void CWindow::OpenVolume(const QString& path)
             "The selected file is not of the correct type: \".volpkg\"");
         vc::Logger()->error(
             "Selected file is not .volpkg: {}", aVpkgPath.toStdString());
-        fVpkg = nullptr;  // Is need for User Experience, clears screen.
+        fVpkg = nullptr;  // Is needed for User Experience, clears screen.
         return;
     }
 
@@ -1852,7 +1831,9 @@ void CWindow::OpenVolume(const QString& path)
     }
     QStringList volIds;
     for (const auto& id : fVpkg->volumeIDs()) {
-        volSelect->addItem(QString("%1 (%2)").arg(QString::fromStdString(id)).arg(QString::fromStdString(fVpkg->volume(id)->name())), QVariant(QString::fromStdString(id)));
+        volSelect->addItem(
+            QString("%1 (%2)").arg(QString::fromStdString(id)).arg(QString::fromStdString(fVpkg->volume(id)->name())),
+            QVariant(QString::fromStdString(id)));
     }
 
     UpdateRecentVolpkgList(aVpkgPath);
@@ -1868,6 +1849,7 @@ void CWindow::CloseVolume(void)
     fSegTool->setChecked(false);                   // Reset Segmentation Tool Button
     ui.chkDisplayAll->setChecked(false);
     ui.chkComputeAll->setChecked(false);
+    fVolumeViewerWidget->Reset();
     ResetPointCloud();
     OpenSlice();
     InitPathList();
@@ -1951,9 +1933,9 @@ void CWindow::Keybindings(void)
         "Q,E: Slice scan range down/up (mouse wheel scanning) \n"
         "Arrow Left/Right: Slice down/up by 1 \n"
         "1,2: Slice down/up by 1 \n"
-        "3,4: Slice down/up by 2 \n"
-        "5,6: Slice down/up by 5 \n"
-        "7,8: Slice down/up by 10 \n"
+        "3,4: Slice down/up by 5 \n"
+        "5,6: Slice down/up by 10 \n"
+        "7,8: Slice down/up by 50 \n"
         "9,0: Slice down/up by 100 \n"
         "Ctrl+G: Go to slice (opens dialog to insert slice index) \n"
         "T: Segmentation Tool \n"
@@ -1964,8 +1946,10 @@ void CWindow::Keybindings(void)
         "K: Highlight Previous Curve that is selected for computation \n"
         "F: Return to slice that the currently active tool was started on \n"
         "L: Mark/unmark current slice as anchor (only in Segmentation Tool) \n"
-        "Y/Z: Evenly space Points on Curve (only in Segmentation Tool) \n"
-        "Z: Reset view rotation back to zero \n"
+        "Y/Z/V: Evenly space Points on Curve (only in Segmentation Tool) \n"
+        "U: Rotate view counterclockwise \n"
+        "O: Rotate view clockwise \n"
+        "X/I: Reset view rotation back to zero \n"
         "\n"
         "Mouse: \n"
         "------------------- \n"
@@ -2893,7 +2877,7 @@ void CWindow::onImpactRangeDown(void)
 // Handle loading any slice
 void CWindow::OnLoadAnySlice(int slice)
 {
-    if (slice >= 0 && slice < currentVolume->numSlices()) {
+    if (slice >= 0 && currentVolume && slice < currentVolume->numSlices()) {
         fPathOnSliceIndex = slice;
         OpenSlice();
         SetCurrentCurve(fPathOnSliceIndex);
