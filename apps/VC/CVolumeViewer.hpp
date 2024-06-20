@@ -138,6 +138,7 @@ protected:
     bool fCenterOnZoomEnabled;
     int fScrollSpeed{-1};
     bool fSkipImageFormatConv;
+    bool fOverlaySliceNeighbor;
 
     QGraphicsPixmapItem* fBaseImageItem;
     QList<COverlayGraphicsItem*> overlayItems;

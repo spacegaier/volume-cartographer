@@ -199,6 +199,7 @@ CVolumeViewer::CVolumeViewer(QWidget* parent)
     fCenterOnZoomEnabled = settings.value("viewer/center_on_zoom", false).toInt() != 0;
     fScrollSpeed = settings.value("viewer/scroll_speed", false).toInt();
     fSkipImageFormatConv = settings.value("perf/chkSkipImageFormatConvExp", false).toBool();
+    fOverlaySliceNeighbor = settings.value("overlay/slice_neighbor", false).toBool();
 
     QVBoxLayout* aWidgetLayout = new QVBoxLayout;
     aWidgetLayout->addWidget(fGraphicsView);
@@ -519,49 +520,37 @@ void CVolumeViewer::UpdateOverlay()
     
     // QRect sceneRect(std::max(0, x), std::max(0, y), w, h);
 
-    // auto overlay1 = new COverlayGraphicsItem(fGraphicsView, this);
-    // overlay1->setPen(QPen(QColor(80, 100, 210)));
-    // overlay1->setBrush(QBrush(QColor(100, 120, 230, alpha)));
-    // overlay1->setPoints(data[fImageIndex - 2]);
-    // fScene->addItem(overlay1);
-    // overlayItems.append(overlay1);
+    if (fOverlaySliceNeighbor) {
+        auto dataM1 = fOverlayHandler->getOverlayDataForView(fImageIndex - 1);
+        if (dataM1.size() > 0) {
+            auto overlayM1 = new COverlayGraphicsItem(fGraphicsView, dataM1, sceneRect, this);
+            overlayM1->setPen(QPen(QColor(220, 140, 10)));
+            overlayM1->setBrush(QBrush(QColor(255, 170, 30, alpha)));        
+            overlayM1->setPos(sceneRect.left(), sceneRect.top());
+            fScene->addItem(overlayM1);
+            overlayItems.append(overlayM1);
+        }    
 
-    auto dataM1 = fOverlayHandler->getOverlayDataForView(fImageIndex - 1);
-    if (dataM1.size() > 0) {
-        auto overlay2 = new COverlayGraphicsItem(fGraphicsView, dataM1, sceneRect, this);
-        overlay2->setPen(QPen(QColor(140, 100, 160)));
-        overlay2->setBrush(QBrush(QColor(160, 120, 180, alpha)));
-        overlay2->setPos(sceneRect.left(), sceneRect.top());
-        fScene->addItem(overlay2);
-        overlayItems.append(overlay2);
+        auto dataP1 = fOverlayHandler->getOverlayDataForView(fImageIndex + 1);
+        if (dataP1.size() > 0) {
+            auto overlayP1 = new COverlayGraphicsItem(fGraphicsView, dataP1, sceneRect, this);
+            overlayP1->setPen(QPen(QColor(80, 100, 210)));
+            overlayP1->setBrush(QBrush(QColor(100, 120, 230, alpha)));
+            overlayP1->setPos(sceneRect.left(), sceneRect.top());
+            fScene->addItem(overlayP1);
+            overlayItems.append(overlayP1);
+        }
     }
 
     auto data = fOverlayHandler->getOverlayDataForView(fImageIndex);
     if (data.size() > 0) {
-        auto overlay3 = new COverlayGraphicsItem(fGraphicsView, data, sceneRect, this);
-        overlay3->setPen(QPen(QColor(180, 90, 120)));
-        overlay3->setBrush(QBrush(QColor(200, 110, 140, alpha)));
-        overlay3->setPos(sceneRect.left(), sceneRect.top());
-        fScene->addItem(overlay3);
-        overlayItems.append(overlay3);
+        auto overlay = new COverlayGraphicsItem(fGraphicsView, data, sceneRect, this);
+        overlay->setPen(QPen(QColor(230, 100, 80)));
+        overlay->setBrush(QBrush(QColor(250, 120, 100, alpha)));
+        overlay->setPos(sceneRect.left(), sceneRect.top());
+        fScene->addItem(overlay);
+        overlayItems.append(overlay);
     }
-
-    auto dataP1 = fOverlayHandler->getOverlayDataForView(fImageIndex + 1);
-    if (dataP1.size() > 0) {
-        auto overlay4 = new COverlayGraphicsItem(fGraphicsView, dataP1, sceneRect, this);
-        overlay4->setPen(QPen(QColor(230, 100, 80)));
-        overlay4->setBrush(QBrush(QColor(250, 120, 100, alpha)));
-        overlay4->setPos(sceneRect.left(), sceneRect.top());
-        fScene->addItem(overlay4);
-        overlayItems.append(overlay4);
-    }
-
-    // auto overlay5 = new COverlayGraphicsItem(fGraphicsView, this);
-    // overlay5->setPen(QPen(QColor(220, 140, 10)));
-    // overlay5->setBrush(QBrush(QColor(255, 170, 30, alpha)));
-    // overlay5->setPoints(data[fImageIndex + 2]);
-    // fScene->addItem(overlay5);
-    // overlayItems.append(overlay5);
 }
 
 // Reset the viewer
