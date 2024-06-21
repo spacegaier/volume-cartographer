@@ -20,7 +20,7 @@ COverlayGraphicsItem::COverlayGraphicsItem(QGraphicsView* graphicsView, OverlayS
 
 void COverlayGraphicsItem::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget)
 {
-    const int pointWidth = 2;
+    const int pointWidth = 1;
 
     painter->setPen(pen);
     painter->setBrush(brush);

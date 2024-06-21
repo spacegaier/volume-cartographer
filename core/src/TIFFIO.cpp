@@ -75,13 +75,13 @@ auto tio::ReadTIFF(const volcart::filesystem::path& path) -> cv::Mat
 {
     // Make sure input file exists
     if (!fs::exists(path)) {
-        throw IOException("File does not exist");
+        throw IOException("File does not exist: " + path.string());
     }
 
     // Open the file read-only
     lt::TIFF* tif = lt::TIFFOpen(path.c_str(), "rc");
     if (tif == nullptr) {
-        throw IOException("Failed to open TIFF");
+        throw IOException("Failed to open TIFF: " + path.string());
     }
 
     // Get metadata

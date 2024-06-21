@@ -486,66 +486,53 @@ void CVolumeViewer::UpdateButtons(void)
 
 void CVolumeViewer::ScheduleOverlayUpdate()
 {
-    timerOverlayUpdate->start(20);
+    timerOverlayUpdate->start(200);
 }
 
 void CVolumeViewer::UpdateOverlay()
 { 
-    // if (isPanning()) {
-    //     return;
-    // }
     for (auto overlay : overlayItems) {
         fScene->removeItem(overlay);
         delete overlay;
     }
     overlayItems.clear();
 
-    const int alpha = 120;
+    const int alpha = 50;
     fOverlayHandler->updateOverlayData();    
 
     auto polygon = fGraphicsView->mapToScene(fGraphicsView->viewport()->rect());
     auto sceneRect = QRect(polygon.at(0).x(), polygon.at(0).y(), polygon.at(2).x() - polygon.at(0).x(), polygon.at(2).y() - polygon.at(0).y());
 
-    // int x = static_cast<int>(std::floor(polygon.at(0).x()));
-    // int y = static_cast<int>(std::floor(polygon.at(0).y()));
-    // int w = std::ceil(polygon.at(2).x() - x);
-    // int h = std::ceil(polygon.at(2).y() - y);
-    
-    // // Load a bit more around the actually needed rect, so we prevent/minimize white bars when panning
-    // auto marginPercent = 0.2;
-    // x -= w * marginPercent;
-    // y -= h * marginPercent;
-    // w += 2 * w * marginPercent; // 2 times, because we also moved x
-    // h += 2 * h * marginPercent; // 2 times, because we also moved y
-    
-    // QRect sceneRect(std::max(0, x), std::max(0, y), w, h);
-
     if (fOverlaySliceNeighbor) {
-        auto dataM1 = fOverlayHandler->getOverlayDataForView(fImageIndex - 1);
-        if (dataM1.size() > 0) {
-            auto overlayM1 = new COverlayGraphicsItem(fGraphicsView, dataM1, sceneRect, this);
-            overlayM1->setPen(QPen(QColor(220, 140, 10)));
-            overlayM1->setBrush(QBrush(QColor(255, 170, 30, alpha)));        
-            overlayM1->setPos(sceneRect.left(), sceneRect.top());
-            fScene->addItem(overlayM1);
-            overlayItems.append(overlayM1);
-        }    
+        if (fImageIndex >= 1) {
+            auto dataM1 = fOverlayHandler->getOverlayDataForView(fImageIndex - 1);
+            if (dataM1.size() > 0) {
+                auto overlayM1 = new COverlayGraphicsItem(fGraphicsView, dataM1, sceneRect, this);
+                overlayM1->setPen(QPen(QColor(220, 120, 40, alpha)));
+                overlayM1->setBrush(QBrush(QColor(255, 150, 70, alpha)));        
+                overlayM1->setPos(sceneRect.left(), sceneRect.top());
+                fScene->addItem(overlayM1);
+                overlayItems.append(overlayM1);
+            }   
+        } 
 
-        auto dataP1 = fOverlayHandler->getOverlayDataForView(fImageIndex + 1);
-        if (dataP1.size() > 0) {
-            auto overlayP1 = new COverlayGraphicsItem(fGraphicsView, dataP1, sceneRect, this);
-            overlayP1->setPen(QPen(QColor(80, 100, 210)));
-            overlayP1->setBrush(QBrush(QColor(100, 120, 230, alpha)));
-            overlayP1->setPos(sceneRect.left(), sceneRect.top());
-            fScene->addItem(overlayP1);
-            overlayItems.append(overlayP1);
+        if (fImageIndex < fImageIndexSpin->maximum() - 1) {
+            auto dataP1 = fOverlayHandler->getOverlayDataForView(fImageIndex + 1);
+            if (dataP1.size() > 0) {
+                auto overlayP1 = new COverlayGraphicsItem(fGraphicsView, dataP1, sceneRect, this);
+                overlayP1->setPen(QPen(QColor(150, 90, 140, alpha)));
+                overlayP1->setBrush(QBrush(QColor(180, 120, 170, alpha)));
+                overlayP1->setPos(sceneRect.left(), sceneRect.top());
+                fScene->addItem(overlayP1);
+                overlayItems.append(overlayP1);
+            }
         }
     }
 
     auto data = fOverlayHandler->getOverlayDataForView(fImageIndex);
     if (data.size() > 0) {
         auto overlay = new COverlayGraphicsItem(fGraphicsView, data, sceneRect, this);
-        overlay->setPen(QPen(QColor(230, 100, 80)));
+        overlay->setPen(QPen(QColor(230, 100, 80, alpha)));
         overlay->setBrush(QBrush(QColor(250, 120, 100, alpha)));
         overlay->setPos(sceneRect.left(), sceneRect.top());
         fScene->addItem(overlay);

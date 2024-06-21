@@ -191,7 +191,6 @@ void CVolumeViewerWithCurve::UpdateView()
     }
 
     if (showCurve) {
-        // qDebug() << "showCurve";
         DrawIntersectionCurve(fScene);
     }
 
@@ -636,7 +635,8 @@ void CVolumeViewerWithCurve::DrawIntersectionCurve(QGraphicsScene* scene)
                 brushColor = brushColor.darker(150);
             }
 
-            scene->addEllipse(p0, p1, 2, 2, QPen(penColor), QBrush(brushColor));
+            auto item = scene->addEllipse(p0, p1, 2, 2, QPen(penColor), QBrush(brushColor));
+            item->setZValue(50);
         }
     }
 }
@@ -653,7 +653,8 @@ void CVolumeViewerWithCurve::DrawControlPoints(QGraphicsScene* scene)
         // Create new ellipse points
         auto p0 = fControlPoints[i][0] - 0.5;
         auto p1 = fControlPoints[i][1] - 0.5;
-        scene->addEllipse(p0, p1, 2, 2, QPen(QColor(r, g, b)), QBrush(QColor(r, g, b)));
+        auto item = scene->addEllipse(p0, p1, 2, 2, QPen(QColor(r, g, b)), QBrush(QColor(r, g, b)));
+        item->setZValue(50);
     }
 }
 
