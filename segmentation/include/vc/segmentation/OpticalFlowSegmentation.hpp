@@ -15,6 +15,8 @@
 #include "vc/segmentation/lrps/Common.hpp"
 #include "vc/segmentation/lrps/FittedCurve.hpp"
 
+#include "../../apps/VC/COverlayLoader.hpp"
+
 namespace fs = volcart::filesystem;
 
 namespace volcart::segmentation
@@ -171,6 +173,14 @@ public:
     /** @brief Returns the maximum progress value */
     [[nodiscard]] auto progressIterations() const -> std::size_t override;
 
+    void setOverlayLoader(ChaoVis::COverlayLoader* loader) { overlayLoader_ = loader; }
+    void setMagnetStrength(int strength) { magnetStrength_ = strength; }
+    void setMagnetMaxDistance(int distance) { magnetMaxDistance_ = distance; }
+    void setMagnetNeighborSlices(int slices) { magnetNeighborSlices_ = slices; }
+    void setMagnetNeighborUseAverage(bool average) { magnetNeighborUseAverage_ = average; }
+
+    cv::Point2f findMagnetPoint(cv::Rect roi, cv::Point2f curvePoint, int zIndex);
+
 private:
     /**
      * @brief Estimate the normal to the curve at point index
@@ -283,5 +293,10 @@ private:
     Chain reSegStartingChain_;
     volcart::OrderedPointSet<cv::Vec3d> masterCloud_;
     mutable std::shared_mutex display_mutex_;
+    ChaoVis::COverlayLoader* overlayLoader_;
+    int magnetStrength_;
+    int magnetMaxDistance_;
+    int magnetNeighborSlices_;
+    bool magnetNeighborUseAverage_{false};
 };
 }  // namespace volcart::segmentation

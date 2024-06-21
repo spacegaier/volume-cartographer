@@ -11,7 +11,7 @@ set(srcs
     CVolumeViewer.cpp
     CVolumeViewerWithCurve.cpp
     COverlay.cpp
-    COverlayHandler.cpp
+    COverlayLoader.cpp
     CBSpline.cpp
     CBezierCurve.cpp
     BlockingDialog.hpp

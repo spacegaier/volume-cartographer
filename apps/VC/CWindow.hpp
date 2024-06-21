@@ -97,6 +97,11 @@ public:
         int edge_bounce_distance;
         int smoothness_interpolation_percent;
         int step_size{1};
+        // OFS Overlay PointCloud
+        int magnet_max_distance;
+        int magnet_strenght;
+        int magnet_neighbor_slices;
+        bool magnet_neighbor_use_average;
     };
 
     using Segmenter = volcart::segmentation::ChainSegmentationAlgorithm;

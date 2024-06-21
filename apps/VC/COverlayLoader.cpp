@@ -1,6 +1,6 @@
-// COverlayHandler.cpp
+// COverlayLoader.cpp
 // Philip Allgaier 2024 May
-#include "COverlayHandler.hpp"
+#include "COverlayLoader.hpp"
 
 #include "CVolumeViewer.hpp"
 #include "vc/core/io/OBJReader.hpp"
@@ -11,7 +11,7 @@ using namespace ChaoVis;
 namespace vc = volcart;
 namespace fs = std::filesystem;
 
-COverlayHandler::COverlayHandler(CVolumeViewer* volumeViewer) : viewer(volumeViewer)
+COverlayLoader::COverlayLoader()
 {}
 
 auto roundDownToNearestMultiple(float numToRound, int multiple)  ->int
@@ -19,7 +19,7 @@ auto roundDownToNearestMultiple(float numToRound, int multiple)  ->int
     return ((static_cast<int>(numToRound) / multiple) * multiple);
 }
 
-void COverlayHandler::setOverlaySettings(OverlaySettings overlaySettings)
+void COverlayLoader::setOverlaySettings(OverlaySettings overlaySettings)
 { 
     settings = overlaySettings; 
 
@@ -32,28 +32,24 @@ void COverlayHandler::setOverlaySettings(OverlaySettings overlaySettings)
     settings.chunkSize = 25;
 }
 
-auto COverlayHandler::determineChunksForView() const -> OverlayChunkIDs
+auto COverlayLoader::determineChunks(cv::Rect rect, int zIndex) const -> OverlayChunkIDs
 {
     OverlayChunkIDs res;
     
-    if (settings.path.isEmpty()) {
+    if (settings.path.size() == 0) {
         return {};
     }
-
-    // Get the currently displayed region
-    auto rect = viewer->GetView()->mapToScene(viewer->GetView()->viewport()->rect());
  
-    auto xIndexStart = std::max(100, roundDownToNearestMultiple((rect.first().x() - 100) / settings.scale, settings.chunkSize) - settings.offset);
+    auto xIndexStart = std::max(100, roundDownToNearestMultiple((rect.x - 100) / settings.scale, settings.chunkSize) - settings.offset);
     xIndexStart -= settings.chunkSize; // due to the fact that file 000100 contains from -100 to 100, 000125 contains from 0 to 200, 000150 from 100 to 300
-    auto yIndexStart = std::max(100, roundDownToNearestMultiple((rect.first().y() - 100) / settings.scale, settings.chunkSize) - settings.offset);
+    auto yIndexStart = std::max(100, roundDownToNearestMultiple((rect.y - 100) / settings.scale, settings.chunkSize) - settings.offset);
     yIndexStart -= settings.chunkSize;
 
-    auto imageIndex = viewer->GetImageIndex();
-    auto zIndexEnd = std::max(100, roundDownToNearestMultiple((imageIndex - 100) / settings.scale, settings.chunkSize) - settings.offset);
+    auto zIndexEnd = std::max(100, roundDownToNearestMultiple((zIndex - 100) / settings.scale, settings.chunkSize) - settings.offset);
     auto zIndexStart = zIndexEnd - settings.chunkSize;
 
-    auto xIndexEnd = roundDownToNearestMultiple((rect.at(2).x() - 100) / settings.scale, settings.chunkSize) - settings.offset;
-    auto yIndexEnd = roundDownToNearestMultiple((rect.at(2).y() - 100) / settings.scale, settings.chunkSize) - settings.offset;
+    auto xIndexEnd = roundDownToNearestMultiple((rect.br().x - 100) / settings.scale, settings.chunkSize) - settings.offset;
+    auto yIndexEnd = roundDownToNearestMultiple((rect.br().y - 100) / settings.scale, settings.chunkSize) - settings.offset;
 
     OverlayChunkID id;
     for (auto z = zIndexStart; z <= zIndexEnd; z += settings.chunkSize) {
@@ -71,13 +67,11 @@ auto COverlayHandler::determineChunksForView() const -> OverlayChunkIDs
     return res;
 }
 
-auto COverlayHandler::determineNotLoadedOverlayFiles() const -> OverlayChunkFiles
+auto COverlayLoader::determineNotLoadedFiles(OverlayChunkIDs chunks) const -> OverlayChunkFiles
 {
-    auto chunks = determineChunksForView();
-
     QString folder;
     OverlayChunkFiles fileList;
-    QDir overlayMainFolder(settings.path);
+    QDir overlayMainFolder(QString::fromStdString(settings.path));
     auto absPath = overlayMainFolder.absolutePath();
 
     for (auto chunk : chunks) {
@@ -93,7 +87,7 @@ auto COverlayHandler::determineNotLoadedOverlayFiles() const -> OverlayChunkFile
 
             for (auto file : files) {
                 file = overlayFolder.path() + QDir::separator() + file;
-                fileList[chunk].push_back(file);
+                fileList[chunk].push_back(file.toStdString());
             }
         }
     }
@@ -101,11 +95,14 @@ auto COverlayHandler::determineNotLoadedOverlayFiles() const -> OverlayChunkFile
     return fileList;
 }
 
-void COverlayHandler::loadOverlayData(OverlayChunkFiles chunksToLoad)
+void COverlayLoader::loadOverlayData(OverlayChunkFiles chunksToLoad)
 {
-    if (chunksToLoad.size() == 0 || settings.path.isEmpty()) {
+    if (chunksToLoad.size() == 0 || settings.path.size() == 0) {
         return;
     }
+
+    // Required since during an OFS run multiple threads might try to start loading data
+    std::lock_guard<std::shared_mutex> lock(loadMutex);
 
     vc::ITKMesh::Pointer mesh;
     itk::Point<double, 3> point;
@@ -113,7 +110,7 @@ void COverlayHandler::loadOverlayData(OverlayChunkFiles chunksToLoad)
 
     // Convert to flat work list for threads
     std::vector<OverlayChunkID> chunks;
-    std::vector<QString> fileNames;
+    std::vector<std::string> fileNames;
     for (auto chunk : chunksToLoad) {
         for (auto file : chunk.second) {
             chunks.push_back(chunk.first);
@@ -146,19 +143,24 @@ void COverlayHandler::loadOverlayData(OverlayChunkFiles chunksToLoad)
     }
 }
 
-void COverlayHandler::loadSingleOverlayFile(const QString& file, OverlayChunkID chunkID, int threadNum) const
+static bool ends_with(std::string_view str, std::string_view suffix)
+{
+    return str.size() >= suffix.size() && str.compare(str.size()-suffix.size(), suffix.size(), suffix) == 0;
+}
+
+void COverlayLoader::loadSingleOverlayFile(const std::string& file, OverlayChunkID chunkID, int threadNum) const
 {
     vc::ITKMesh::Pointer mesh;
     itk::Point<double, 3> point;
 
     //std::cout << file.toStdString() << std::endl;
-    if (file.endsWith(".ply")) {
-        volcart::io::PLYReader reader(fs::path(file.toStdString()));
+    if (ends_with(file, ".ply")) {
+        volcart::io::PLYReader reader(fs::path({file}));
         reader.read();
         mesh = reader.getMesh();
-    } else if (file.endsWith(".obj")) {
+    } else if (ends_with(file, ".obj")) {
         volcart::io::OBJReader reader;
-        reader.setPath(file.toStdString());
+        reader.setPath(file);
         reader.read();
         mesh = reader.getMesh();
     } else {
@@ -179,13 +181,14 @@ void COverlayHandler::loadSingleOverlayFile(const QString& file, OverlayChunkID 
         if (point[settings.xAxis] >= 0 && point[settings.yAxis] >= 0 && point[settings.zAxis] >= 0) {
             // Just a type conversion for the point, so do not use the axis settings here
             threadData[threadNum][chunkID].push_back({point[0], point[1], point[2]});
+            //threadSliceData[threadNum][chunkID][point[settings.zAxis]].push_back({point[settings.xAxis], point[settings.yAxis]});
         }
     }
 }
 
-void COverlayHandler::mergeThreadData(OverlayChunkData threadData) const
+void COverlayLoader::mergeThreadData(OverlayChunkData threadData) const
 {
-    std::lock_guard<std::shared_mutex> lock(dataMutex);
+    std::lock_guard<std::shared_mutex> lock(mergeMutex);
 
     for (auto it = threadData.begin(); it != threadData.end(); ++it) {
         std::pair<OverlayChunkData::iterator, bool> ins = chunkData.insert(*it);
@@ -196,37 +199,62 @@ void COverlayHandler::mergeThreadData(OverlayChunkData threadData) const
             vec2->insert(vec2->end(), vec1->begin(), vec1->end());
         }
     }
+
+    // for (auto& data : chunkData) {
+    //     std::sort(
+    //         data.second.begin(), data.second.end(),
+    //         [](const auto& a, const auto& b) { 
+    //             return (a[0] < b[0]) || (a[0] == b[0] && a[1] < b[1]) || (a[0] == b[0] && a[1] == b[1] && a[2] < b[2]);
+    //         }
+    //     );
+    //     data.second.erase(
+    //         std::unique(data.second.begin(), data.second.end()),
+    //         data.second.end());
+    // }
+
+    // for (auto it = threadSliceData.begin(); it != threadSliceData.end(); ++it) {
+    //     for (auto jt = it->second.begin(); jt != it->second.end(); ++jt) {
+           
+    //         std::pair<OverlayChunkSliceData::iterator, bool> ins = chunkSliceData.insert(*jt);
+    //         if (!ins.second) { 
+    //             // Map key already existed, so we have to merge the slice data
+    //             for (auto data : jt->second) {
+    //                 chunkSliceData[jt->first][data.first].insert(chunkSliceData[jt->first][data.first].end(), data.second.begin(), data.second.end());
+    //             }
+
+    //             // OverlaySliceData* vec1 = &(jt->second);
+    //             // OverlaySliceData* vec2 = &(ins.first->second);
+    //             // vec2->insert(vec2->end(), vec1->begin(), vec1->end());
+    //         }
+    //     }
+    // }
 }
 
-void COverlayHandler::updateOverlayData()
-{
-    loadOverlayData(determineNotLoadedOverlayFiles());
-}
+// auto COverlayLoader::getOverlayData(cv::Rect rect) const -> OverlayChunkDataRef
+// {
+//     OverlayChunkDataRef res;
+//     auto chunks = determineChunks(rect);
 
-auto COverlayHandler::getOverlayDataForView() const -> OverlayChunkDataRef
-{
-    OverlayChunkDataRef res;
-    if (chunkData.size() == 0) { 
-        return res;
-    }
+//     for (auto chunk : chunks) {
+//         res[chunk] = &chunkData[chunk];
+//     }
 
-    auto chunks = determineChunksForView();
+//     return res;
+// }
 
-    for (auto chunk : chunks) {
-        res[chunk] = &chunkData[chunk];
-    }
-
-    return res;
-}
-
-auto COverlayHandler::getOverlayDataForView(int zIndex) const -> OverlaySliceData
+auto COverlayLoader::getOverlayData(cv::Rect rect, int zIndex) -> OverlaySliceData
 {
     OverlaySliceData res;
-    if (chunkData.size() == 0) { 
-        return res;
-    }
+    auto chunks = determineChunks(rect, zIndex);
+    loadOverlayData(determineNotLoadedFiles(chunks));
 
-    auto chunks = determineChunksForView();
+    // for (auto chunk : chunks) {
+    //     if (chunkSliceData[chunk].find(zIndex) != chunkSliceData[chunk].end()) {
+    //         for (auto point : chunkSliceData[chunk][zIndex]) {
+    //             res.push_back({point[0], point[1]});
+    //         }
+    //     }
+    // }
 
     for (auto chunk : chunks) {
         for (auto point : chunkData[chunk]) {
@@ -235,6 +263,13 @@ auto COverlayHandler::getOverlayDataForView(int zIndex) const -> OverlaySliceDat
             }
         }
     }
+
+    // There are quite some point duplicates across chunks, so we remove them
+    // now for faster rendering and processing.
+    std::sort(res.begin(), res.end(), [](const auto& a, const auto& b) {
+        return (a[0] < b[0]) || (a[0] == b[0] && a[1] < b[1]);
+    });
+    res.erase(std::unique(res.begin(), res.end()), res.end());
 
     return res;
 }

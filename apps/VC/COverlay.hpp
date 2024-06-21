@@ -6,7 +6,7 @@
 #include <QGraphicsView>
 #include <opencv2/imgproc.hpp>
 
-#include "COverlayHandler.hpp"
+#include "COverlayLoader.hpp"
 
 namespace ChaoVis
 {

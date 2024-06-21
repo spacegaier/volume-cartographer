@@ -237,6 +237,35 @@ std::vector<std::vector<Voxel>> OpticalFlowSegmentationClass::interpolateGaps(st
     return points;
 }
 
+cv::Point2f OpticalFlowSegmentationClass::findMagnetPoint(cv::Rect roi, cv::Point2f curvePoint, int zIndex)
+{
+    double minDistance = magnetMaxDistance_;
+    cv::Point2f minPoint;
+
+    bool magnetFound = false;
+    auto overlay = overlayLoader_->getOverlayData(roi, zIndex);
+
+    for (auto point : overlay) {
+
+        cv::Point2f a(point[0], point[1]);
+        cv::Point2f b(curvePoint.x, curvePoint.y);
+        double distance = cv::norm(a - b);
+
+        if (distance < minDistance) {
+            minDistance = distance;
+            minPoint = a;
+            magnetFound = true;
+        }
+    }
+
+    if (magnetFound) {
+        return minPoint;
+    } else  {
+        return cv::Point2f(-1, -1);
+    }
+
+}
+
 // Multithreaded computation of splitted curve segment
 std::vector<Voxel> OpticalFlowSegmentationClass::computeCurve(
     FittedCurve currentCurve,
@@ -367,6 +396,7 @@ std::vector<Voxel> OpticalFlowSegmentationClass::computeCurve(
     int maxDistance = edge_jump_distance_; // Max distance to an considerable edge
     int whiteDistance = edge_bounce_distance_; // The distance the point is moved into the white part of the sheet
     std::vector<bool> updated_indices(currentCurve.size(), false);
+
     for (int i = 0; i < int(currentCurve.size()); ++i) {
         // Get the current point
         Voxel pt_ = currentCurve(i);
@@ -527,6 +557,54 @@ std::vector<Voxel> OpticalFlowSegmentationClass::computeCurve(
             }
             else {
                 edgedVs.push_back(Voxel(0, 0, nextZIndex));
+            }
+        }
+
+        float magnetStrength = magnetStrength_ / 100.f;
+        if (magnetStrength > 0) {
+            // Use point cloud as magnet to pull points
+
+            std::vector<cv::Point2f> minPoints;
+
+            auto minPoint = findMagnetPoint(roi, updatedPt, zIndex);
+            if (minPoint != cv::Point2f(-1, -1)) {
+                minPoints.push_back(minPoint);
+            }
+
+            if (magnetNeighborSlices_ > 0) {
+                auto minPoint = findMagnetPoint(roi, updatedPt, zIndex - 1);
+                if (minPoint != cv::Point2f(-1, -1)) {
+                    minPoints.push_back(minPoint);
+                }
+
+                minPoint = findMagnetPoint(roi, updatedPt, zIndex + 1);
+                if (minPoint != cv::Point2f(-1, -1)) {
+                    minPoints.push_back(minPoint);
+                }
+            }
+
+            if (!minPoints.empty()) {
+                cv::Point2f delta;
+                if (magnetNeighborUseAverage_) {
+                    cv::Point2f sum = std::accumulate(
+                        minPoints.begin(), minPoints.end(),
+                        cv::Point2f(0.0f, 0.0f), std::plus<cv::Point2f>());
+                    delta = sum / (int)minPoints.size();
+                } else {
+                    // Find nearest point
+                    double minDistance = magnetMaxDistance_;
+                    for (auto minPoint : minPoints) {
+                        cv::Point2f a(updatedPt.x, updatedPt.y);
+                        double distance = cv::norm(a - minPoint);
+                        if (distance < minDistance) {
+                            delta = minPoint;
+                            minDistance = distance;
+                        }
+                    }
+                }
+
+                updatedPt.x += magnetStrength * (delta.x - updatedPt.x);
+                updatedPt.y += magnetStrength * (delta.y - updatedPt.y);
             }
         }
 

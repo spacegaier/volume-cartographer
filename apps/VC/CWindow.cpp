@@ -128,6 +128,11 @@ CWindow::CWindow()
     fSegParams.smoothness_interpolation_percent = 40;
     fSegParams.step_size = 1;
 
+    fSegParams.magnet_strenght = 80;
+    fSegParams.magnet_max_distance = 10;
+    fSegParams.magnet_neighbor_slices = 0;
+    fSegParams.magnet_neighbor_use_average = false;
+
     // Process the raw impact and scan ranges string and convert to step vectors
     impactRangeSteps = SettingsDialog::expandSettingToIntRange(settings.value("viewer/impact_range_steps", "1-3, 5, 8, 11, 15, 20, 28, 40, 60, 100, 200").toString());
     scanRangeSteps = SettingsDialog::expandSettingToIntRange(settings.value("viewer/scan_range_steps", "1, 2, 5, 10, 20, 50, 100, 200, 500, 1000").toString());
@@ -328,6 +333,23 @@ void CWindow::CreateWidgets(void)
     // ADD NEW SEGMENTATION ALGORITHM NAMES HERE
     // aSegMethodsComboBox->addItem(tr("My custom algorithm"));
 
+    // OFS Overlay PointCloud Parameters
+    auto* edtMagnetStrength= new QSpinBox();
+    edtMagnetStrength->setMinimum(0);
+    edtMagnetStrength->setMaximum(100);
+    edtMagnetStrength->setValue(80);
+    auto* edtMagnetMaxDistance= new QSpinBox();
+    edtMagnetMaxDistance->setMinimum(0);
+    edtMagnetMaxDistance->setMaximum(100);
+    edtMagnetMaxDistance->setValue(10);
+    auto* edtMagnetNeighborSlices= new QSpinBox();
+    edtMagnetNeighborSlices->setMinimum(0);
+    edtMagnetNeighborSlices->setMaximum(5);
+    edtMagnetNeighborSlices->setValue(0);
+
+    auto* chkMagnetNeighborUseAverage = new QCheckBox(tr("Magnet Average Neighbors"));
+    chkMagnetNeighborUseAverage->setChecked(false);
+
     // Optical Flow Segmentation Parameters
     auto* edtOutsideThreshold = new QSpinBox();
     edtOutsideThreshold->setMinimum(0);
@@ -366,6 +388,11 @@ void CWindow::CreateWidgets(void)
     edtCacheSize->setMaximum(20000);
     edtCacheSize->setValue(settings.value("perf/preloaded_slices", 200).toInt());
 
+    connect(edtMagnetStrength, &QSpinBox::valueChanged, [=](int v){fSegParams.magnet_strenght = v;});
+    connect(edtMagnetMaxDistance, &QSpinBox::valueChanged, [=](int v){fSegParams.magnet_max_distance = v;});
+    connect(edtMagnetNeighborSlices, &QSpinBox::valueChanged, [=](int v){fSegParams.magnet_neighbor_slices = v;});
+    connect(chkMagnetNeighborUseAverage, &QCheckBox::toggled, [=](bool checked){fSegParams.magnet_neighbor_use_average = checked;});
+
     connect(edtOutsideThreshold, &QSpinBox::valueChanged, [=](int v){fSegParams.outside_threshold = v;});
     connect(edtOpticalFlowPixelThreshold, &QSpinBox::valueChanged, [=](int v){fSegParams.optical_flow_pixel_threshold = v;});
     connect(edtOpticalFlowDisplacementThreshold, &QSpinBox::valueChanged, [=](int v){fSegParams.optical_flow_displacement_threshold = v;});
@@ -381,6 +408,14 @@ void CWindow::CreateWidgets(void)
     auto* opticalFlowParamsContainer = new QWidget();
     auto* opticalFlowParamsLayout = new QVBoxLayout(opticalFlowParamsContainer);
 
+    opticalFlowParamsLayout->addWidget(new QLabel(tr("Magnet Strength")));
+    opticalFlowParamsLayout->addWidget(edtMagnetStrength);
+    opticalFlowParamsLayout->addWidget(new QLabel(tr("Magnet Max Distance")));
+    opticalFlowParamsLayout->addWidget(edtMagnetMaxDistance);
+    opticalFlowParamsLayout->addWidget(new QLabel(tr("Magnet Heighbor Slices")));
+    opticalFlowParamsLayout->addWidget(edtMagnetNeighborSlices);
+    opticalFlowParamsLayout->addWidget(chkMagnetNeighborUseAverage);    
+
     opticalFlowParamsLayout->addWidget(new QLabel(tr("Optical Flow Displacement Threshold")));
     opticalFlowParamsLayout->addWidget(edtOpticalFlowDisplacementThreshold);
     opticalFlowParamsLayout->addWidget(new QLabel(tr("Optical Flow Dark Pixel Threshold")));
@@ -389,7 +424,7 @@ void CWindow::CreateWidgets(void)
     opticalFlowParamsLayout->addWidget(edtOutsideThreshold);
     opticalFlowParamsLayout->addWidget(new QLabel(tr("Smoothen Curve at Bright Points")));
     opticalFlowParamsLayout->addWidget(edtSmoothenPixelThreshold);
-    opticalFlowParamsLayout->addWidget(chkEnableSmoothenOutlier);    
+    opticalFlowParamsLayout->addWidget(chkEnableSmoothenOutlier);
     lblInterpolationPercent = new QLabel(tr("Interpolation Percent"));
     opticalFlowParamsLayout->addWidget(lblInterpolationPercent);
     opticalFlowParamsLayout->addWidget(edtInterpolationPercent);
@@ -1264,6 +1299,12 @@ bool CWindow::prepareSegmentationOFS(std::string segID, bool forward, bool useAn
         ofsc->setStepSize(fSegParams.step_size);
         ofsc->setChain(fSegStructMap[segID].fStartingPath);
         ofsc->setVolume(currentVolume);
+        // OFS Overlay PointCloud
+        ofsc->setOverlayLoader(fVolumeViewerWidget->GetOverlayLoader());
+        ofsc->setMagnetStrength(fSegParams.magnet_strenght);
+        ofsc->setMagnetMaxDistance(fSegParams.magnet_max_distance);
+        ofsc->setMagnetNeighborSlices(fSegParams.magnet_neighbor_slices);
+        ofsc->setMagnetNeighborUseAverage(fSegParams.magnet_neighbor_use_average);
 
         // Queue segmentation for execution
         queueSegmentation(segID, ofsc);
@@ -1903,8 +1944,8 @@ void CWindow::ShowOverlayImportDlg(const QString& path)
     auto overlayImportDlg = new Ui::VCOverlayImportDlg();
     overlayImportDlg->setupUi(dlg);
     QObject::connect(overlayImportDlg->buttonBox, &QDialogButtonBox::accepted, this, [this, overlayPath, dlg, overlayImportDlg]() {
-        COverlayHandler::OverlaySettings overlaySettings;
-        overlaySettings.path = overlayPath;
+        COverlayLoader::OverlaySettings overlaySettings;
+        overlaySettings.path = overlayPath.toStdString();
         overlaySettings.xAxis = overlayImportDlg->comboBox1stAxis->currentText() == "X" ? 0 : overlayImportDlg->comboBox2ndAxis->currentText() == "X" ? 1 : 2;
         overlaySettings.yAxis = overlayImportDlg->comboBox1stAxis->currentText() == "Y" ? 0 : overlayImportDlg->comboBox2ndAxis->currentText() == "Y" ? 1 : 2;
         overlaySettings.zAxis = overlayImportDlg->comboBox1stAxis->currentText() == "Z" ? 0 : overlayImportDlg->comboBox2ndAxis->currentText() == "Z" ? 1 : 2;

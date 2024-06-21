@@ -11,7 +11,8 @@
 #include <QGraphicsScene>
 #include <QDebug>
 
-#include "COverlayHandler.hpp"
+#include "COverlayLoader.hpp"
+#include "COverlay.hpp"
 
 namespace ChaoVis
 {
@@ -80,7 +81,8 @@ public:
     void Rotate(int delta);
     void ResetRotation();
 
-    void SetOverlaySettings(COverlayHandler::OverlaySettings settings);
+    void SetOverlaySettings(COverlayLoader::OverlaySettings settings);
+    auto GetOverlayLoader() -> COverlayLoader* { return fOverlayLoader; };
     void ScheduleOverlayUpdate();
     void UpdateOverlay();    
 
@@ -113,7 +115,7 @@ protected:
     // widget components
     CVolumeViewerView* fGraphicsView;
     QGraphicsScene* fScene;
-    COverlayHandler* fOverlayHandler;
+    COverlayLoader* fOverlayLoader;
 
     QLabel* fCanvas;
     QScrollArea* fScrollArea;
