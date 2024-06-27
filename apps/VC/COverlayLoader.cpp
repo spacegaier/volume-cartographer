@@ -178,9 +178,8 @@ void COverlayLoader::loadSingleOverlayFile(const std::string& file, OverlayChunk
         point[1] *= settings.scale;
         point[2] *= settings.scale;
 
-        if (point[settings.xAxis] >= 0 && point[settings.yAxis] >= 0 && point[settings.zAxis] >= 0) {
-            // Just a type conversion for the point, so do not use the axis settings here
-            threadData[threadNum][chunkID].push_back({point[0], point[1], point[2]});
+        if (point[0] >= 0 && point[1] >= 0 && point[2] >= 0) {
+            threadData[threadNum][chunkID].push_back({point[settings.xAxis], point[settings.yAxis], point[settings.zAxis]});
             //threadSliceData[threadNum][chunkID][point[settings.zAxis]].push_back({point[settings.xAxis], point[settings.yAxis]});
         }
     }
@@ -242,7 +241,7 @@ void COverlayLoader::mergeThreadData(OverlayChunkData threadData) const
 //     return res;
 // }
 
-auto COverlayLoader::getOverlayData(cv::Rect rect, int zIndex) -> OverlaySliceData
+auto COverlayLoader::getOverlayData(cv::Rect2d rect, int zIndex) -> OverlaySliceData
 {
     OverlaySliceData res;
     auto chunks = determineChunks(rect, zIndex);
@@ -256,10 +255,13 @@ auto COverlayLoader::getOverlayData(cv::Rect rect, int zIndex) -> OverlaySliceDa
     //     }
     // }
 
-    for (auto chunk : chunks) {
-        for (auto point : chunkData[chunk]) {
-            if (point[settings.zAxis] == zIndex) {
-                res.push_back({point[settings.xAxis], point[settings.yAxis]});
+    cv::Point2f point2f;
+    for (auto& chunk : chunks) {
+        for (auto& point : chunkData[chunk]) {
+            if (point.z == zIndex) {
+                point2f = cv::Point2f(point.x, point.y);
+                if (rect.contains(point2f))
+                    res.push_back(point2f);
             }
         }
     }
@@ -267,7 +269,7 @@ auto COverlayLoader::getOverlayData(cv::Rect rect, int zIndex) -> OverlaySliceDa
     // There are quite some point duplicates across chunks, so we remove them
     // now for faster rendering and processing.
     std::sort(res.begin(), res.end(), [](const auto& a, const auto& b) {
-        return (a[0] < b[0]) || (a[0] == b[0] && a[1] < b[1]);
+        return (a.x < b.x) || (a.x == b.x && a.y < b.y);
     });
     res.erase(std::unique(res.begin(), res.end()), res.end());
 

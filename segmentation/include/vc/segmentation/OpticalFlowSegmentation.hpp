@@ -179,7 +179,7 @@ public:
     void setMagnetNeighborSlices(int slices) { magnetNeighborSlices_ = slices; }
     void setMagnetNeighborUseAverage(bool average) { magnetNeighborUseAverage_ = average; }
 
-    cv::Point2f findMagnetPoint(cv::Rect roi, cv::Point2f curvePoint, int zIndex);
+    cv::Point2f findMagnetPoint(cv::Rect roi, cv::Point2f curvePoint, int zIndex, int numPointsOnSlice);
 
 private:
     /**

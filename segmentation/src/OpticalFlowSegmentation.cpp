@@ -237,33 +237,55 @@ std::vector<std::vector<Voxel>> OpticalFlowSegmentationClass::interpolateGaps(st
     return points;
 }
 
-cv::Point2f OpticalFlowSegmentationClass::findMagnetPoint(cv::Rect roi, cv::Point2f curvePoint, int zIndex)
+cv::Point2f OpticalFlowSegmentationClass::findMagnetPoint(cv::Rect roi, cv::Point2f curvePoint, int zIndex, int numPointsOnSlice)
 {
-    double minDistance = magnetMaxDistance_;
-    cv::Point2f minPoint;
+    float minDistance = magnetMaxDistance_;
+    std::map<float, cv::Point2f> validPoints;
 
     bool magnetFound = false;
     auto overlay = overlayLoader_->getOverlayData(roi, zIndex);
+    float distance;
+    bool linearAvg = true;
 
     for (auto point : overlay) {
 
-        cv::Point2f a(point[0], point[1]);
+        cv::Point2f a(point.x, point.y);
         cv::Point2f b(curvePoint.x, curvePoint.y);
-        double distance = cv::norm(a - b);
+        distance = cv::norm(a - b);
 
         if (distance < minDistance) {
-            minDistance = distance;
-            minPoint = a;
-            magnetFound = true;
+            validPoints[distance] = a;
         }
     }
 
-    if (magnetFound) {
-        return minPoint;
-    } else  {
+    if (validPoints.empty()) {
         return cv::Point2f(-1, -1);
-    }
+    } else {
+        cv::Point2f sum;
+        auto avgPoints = std::min((int)validPoints.size(), numPointsOnSlice);   
+        auto it = validPoints.begin();
 
+        if (linearAvg) {          
+            for (int i = 0; i < avgPoints; ++i)  {
+                sum += it->second;
+                ++it;
+            }
+            return sum / avgPoints;
+        } else {
+            float weightRemainder = 100;
+            float weightSum = 0;
+            float weight = 50; // we start with 50 = nearest point will be weighted with 50%
+            for (int i = 0; i < avgPoints; ++i) {
+                sum += weight / 100 * it->second;
+
+                weightSum += weight;
+                weightRemainder -= weight;
+                weight = weightRemainder / 2;
+                ++it;
+            }
+            return sum * 100 / weightSum;
+        }
+    }
 }
 
 // Multithreaded computation of splitted curve segment
@@ -276,8 +298,6 @@ std::vector<Voxel> OpticalFlowSegmentationClass::computeCurve(
     bool backwards)
 {
     bool visualize = false;
-    // Extract 2D image slices at zIndex and zIndex+1
-    // cv::Mat slice1 = vol_->getSliceDataCopy(zIndex);
 
     // Calculate the bounding box of the curve to define the region of interest
     int x_min = std::numeric_limits<int>::max();
@@ -293,6 +313,9 @@ std::vector<Voxel> OpticalFlowSegmentationClass::computeCurve(
         x_max = std::max(x_max, static_cast<int>(pt_[0]));
         y_max = std::max(y_max, static_cast<int>(pt_[1]));
     }
+
+    // Extract the region of interest without margin
+    cv::Rect roiNoMargin(x_min, y_min, x_max - x_min + 1, y_max - y_min + 1);
 
     // Add a margin to the bounding box to avoid edge effects
     int margin = 15;
@@ -561,23 +584,24 @@ std::vector<Voxel> OpticalFlowSegmentationClass::computeCurve(
         }
 
         float magnetStrength = magnetStrength_ / 100.f;
+        int numPointsOnSlice = 3;
         if (magnetStrength > 0) {
             // Use point cloud as magnet to pull points
 
             std::vector<cv::Point2f> minPoints;
 
-            auto minPoint = findMagnetPoint(roi, updatedPt, zIndex);
+            auto minPoint = findMagnetPoint(roiNoMargin, updatedPt, nextZIndex, numPointsOnSlice);
             if (minPoint != cv::Point2f(-1, -1)) {
                 minPoints.push_back(minPoint);
             }
 
-            if (magnetNeighborSlices_ > 0) {
-                auto minPoint = findMagnetPoint(roi, updatedPt, zIndex - 1);
+            for (int i = 0; i < magnetNeighborSlices_; ++i) {
+                minPoint = findMagnetPoint(roiNoMargin, updatedPt, std::clamp(nextZIndex - i,0 , vol_->numSlices()), numPointsOnSlice);
                 if (minPoint != cv::Point2f(-1, -1)) {
                     minPoints.push_back(minPoint);
                 }
 
-                minPoint = findMagnetPoint(roi, updatedPt, zIndex + 1);
+                minPoint = findMagnetPoint(roiNoMargin, updatedPt, std::clamp(nextZIndex + i,0 , vol_->numSlices()), numPointsOnSlice);
                 if (minPoint != cv::Point2f(-1, -1)) {
                     minPoints.push_back(minPoint);
                 }
@@ -1137,8 +1161,6 @@ ChainSegmentationAlgorithm::Status OpticalFlowSegmentationClass::computeSub(std:
         // Stitch curve segments together, discarding overlapping points
         std::vector<Voxel> stitched_curve;
         stitched_curve.reserve(currentVs.size());
-
-        // Stitch curve segments together, discarding overlapping points
         for (int i = 0; i < num_threads; ++i)
         {
             if (i > 0) {

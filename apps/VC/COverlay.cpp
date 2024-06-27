@@ -28,7 +28,7 @@ void COverlayGraphicsItem::paint(QPainter* painter, const QStyleOptionGraphicsIt
 
     for (auto point : points) {
 
-        QPoint center(point[0] - sceneRect.x(), point[1] - sceneRect.y());
+        QPoint center(point.x - sceneRect.x(), point.y - sceneRect.y());
         painter->drawEllipse(center, pointWidth, pointWidth);
         count++;
     }

@@ -10,15 +10,15 @@
 
 namespace ChaoVis
 {
-// struct cmpVec2d {
-//     bool operator()(const cv::Vec2d& a, const cv::Vec2d& b) const
-//     {
-//         return (a[0] < b[0]) || (a[0] == b[0] && a[1] < b[1]);
-//     }
-// };
+struct cmpPoint2f {
+    bool operator()(const cv::Point2f& a, const cv::Point2f& b) const
+    {
+        return (a.x < b.x) || (a.x == b.x && a.y < b.y);
+    }
+};
 
-// struct cmpVec3d {
-//     bool operator()(const cv::Vec3d& a, const cv::Vec3d& b) const
+// struct cmpPoint3f {
+//     bool operator()(const cv::Point3f& a, const cv::Point3f& b) const
 //     {
 //         return (a[0] < b[0]) || (a[0] == b[0] && a[1] < b[1]) || (a[0] == b[0] && a[1] == b[1] && a[2] < b[2]);
 //     }
@@ -26,10 +26,10 @@ namespace ChaoVis
 
 typedef cv::Vec3i OverlayChunkID;
 typedef std::vector<OverlayChunkID> OverlayChunkIDs;
-typedef std::vector<cv::Vec2d> OverlaySliceData;
-typedef std::vector<cv::Vec3d> OverlayData;
-// typedef std::set<cv::Vec2d, cmpVec2d> OverlaySliceData;
-// typedef std::set<cv::Vec3d, cmpVec3d> OverlayData;
+typedef std::vector<cv::Point2f> OverlaySliceData;
+typedef std::vector<cv::Point3f> OverlayData;
+// typedef std::set<cv::Point2f, cmpVec2d> OverlaySliceData;
+// typedef std::set<cv::Point3f, cmpVec3d> OverlayData;
 
 struct cmpOverlayChunkID {
     bool operator()(const OverlayChunkID& a, const OverlayChunkID& b) const
@@ -63,7 +63,7 @@ public:
     auto determineNotLoadedFiles(OverlayChunkIDs chunks) const -> OverlayChunkFiles;
     void loadOverlayData(OverlayChunkFiles files);
     // auto getOverlayData(cv::Rect rect) const -> OverlayChunkDataRef;
-    auto getOverlayData(cv::Rect rect, int zIndex = -1) -> OverlaySliceData;
+    auto getOverlayData(cv::Rect2d rect, int zIndex = -1) -> OverlaySliceData;
 
     void loadSingleOverlayFile(const std::string& file, OverlayChunkID chunkID, int threadNum) const;
     void mergeThreadData(OverlayChunkData threadData) const;
