@@ -24,12 +24,12 @@ void COverlayLoader::setOverlaySettings(OverlaySettings overlaySettings)
     settings = overlaySettings; 
 
     // Hard-code for testing
-    settings.offset = -125;
-    settings.xAxis = 2;
-    settings.yAxis = 0;
-    settings.zAxis = 1;
-    settings.scale = 4;
-    settings.chunkSize = 25;
+    // settings.offset = -125;
+    // settings.xAxis = 2;
+    // settings.yAxis = 0;
+    // settings.zAxis = 1;
+    // settings.scale = 4;
+    // settings.chunkSize = 25;
 }
 
 auto COverlayLoader::determineChunks(cv::Rect rect, int zIndex) const -> OverlayChunkIDs

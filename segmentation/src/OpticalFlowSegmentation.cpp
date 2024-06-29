@@ -634,8 +634,11 @@ std::vector<Voxel> OpticalFlowSegmentationClass::computeCurve(
                     int weightDivisor = 2;
                     cv::Point2f sum;
 
-                    // For main index first
-                    sum += weight / 100 * validMagnets.at(nextZIndex);
+                    // Main index first (if there was not magnet found for it, we use)
+                    // the OFS curve point to ensure we have an "anchor" for the weight logic
+                    auto it = validMagnets.find(nextZIndex);
+                    cv::Point2f mainPoint = (it == validMagnets.end()) ? updatedPt : it->second;                    
+                    sum += weight / 100 * mainPoint;
                     weightSum += weight;
                     weightRemainder -= weight;
                     weight = weightRemainder / weightDivisor;
@@ -661,10 +664,11 @@ std::vector<Voxel> OpticalFlowSegmentationClass::computeCurve(
                 } else if (magnetSettings_.magnetNeighborSliceAvgMode == 3) {
                     // Nearest-only mode
                     double minDistance = magnetSettings_.maxDistance;
-                    for (auto magnet : validMagnets) {                        
-                        if (magnet.first < minDistance) {
+                    for (auto& magnet : validMagnets) {
+                        double distance = cv::norm(updatedPt - magnet.second);
+                        if (distance < minDistance) {
                             finalMagnet = magnet.second;
-                            minDistance = magnet.first;
+                            minDistance = distance;
                         }
                     }
                 }

@@ -486,7 +486,7 @@ void CVolumeViewer::UpdateButtons(void)
 
 void CVolumeViewer::ScheduleOverlayUpdate()
 {
-    timerOverlayUpdate->start(200);
+    timerOverlayUpdate->start(500);
 }
 
 void CVolumeViewer::UpdateOverlay()

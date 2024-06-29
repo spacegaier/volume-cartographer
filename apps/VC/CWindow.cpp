@@ -1981,6 +1981,7 @@ void CWindow::ShowOverlayImportDlg(const QString& path)
         overlaySettings.zAxis = overlayImportDlg->comboBox1stAxis->currentText() == "Z" ? 0 : overlayImportDlg->comboBox2ndAxis->currentText() == "Z" ? 1 : 2;
         overlaySettings.offset = overlayImportDlg->spinBoxOffset->value();
         overlaySettings.scale = overlayImportDlg->doubleSpinBoxScalingFactor->value();
+        overlaySettings.chunkSize = overlayImportDlg->spinBoxChunkSize->value();
 
         fVolumeViewerWidget->SetOverlaySettings(overlaySettings);
         dlg->close();

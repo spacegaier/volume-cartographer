@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>268</width>
-    <height>189</height>
+    <width>269</width>
+    <height>210</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -29,6 +29,9 @@
      <property name="maximum">
       <number>99999</number>
      </property>
+     <property name="value">
+      <number>-125</number>
+     </property>
     </widget>
    </item>
    <item row="1" column="0">
@@ -40,6 +43,9 @@
    </item>
    <item row="1" column="1">
     <widget class="QComboBox" name="comboBox1stAxis">
+     <property name="currentText">
+      <string>Y</string>
+     </property>
      <item>
       <property name="text">
        <string>X</string>
@@ -67,10 +73,10 @@
    <item row="2" column="1">
     <widget class="QComboBox" name="comboBox2ndAxis">
      <property name="currentText">
-      <string>Y</string>
+      <string>Z</string>
      </property>
      <property name="currentIndex">
-      <number>1</number>
+      <number>2</number>
      </property>
      <item>
       <property name="text">
@@ -98,8 +104,11 @@
    </item>
    <item row="3" column="1">
     <widget class="QComboBox" name="comboBox3rdAxis">
+     <property name="currentText">
+      <string>X</string>
+     </property>
      <property name="currentIndex">
-      <number>2</number>
+      <number>0</number>
      </property>
      <item>
       <property name="text">
@@ -144,7 +153,21 @@
       <number>2</number>
      </property>
      <property name="value">
-      <double>1.000000000000000</double>
+      <double>4.000000000000000</double>
+     </property>
+    </widget>
+   </item>
+   <item row="5" column="0">
+    <widget class="QLabel" name="label_6">
+     <property name="text">
+      <string>Chunk Size</string>
+     </property>
+    </widget>
+   </item>
+   <item row="5" column="1">
+    <widget class="QSpinBox" name="spinBoxChunkSize">
+     <property name="value">
+      <number>25</number>
      </property>
     </widget>
    </item>
