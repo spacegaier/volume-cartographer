@@ -636,7 +636,7 @@ void CWindow::CreateMenus(void)
     fFileMenu->addSeparator();
     fFileMenu->addAction(fSavePointCloudAct);
     fFileMenu->addSeparator();
-    fFileMenu->addAction(fAddOverlay);
+    // fFileMenu->addAction(fAddOverlay);
     fFileMenu->addSeparator();
     fFileMenu->addAction(fSettingsAct);
     fFileMenu->addSeparator();
@@ -688,8 +688,8 @@ void CWindow::CreateActions(void)
         fSavePointCloudAct, SIGNAL(triggered()), this, SLOT(SavePointCloud()));
     fSavePointCloudAct->setShortcut(QKeySequence::Save);
 
-    fAddOverlay = new QAction(style()->standardIcon(QStyle::SP_DialogOpenButton), tr("Add overlay..."), this);
-    connect(fAddOverlay, &QAction::triggered, this, [=]() { ShowOverlayImportDlg(); });
+    // fAddOverlay = new QAction(style()->standardIcon(QStyle::SP_DialogOpenButton), tr("Add overlay..."), this);
+    // connect(fAddOverlay, &QAction::triggered, this, [=]() { ShowOverlayImportDlg(); });
 
     fSettingsAct = new QAction(tr("Settings"), this);
     connect(fSettingsAct, SIGNAL(triggered()), this, SLOT(ShowSettings()));
