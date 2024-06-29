@@ -75,7 +75,7 @@ auto COverlayLoader::determineNotLoadedFiles(OverlayChunkIDs chunks) const -> Ov
     auto absPath = overlayMainFolder.absolutePath();
 
     for (auto chunk : chunks) {
-        if (chunkData.find(chunk) == chunkData.end()) {
+        if (chunkSliceData.find(chunk) == chunkSliceData.end()) {
             // TODO:Check if the settings logic for axis really works here
             folder = QStringLiteral("%1")
                          .arg(chunk[settings.yAxis], 6, 10, QLatin1Char('0'))
@@ -103,10 +103,10 @@ void COverlayLoader::loadOverlayData(OverlayChunkFiles chunksToLoad)
 
     // Required since during an OFS run multiple threads might try to start loading data
     std::lock_guard<std::shared_mutex> lock(loadMutex);
+    threadSliceData.clear();
 
     vc::ITKMesh::Pointer mesh;
     itk::Point<double, 3> point;
-    threadData.clear();
 
     // Convert to flat work list for threads
     std::vector<OverlayChunkID> chunks;
@@ -119,11 +119,21 @@ void COverlayLoader::loadOverlayData(OverlayChunkFiles chunksToLoad)
     }
 
     int numThreads = static_cast<int>(std::thread::hardware_concurrency());
-    int jobSize = 5;
+
+    // Ensures that for each thread we have a map entry existing
+    for (int i = 0; i < numThreads; ++i) {
+        // threadData[i].clear();
+        threadSliceData[i].clear();
+    }
+
+    // TODO: Test different job sizes
+    // Set a minimum to prevent too many way too small threads and a maximum to
+    // have the option later to interrupt the process at the join().
+    int jobSize = std::clamp(static_cast<int>(chunksToLoad.size() / numThreads), 5, 20);
     for (int f = 0; f < fileNames.size(); f += numThreads * jobSize) {
         std::vector<std::thread> threads;
 
-        for (int i = 0; i < numThreads; ++i) {
+        for (int i = 0; i < numThreads; ++i) {            
             threads.emplace_back([=]() {
                 for (int j = 0; j < jobSize && (f + i * jobSize + j) < fileNames.size(); ++j) {
                     loadSingleOverlayFile(fileNames.at(f + i * jobSize + j), chunks.at(f + i * jobSize + j), i);
@@ -136,11 +146,7 @@ void COverlayLoader::loadOverlayData(OverlayChunkFiles chunksToLoad)
         }
     }
 
-    for (auto threadDataSet : threadData) {
-        if (threadDataSet.second.size() > 0) {
-            mergeThreadData(threadDataSet.second);
-        }
-    }
+    mergeThreadData();
 }
 
 static bool ends_with(std::string_view str, std::string_view suffix)
@@ -168,6 +174,16 @@ void COverlayLoader::loadSingleOverlayFile(const std::string& file, OverlayChunk
     }
 
     auto numPoints = mesh->GetNumberOfPoints();
+    // threadData[threadNum][chunkID].reserve(numPoints);
+    // auto it = threadData.find(threadNum)->second.find(chunkID);
+    // TODO: Any heuristics to reserve memory already for each Z slice?
+    // threadSliceData[threadNum][chunkID].reserve(numPoints);
+    auto it = threadSliceData.find(threadNum)->second.find(chunkID);
+    if (it == threadSliceData.find(threadNum)->second.end()) {
+        threadSliceData[threadNum][chunkID].clear();
+        it = threadSliceData.find(threadNum)->second.find(chunkID);
+    }
+    auto estimatedPointsPerDim = numPoints / 3;
 
     for (std::uint64_t pnt_id = 0; pnt_id < numPoints; pnt_id++) {
         point = mesh->GetPoint(pnt_id);
@@ -179,23 +195,64 @@ void COverlayLoader::loadSingleOverlayFile(const std::string& file, OverlayChunk
         point[2] *= settings.scale;
 
         if (point[0] >= 0 && point[1] >= 0 && point[2] >= 0) {
-            threadData[threadNum][chunkID].push_back({point[settings.xAxis], point[settings.yAxis], point[settings.zAxis]});
-            //threadSliceData[threadNum][chunkID][point[settings.zAxis]].push_back({point[settings.xAxis], point[settings.yAxis]});
+            // it->second.push_back({point[settings.xAxis], point[settings.yAxis], point[settings.zAxis]});
+            auto jt = it->second.find(point[settings.zAxis]);
+            if (jt == it->second.end()) {
+                it->second[point[settings.zAxis]].reserve(estimatedPointsPerDim);
+                // Now it has to exist
+                jt = it->second.find(point[settings.zAxis]);
+            }
+            jt->second.push_back({(float)point[settings.xAxis], (float)point[settings.yAxis]});
         }
     }
 }
 
-void COverlayLoader::mergeThreadData(OverlayChunkData threadData) const
+void COverlayLoader::mergeThreadData() const
 {
     std::lock_guard<std::shared_mutex> lock(mergeMutex);
 
-    for (auto it = threadData.begin(); it != threadData.end(); ++it) {
-        std::pair<OverlayChunkData::iterator, bool> ins = chunkData.insert(*it);
-        if (!ins.second) {  
-            // Map key already existed, so we have to merge the slice data
-            OverlayData* vec1 = &(it->second);
-            OverlayData* vec2 = &(ins.first->second);
-            vec2->insert(vec2->end(), vec1->begin(), vec1->end());
+    // for (auto it = threadData.begin(); it != threadData.end(); ++it) {
+    //     std::pair<OverlayChunkData::iterator, bool> ins = chunkData.insert(*it);
+    //     if (!ins.second) {  
+    //         // Map key already existed, so we have to merge the slice data
+    //         OverlayData* vec1 = &(it->second);
+    //         OverlayData* vec2 = &(ins.first->second);
+    //         vec2->insert(vec2->end(), vec1->begin(), vec1->end());
+    //     }
+    // }
+    
+    // for (auto it = threadData.begin(); it != threadData.end(); ++it) {
+    //     for (auto jt = it->second.begin(); jt != it->second.end(); ++jt) {
+    //         std::pair<OverlayChunkData::iterator, bool> ins = chunkData.insert(*jt);
+    //         if (!ins.second) {
+    //             // Map key already existed, so we have to merge the slice data
+    //             OverlayData* vec1 = &(jt->second);
+    //             OverlayData* vec2 = &(ins.first->second);
+    //             vec2->insert(vec2->end(), vec1->begin(), vec1->end());
+    //         }
+
+    //         // // Cluster into Z slices
+    //         // for (auto& point : jt->second) {
+    //         //     chunkSliceData[jt->first][point.z].push_back(
+    //         //         cv::Point2f(point.x, point.y));
+    //         // }
+    //     }
+    // }
+
+    for (auto it = threadSliceData.begin(); it != threadSliceData.end(); ++it) {
+        for (auto jt = it->second.begin(); jt != it->second.end(); ++jt) {
+           
+            std::pair<OverlayChunkSliceData::iterator, bool> ins = chunkSliceData.insert(*jt);
+            if (!ins.second) { 
+                // Map key already existed, so we have to merge the slice data
+                for (auto& data : jt->second) {
+                    chunkSliceData[jt->first][data.first].insert(chunkSliceData[jt->first][data.first].end(), data.second.begin(), data.second.end());
+                }
+
+                // OverlaySliceData* vec1 = &(jt->second);
+                // OverlaySliceData* vec2 = &(ins.first->second);
+                // vec2->insert(vec2->end(), vec1->begin(), vec1->end());
+            }
         }
     }
 
@@ -211,22 +268,7 @@ void COverlayLoader::mergeThreadData(OverlayChunkData threadData) const
     //         data.second.end());
     // }
 
-    // for (auto it = threadSliceData.begin(); it != threadSliceData.end(); ++it) {
-    //     for (auto jt = it->second.begin(); jt != it->second.end(); ++jt) {
-           
-    //         std::pair<OverlayChunkSliceData::iterator, bool> ins = chunkSliceData.insert(*jt);
-    //         if (!ins.second) { 
-    //             // Map key already existed, so we have to merge the slice data
-    //             for (auto data : jt->second) {
-    //                 chunkSliceData[jt->first][data.first].insert(chunkSliceData[jt->first][data.first].end(), data.second.begin(), data.second.end());
-    //             }
 
-    //             // OverlaySliceData* vec1 = &(jt->second);
-    //             // OverlaySliceData* vec2 = &(ins.first->second);
-    //             // vec2->insert(vec2->end(), vec1->begin(), vec1->end());
-    //         }
-    //     }
-    // }
 }
 
 // auto COverlayLoader::getOverlayData(cv::Rect rect) const -> OverlayChunkDataRef
@@ -247,24 +289,28 @@ auto COverlayLoader::getOverlayData(cv::Rect2d rect, int zIndex) -> OverlaySlice
     auto chunks = determineChunks(rect, zIndex);
     loadOverlayData(determineNotLoadedFiles(chunks));
 
-    // for (auto chunk : chunks) {
-    //     if (chunkSliceData[chunk].find(zIndex) != chunkSliceData[chunk].end()) {
-    //         for (auto point : chunkSliceData[chunk][zIndex]) {
-    //             res.push_back({point[0], point[1]});
-    //         }
-    //     }
-    // }
-
     cv::Point2f point2f;
     for (auto& chunk : chunks) {
-        for (auto& point : chunkData[chunk]) {
-            if (point.z == zIndex) {
+        auto it = chunkSliceData[chunk].find(zIndex);
+        if (it != chunkSliceData[chunk].end()) {
+            for (auto& point : it->second) {
                 point2f = cv::Point2f(point.x, point.y);
                 if (rect.contains(point2f))
                     res.push_back(point2f);
             }
         }
     }
+
+    // cv::Point2f point2f;
+    // for (auto& chunk : chunks) {
+    //     for (auto& point : chunkData[chunk]) {
+    //         if (point.z == zIndex) {
+    //             point2f = cv::Point2f(point.x, point.y);
+    //             if (rect.contains(point2f))
+    //                 res.push_back(point2f);
+    //         }
+    //     }
+    // }
 
     // There are quite some point duplicates across chunks, so we remove them
     // now for faster rendering and processing.

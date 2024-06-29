@@ -319,6 +319,7 @@ private:
     QShortcut* sliceZoomOut;
     QShortcut* displayCurves;
     QShortcut* displayCurves_C;
+    QShortcut* displayOverlays;
     QShortcut* impactUp;
     QShortcut* impactDwn;
     QShortcut* impactUp_old;

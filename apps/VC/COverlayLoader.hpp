@@ -66,7 +66,7 @@ public:
     auto getOverlayData(cv::Rect2d rect, int zIndex = -1) -> OverlaySliceData;
 
     void loadSingleOverlayFile(const std::string& file, OverlayChunkID chunkID, int threadNum) const;
-    void mergeThreadData(OverlayChunkData threadData) const;
+    void mergeThreadData() const;
 
 protected:
     OverlaySettings settings;

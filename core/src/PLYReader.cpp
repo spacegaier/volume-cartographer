@@ -181,6 +181,9 @@ void PLYReader::read_points_()
     unsigned int greenBinOffset = vertextByteInfo_["green"].offset;
     unsigned int blueBinOffset  = vertextByteInfo_["blue"].offset;
 
+    bool hasNormal = properties_.find("nx") != properties_.end();
+    bool hasColor = properties_.find("red") != properties_.end();
+
     for (int i = 0; i < numVertices_; i++) {
         SimpleMesh::Vertex curPoint;
 
@@ -190,12 +193,12 @@ void PLYReader::read_points_()
             curPoint.x = std::stod(curLine[properties_["x"]]);
             curPoint.y = std::stod(curLine[properties_["y"]]);
             curPoint.z = std::stod(curLine[properties_["z"]]);
-            if (properties_.find("nx") != properties_.end()) {
+            if (hasNormal) {
                 curPoint.nx = std::stod(curLine[properties_["nx"]]);
                 curPoint.ny = std::stod(curLine[properties_["ny"]]);
                 curPoint.nz = std::stod(curLine[properties_["nz"]]);
             }
-            if (properties_.find("red") != properties_.end()) {
+            if (hasColor) {
                 curPoint.r = std::stoi(curLine[properties_["red"]]);
                 curPoint.g = std::stoi(curLine[properties_["green"]]);
                 curPoint.b = std::stoi(curLine[properties_["blue"]]);
@@ -207,12 +210,12 @@ void PLYReader::read_points_()
             curPoint.y = convert(buffer + yBinOffset, yBinLength);
             curPoint.z = convert(buffer + zBinOffset, zBinLength);     
 
-            if (properties_.find("nx") != properties_.end()) {
+            if (hasNormal) {
                 curPoint.nx = convert(buffer + nxBinOffset, nxBinLength);
                 curPoint.ny = convert(buffer + nyBinOffset, nyBinLength);
                 curPoint.nz = convert(buffer+ nzBinOffset, nzBinLength);
             }
-            if (properties_.find("red") != properties_.end()) {
+            if (hasColor) {
                 curPoint.r = convert(buffer + redBinOffset,   redBinLength);
                 curPoint.g = convert(buffer + greenBinOffset, greenBinLength);
                 curPoint.b = convert(buffer + blueBinOffset,  blueBinLength);

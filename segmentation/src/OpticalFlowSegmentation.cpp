@@ -583,11 +583,10 @@ std::vector<Voxel> OpticalFlowSegmentationClass::computeCurve(
             }
         }
 
+        // Use point cloud as magnet to pull points
         float magnetStrength = magnetStrength_ / 100.f;
         int numPointsOnSlice = 3;
         if (magnetStrength > 0) {
-            // Use point cloud as magnet to pull points
-
             std::vector<cv::Point2f> minPoints;
 
             auto minPoint = findMagnetPoint(roiNoMargin, updatedPt, nextZIndex, numPointsOnSlice);

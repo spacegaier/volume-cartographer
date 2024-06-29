@@ -135,12 +135,13 @@ protected:
     int fScanRange;  // how many slices a mouse wheel step will jump
     // Required to be able to reset the rotation without also resetting the scaling
     int currentRotation{0};
+    bool showOverlay{true};
 
     // user settings
     bool fCenterOnZoomEnabled;
     int fScrollSpeed{-1};
     bool fSkipImageFormatConv;
-    bool fOverlaySliceNeighbor;
+    int fOverlaySliceNeighbors{1};
 
     QGraphicsPixmapItem* fBaseImageItem;
     QList<COverlayGraphicsItem*> overlayItems;

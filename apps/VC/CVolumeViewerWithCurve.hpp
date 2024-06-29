@@ -43,8 +43,8 @@ public:
     void ReturnToSliceIndexToolStart();
 
     void UpdateView();
-    void SetShowCurve(bool b) { showCurve = b; }
-    void toggleShowCurveBox();
+    void ToggleShowCurveBox();
+    void ToggleShowOverlayBox();
 
     void SetButtonsEnabled(bool state);
 
@@ -57,7 +57,8 @@ protected:
 
 private slots:
     void OnShowCurveStateChanged(int state);
-    void panAlongCurve(double speed, bool forward);
+    void OnShowOverlayStateChanged(int state);
+    void PanAlongCurve(double speed, bool forward);
 
 private:
     void WidgetLoc2ImgLoc(const cv::Vec2f& nWidgetLoc, cv::Vec2f& nImgLoc);
@@ -83,6 +84,7 @@ private:
     ColorFrame* colorSelectorHighlight{nullptr};
     ColorFrame* colorSelectorManual{nullptr};
     QCheckBox* fShowCurveBox;
+    QCheckBox* fShowOverlayBox;
     bool showCurve;
     int fwdBackMsJump;
     int displaySegmentOpacity;

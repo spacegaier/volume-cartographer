@@ -511,6 +511,7 @@ void CWindow::CreateWidgets(void)
     sliceZoomOut = new QShortcut(QKeySequence::ZoomOut, this);
     displayCurves = new QShortcut(QKeySequence(Qt::Key_Space), this);
     displayCurves_C = new QShortcut(QKeySequence(Qt::Key_C), this); // For NoMachine Segmenters
+    displayOverlays = new QShortcut(QKeySequence(Qt::Key_B), this);
     impactDwn = new QShortcut(QKeySequence(Qt::Key_A), this);
     impactUp = new QShortcut(QKeySequence(Qt::Key_D), this);
     impactDwn_old = new QShortcut(QKeySequence(tr("[")), this);
@@ -553,10 +554,13 @@ void CWindow::CreateWidgets(void)
         &CVolumeViewerWithCurve::OnZoomOutClicked);
     connect(
         displayCurves, &QShortcut::activated, fVolumeViewerWidget,
-        &CVolumeViewerWithCurve::toggleShowCurveBox);
+        &CVolumeViewerWithCurve::ToggleShowCurveBox);
     connect(
         displayCurves_C, &QShortcut::activated, fVolumeViewerWidget,
-        &CVolumeViewerWithCurve::toggleShowCurveBox);
+        &CVolumeViewerWithCurve::ToggleShowCurveBox);
+    connect(
+        displayOverlays, &QShortcut::activated, fVolumeViewerWidget,
+        &CVolumeViewerWithCurve::ToggleShowOverlayBox);
     connect(impactUp, &QShortcut::activated, this, &CWindow::onImpactRangeUp);
     connect(impactDwn, &QShortcut::activated, this, &CWindow::onImpactRangeDown);
     connect(impactUp_old, &QShortcut::activated, this, &CWindow::onImpactRangeUp);
@@ -1983,6 +1987,7 @@ void CWindow::Keybindings(void)
         "P: Pen Tool \n"
         "Space: Toggle Curve Visibility \n"
         "C: Alternate Toggle Curve Visibility \n"
+        "B: Toggle Overlay Visibility \n"
         "J: Highlight Next Curve that is selected for computation \n"
         "K: Highlight Previous Curve that is selected for computation \n"
         "F: Return to slice that the currently active tool was started on \n"

@@ -16,6 +16,7 @@ using namespace ChaoVis;
 CVolumeViewerWithCurve::CVolumeViewerWithCurve(std::unordered_map<std::string, SegmentationStruct>& nSegStructMapRef)
     : fShowCurveBox(nullptr)
     , showCurve(true)
+    , fShowOverlayBox(nullptr)
     , fSplineCurveRef(nullptr)
     , fIntersectionCurveRef(nullptr)
     , fSelectedPointIndex(-1)
@@ -87,17 +88,25 @@ CVolumeViewerWithCurve::CVolumeViewerWithCurve(std::unordered_map<std::string, S
         internalSettings.setValue("volumeViewer/manualColor", c);
     });
 
-    // show curve box
+    // Show curve checkbox
     fShowCurveBox = new QCheckBox(this);
     fShowCurveBox->setChecked(true);
-    connect(
-        fShowCurveBox, SIGNAL(stateChanged(int)), this,
-        SLOT(OnShowCurveStateChanged(int)));
+    connect(fShowCurveBox, &QCheckBox::stateChanged, this, &CVolumeViewerWithCurve::OnShowCurveStateChanged);
     // Separate label (rather than using the one from the checkbox) for a visually tighter fit
     QLabel* ShowCurveLabel = new QLabel(this);
     ShowCurveLabel->setText("Show Curve");
     fButtonsLayout->addWidget(fShowCurveBox);
     fButtonsLayout->addWidget(ShowCurveLabel);
+
+    // Show overlay checkbox
+    fShowOverlayBox = new QCheckBox(this);
+    fShowOverlayBox->setChecked(true);
+    connect(fShowOverlayBox, &QCheckBox::stateChanged, this, &CVolumeViewerWithCurve::OnShowOverlayStateChanged);
+    // Separate label (rather than using the one from the checkbox) for a visually tighter fit
+    QLabel* ShowOverlayabel = new QLabel(this);
+    ShowOverlayabel->setText("Show Overlay");
+    fButtonsLayout->addWidget(fShowOverlayBox);
+    fButtonsLayout->addWidget(ShowOverlayabel);
 
     QSettings userSettings("VC.ini", QSettings::IniFormat);
     fwdBackMsJump = userSettings.value("viewer/fwd_back_step_ms", 25).toInt();
@@ -202,7 +211,7 @@ void CVolumeViewerWithCurve::UpdateView()
     update();  // Repaint the widget
 }
 
-void CVolumeViewerWithCurve::panAlongCurve(double speed, bool forward)
+void CVolumeViewerWithCurve::PanAlongCurve(double speed, bool forward)
 {
     int viewportWidth = fGraphicsView->viewport()->width();
     int viewportHeight = fGraphicsView->viewport()->height();
@@ -255,7 +264,7 @@ void CVolumeViewerWithCurve::mousePressEvent(QMouseEvent* event)
         lastPressedSideButton = event->button();
         scrollPositionModifier = cv::Vec2f(0.0, 0.0);
         bool forward = event->buttons() & Qt::ForwardButton;
-        connect(timer, &QTimer::timeout, this, [this, forward]{ panAlongCurve(50.0, forward); });
+        connect(timer, &QTimer::timeout, this, [this, forward]{ PanAlongCurve(50.0, forward); });
         timer->start(fwdBackMsJump); // start timer with millisec delay value from settings
         return;
     }
@@ -492,9 +501,9 @@ bool CVolumeViewerWithCurve::eventFilter(QObject* watched, QEvent* event)
             int numDegrees = wheelEvent->angleDelta().y() / 8;
 
             if (numDegrees > 0) {
-                panAlongCurve(100.0, true);
+                PanAlongCurve(100.0, true);
             } else if (numDegrees < 0) {
-                panAlongCurve(100.0, false);
+                PanAlongCurve(100.0, false);
             }
 
             return true;
@@ -505,22 +514,28 @@ bool CVolumeViewerWithCurve::eventFilter(QObject* watched, QEvent* event)
     return CVolumeViewer::eventFilter(watched, event);
 }
 
-void CVolumeViewerWithCurve::toggleShowCurveBox()
+void CVolumeViewerWithCurve::ToggleShowCurveBox()
 {
-    bool currentState = fShowCurveBox->isChecked();
-    fShowCurveBox->setChecked(!currentState);
-    UpdateView();
+    fShowCurveBox->setChecked(!fShowCurveBox->isChecked());
 }
 
 // Handle setting the draw state for the curve
 void CVolumeViewerWithCurve::OnShowCurveStateChanged(int state)
 {
-    if (state > 0)
-        showCurve = true;
-    else
-        showCurve = false;
-
+    showCurve = (state > 0);
     UpdateView();
+}
+
+void CVolumeViewerWithCurve::ToggleShowOverlayBox()
+{
+    fShowOverlayBox->setChecked(!fShowOverlayBox->isChecked());
+}
+
+// Handle setting the draw state for the overlay
+void CVolumeViewerWithCurve::OnShowOverlayStateChanged(int state)
+{
+    showOverlay = (state > 0);
+    UpdateOverlay();
 }
 
 void CVolumeViewerWithCurve::WidgetLoc2ImgLoc(
