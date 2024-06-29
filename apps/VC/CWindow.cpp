@@ -128,10 +128,13 @@ CWindow::CWindow()
     fSegParams.smoothness_interpolation_percent = 40;
     fSegParams.step_size = 1;
 
-    fSegParams.magnet_strenght = 80;
-    fSegParams.magnet_max_distance = 10;
-    fSegParams.magnet_neighbor_slices = 0;
-    fSegParams.magnet_neighbor_use_average = false;
+    fSegParams.magnet_settings.enable = true;
+    fSegParams.magnet_settings.magnetStrength = 70;
+    fSegParams.magnet_settings.maxDistance = 5;
+    fSegParams.magnet_settings.magnetsPerSlice = 5;
+    fSegParams.magnet_settings.magnetSliceAvgMode = 1;
+    fSegParams.magnet_settings.magnetNeighborSlices = 1;
+    fSegParams.magnet_settings.magnetNeighborSliceAvgMode = 2;
 
     // Process the raw impact and scan ranges string and convert to step vectors
     impactRangeSteps = SettingsDialog::expandSettingToIntRange(settings.value("viewer/impact_range_steps", "1-3, 5, 8, 11, 15, 20, 28, 40, 60, 100, 200").toString());
@@ -333,22 +336,43 @@ void CWindow::CreateWidgets(void)
     // ADD NEW SEGMENTATION ALGORITHM NAMES HERE
     // aSegMethodsComboBox->addItem(tr("My custom algorithm"));
 
-    // OFS Overlay PointCloud Parameters
-    auto* edtMagnetStrength= new QSpinBox();
-    edtMagnetStrength->setMinimum(0);
-    edtMagnetStrength->setMaximum(100);
-    edtMagnetStrength->setValue(80);
-    auto* edtMagnetMaxDistance= new QSpinBox();
-    edtMagnetMaxDistance->setMinimum(0);
-    edtMagnetMaxDistance->setMaximum(100);
-    edtMagnetMaxDistance->setValue(10);
-    auto* edtMagnetNeighborSlices= new QSpinBox();
-    edtMagnetNeighborSlices->setMinimum(0);
-    edtMagnetNeighborSlices->setMaximum(5);
-    edtMagnetNeighborSlices->setValue(0);
+    // OFS Magnet PointCloud Parameters
+    auto* chkUseMagnets = new QCheckBox(tr("Use Magnets"));
+    chkUseMagnets->setChecked(fSegParams.magnet_settings.enable);
+    auto* spinMagnetStrength = new QSpinBox();
+    spinMagnetStrength->setMinimum(0);
+    spinMagnetStrength->setMaximum(100);
+    spinMagnetStrength->setValue(fSegParams.magnet_settings.magnetStrength);
+    auto* spinMagnetMaxDistance = new QSpinBox();
+    spinMagnetMaxDistance->setMinimum(0);
+    spinMagnetMaxDistance->setMaximum(100);
+    spinMagnetMaxDistance->setValue(fSegParams.magnet_settings.maxDistance);
+    auto* spinMagnetsPerSlice = new QSpinBox();
+    spinMagnetsPerSlice->setMinimum(0);
+    spinMagnetsPerSlice->setValue(fSegParams.magnet_settings.magnetsPerSlice);
+    auto* cmbMagnetSliceAvgMode = new QComboBox();
+    cmbMagnetSliceAvgMode->addItem(tr("Linear Average"));
+    cmbMagnetSliceAvgMode->addItem(tr("Weighted Average (nearest = 50%)"));
+    cmbMagnetSliceAvgMode->addItem(tr("Weighted Average (nearest = 75%)"));
+    cmbMagnetSliceAvgMode->setCurrentIndex(fSegParams.magnet_settings.magnetSliceAvgMode);
+    auto* spinMagnetNeighborSlices = new QSpinBox();
+    spinMagnetNeighborSlices->setMinimum(0);
+    spinMagnetNeighborSlices->setMaximum(100);
+    spinMagnetNeighborSlices->setValue(fSegParams.magnet_settings.magnetNeighborSlices);
+    auto* cmbMagnetNeighborSlicesAvgMode = new QComboBox();
+    cmbMagnetNeighborSlicesAvgMode->addItem(tr("Linear Average"));
+    cmbMagnetNeighborSlicesAvgMode->addItem(tr("Weighted Average (start index = 50%)"));
+    cmbMagnetNeighborSlicesAvgMode->addItem(tr("Weighted Average (start index = 75%)"));
+    cmbMagnetNeighborSlicesAvgMode->addItem(tr("Nearest Only"));
+    cmbMagnetNeighborSlicesAvgMode->setCurrentIndex(fSegParams.magnet_settings.magnetNeighborSliceAvgMode);
 
-    auto* chkMagnetNeighborUseAverage = new QCheckBox(tr("Magnet Average Neighbors"));
-    chkMagnetNeighborUseAverage->setChecked(false);
+    connect(chkUseMagnets, &QCheckBox::toggled, [=](bool checked){fSegParams.magnet_settings.enable = checked;});
+    connect(spinMagnetStrength, &QSpinBox::valueChanged, [=](int v){fSegParams.magnet_settings.magnetStrength = v;});
+    connect(spinMagnetMaxDistance, &QSpinBox::valueChanged, [=](int v){fSegParams.magnet_settings.maxDistance = v;});
+    connect(spinMagnetsPerSlice, &QSpinBox::valueChanged, [=](int v){fSegParams.magnet_settings.magnetsPerSlice = v;});
+    connect(cmbMagnetSliceAvgMode, &QComboBox::currentIndexChanged, [=](int v){fSegParams.magnet_settings.magnetSliceAvgMode = v;});
+    connect(spinMagnetNeighborSlices, &QSpinBox::valueChanged, [=](int v){fSegParams.magnet_settings.magnetNeighborSlices = v;});
+    connect(cmbMagnetNeighborSlicesAvgMode, &QComboBox::currentIndexChanged, [=](int v){fSegParams.magnet_settings.magnetNeighborSliceAvgMode = v;});
 
     // Optical Flow Segmentation Parameters
     auto* edtOutsideThreshold = new QSpinBox();
@@ -388,11 +412,6 @@ void CWindow::CreateWidgets(void)
     edtCacheSize->setMaximum(20000);
     edtCacheSize->setValue(settings.value("perf/preloaded_slices", 200).toInt());
 
-    connect(edtMagnetStrength, &QSpinBox::valueChanged, [=](int v){fSegParams.magnet_strenght = v;});
-    connect(edtMagnetMaxDistance, &QSpinBox::valueChanged, [=](int v){fSegParams.magnet_max_distance = v;});
-    connect(edtMagnetNeighborSlices, &QSpinBox::valueChanged, [=](int v){fSegParams.magnet_neighbor_slices = v;});
-    connect(chkMagnetNeighborUseAverage, &QCheckBox::toggled, [=](bool checked){fSegParams.magnet_neighbor_use_average = checked;});
-
     connect(edtOutsideThreshold, &QSpinBox::valueChanged, [=](int v){fSegParams.outside_threshold = v;});
     connect(edtOpticalFlowPixelThreshold, &QSpinBox::valueChanged, [=](int v){fSegParams.optical_flow_pixel_threshold = v;});
     connect(edtOpticalFlowDisplacementThreshold, &QSpinBox::valueChanged, [=](int v){fSegParams.optical_flow_displacement_threshold = v;});
@@ -408,13 +427,23 @@ void CWindow::CreateWidgets(void)
     auto* opticalFlowParamsContainer = new QWidget();
     auto* opticalFlowParamsLayout = new QVBoxLayout(opticalFlowParamsContainer);
 
+    opticalFlowParamsLayout->addWidget(chkUseMagnets);
     opticalFlowParamsLayout->addWidget(new QLabel(tr("Magnet Strength")));
-    opticalFlowParamsLayout->addWidget(edtMagnetStrength);
+    opticalFlowParamsLayout->addWidget(spinMagnetStrength);
     opticalFlowParamsLayout->addWidget(new QLabel(tr("Magnet Max Distance")));
-    opticalFlowParamsLayout->addWidget(edtMagnetMaxDistance);
-    opticalFlowParamsLayout->addWidget(new QLabel(tr("Magnet Heighbor Slices")));
-    opticalFlowParamsLayout->addWidget(edtMagnetNeighborSlices);
-    opticalFlowParamsLayout->addWidget(chkMagnetNeighborUseAverage);    
+    opticalFlowParamsLayout->addWidget(spinMagnetMaxDistance);
+    opticalFlowParamsLayout->addWidget(new QLabel(tr("Magnets per Slice")));
+    opticalFlowParamsLayout->addWidget(spinMagnetsPerSlice);
+    opticalFlowParamsLayout->addWidget(new QLabel(tr("Magnets Slice Average Mode")));
+    opticalFlowParamsLayout->addWidget(cmbMagnetSliceAvgMode);
+    opticalFlowParamsLayout->addWidget(new QLabel(tr("Magnet Neighbor Slices")));
+    opticalFlowParamsLayout->addWidget(spinMagnetNeighborSlices);
+    opticalFlowParamsLayout->addWidget(new QLabel(tr("Magnet Neighbor Slices Average Mode")));
+    opticalFlowParamsLayout->addWidget(cmbMagnetNeighborSlicesAvgMode);
+
+    QFrame* hFrame = new QFrame;
+    hFrame->setFrameShape(QFrame::HLine);
+    opticalFlowParamsLayout->addWidget(hFrame);
 
     opticalFlowParamsLayout->addWidget(new QLabel(tr("Optical Flow Displacement Threshold")));
     opticalFlowParamsLayout->addWidget(edtOpticalFlowDisplacementThreshold);
@@ -1303,12 +1332,9 @@ bool CWindow::prepareSegmentationOFS(std::string segID, bool forward, bool useAn
         ofsc->setStepSize(fSegParams.step_size);
         ofsc->setChain(fSegStructMap[segID].fStartingPath);
         ofsc->setVolume(currentVolume);
-        // OFS Overlay PointCloud
+        // OFS Magnet PointCloud
         ofsc->setOverlayLoader(fVolumeViewerWidget->GetOverlayLoader());
-        ofsc->setMagnetStrength(fSegParams.magnet_strenght);
-        ofsc->setMagnetMaxDistance(fSegParams.magnet_max_distance);
-        ofsc->setMagnetNeighborSlices(fSegParams.magnet_neighbor_slices);
-        ofsc->setMagnetNeighborUseAverage(fSegParams.magnet_neighbor_use_average);
+        ofsc->setMagnetSettings(fSegParams.magnet_settings);
 
         // Queue segmentation for execution
         queueSegmentation(segID, ofsc);

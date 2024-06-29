@@ -239,13 +239,10 @@ std::vector<std::vector<Voxel>> OpticalFlowSegmentationClass::interpolateGaps(st
 
 cv::Point2f OpticalFlowSegmentationClass::findMagnetPoint(cv::Rect roi, cv::Point2f curvePoint, int zIndex, int numPointsOnSlice)
 {
-    float minDistance = magnetMaxDistance_;
-    std::map<float, cv::Point2f> validPoints;
-
-    bool magnetFound = false;
+    float minDistance = magnetSettings_.maxDistance;
+    std::map<float, cv::Point2f> validMagnets;
     auto overlay = overlayLoader_->getOverlayData(roi, zIndex);
     float distance;
-    bool linearAvg = true;
 
     for (auto point : overlay) {
 
@@ -254,27 +251,22 @@ cv::Point2f OpticalFlowSegmentationClass::findMagnetPoint(cv::Rect roi, cv::Poin
         distance = cv::norm(a - b);
 
         if (distance < minDistance) {
-            validPoints[distance] = a;
+            validMagnets[distance] = a;
         }
     }
 
-    if (validPoints.empty()) {
+    if (validMagnets.empty()) {
         return cv::Point2f(-1, -1);
     } else {
         cv::Point2f sum;
-        auto avgPoints = std::min((int)validPoints.size(), numPointsOnSlice);   
-        auto it = validPoints.begin();
+        auto avgPoints = std::min((int)validMagnets.size(), numPointsOnSlice);   
+        auto it = validMagnets.begin();
 
-        if (linearAvg) {          
-            for (int i = 0; i < avgPoints; ++i)  {
-                sum += it->second;
-                ++it;
-            }
-            return sum / avgPoints;
-        } else {
+        if (magnetSettings_.magnetSliceAvgMode == 1 || magnetSettings_.magnetSliceAvgMode == 2) {    
+            // Weighted average mode
             float weightRemainder = 100;
             float weightSum = 0;
-            float weight = 50; // we start with 50 = nearest point will be weighted with 50%
+            float weight = magnetSettings_.magnetSliceAvgMode == 1 ? 50 : 75;
             for (int i = 0; i < avgPoints; ++i) {
                 sum += weight / 100 * it->second;
 
@@ -284,6 +276,13 @@ cv::Point2f OpticalFlowSegmentationClass::findMagnetPoint(cv::Rect roi, cv::Poin
                 ++it;
             }
             return sum * 100 / weightSum;
+        } else {    
+            // Default: Linear average mode      
+            for (int i = 0; i < avgPoints; ++i)  {
+                sum += it->second;
+                ++it;
+            }
+            return sum / avgPoints;
         }
     }
 }
@@ -419,6 +418,18 @@ std::vector<Voxel> OpticalFlowSegmentationClass::computeCurve(
     int maxDistance = edge_jump_distance_; // Max distance to an considerable edge
     int whiteDistance = edge_bounce_distance_; // The distance the point is moved into the white part of the sheet
     std::vector<bool> updated_indices(currentCurve.size(), false);
+
+    float magnetStrength = magnetSettings_.magnetStrength / 100.f;
+    cv::Rect roiMagnets;
+    if (magnetSettings_.enable && magnetStrength > 0) {
+        int margin = magnetSettings_.maxDistance;
+        auto xMagnetMin = std::max(0, roiNoMargin.x - margin);
+        auto yMagnetMin = std::max(0, roiNoMargin.y - margin);
+        auto xMagnetMax = std::min(vol_->sliceWidth() - 1, roiNoMargin.br().x + margin);
+        auto yMagnetMax = std::min(vol_->sliceHeight() - 1, roiNoMargin.br().y + margin);
+
+        roiMagnets = cv::Rect(x_min, y_min, x_max - x_min + 1, y_max - y_min + 1);
+    }
 
     for (int i = 0; i < int(currentCurve.size()); ++i) {
         // Get the current point
@@ -584,50 +595,82 @@ std::vector<Voxel> OpticalFlowSegmentationClass::computeCurve(
         }
 
         // Use point cloud as magnet to pull points
-        float magnetStrength = magnetStrength_ / 100.f;
-        int numPointsOnSlice = 3;
-        if (magnetStrength > 0) {
-            std::vector<cv::Point2f> minPoints;
+        if (magnetSettings_.enable && magnetStrength > 0) {
+            // Map of slice index and magnet point
+            std::map<int, cv::Point2f> validMagnets;
 
-            auto minPoint = findMagnetPoint(roiNoMargin, updatedPt, nextZIndex, numPointsOnSlice);
+            auto minPoint = findMagnetPoint(roiMagnets, updatedPt, nextZIndex, magnetSettings_.magnetStrength);
             if (minPoint != cv::Point2f(-1, -1)) {
-                minPoints.push_back(minPoint);
+                validMagnets.emplace(nextZIndex, minPoint);
             }
 
-            for (int i = 0; i < magnetNeighborSlices_; ++i) {
-                minPoint = findMagnetPoint(roiNoMargin, updatedPt, std::clamp(nextZIndex - i,0 , vol_->numSlices()), numPointsOnSlice);
+            for (int i = 0; i < magnetSettings_.magnetNeighborSlices; ++i) {
+                minPoint = findMagnetPoint(roiMagnets, updatedPt, std::clamp(nextZIndex - i,0 , vol_->numSlices()), magnetSettings_.magnetStrength);
                 if (minPoint != cv::Point2f(-1, -1)) {
-                    minPoints.push_back(minPoint);
+                    validMagnets.emplace(nextZIndex - i, minPoint);
                 }
 
-                minPoint = findMagnetPoint(roiNoMargin, updatedPt, std::clamp(nextZIndex + i,0 , vol_->numSlices()), numPointsOnSlice);
+                minPoint = findMagnetPoint(roiMagnets, updatedPt, std::clamp(nextZIndex + i,0 , vol_->numSlices()), magnetSettings_.magnetStrength);
                 if (minPoint != cv::Point2f(-1, -1)) {
-                    minPoints.push_back(minPoint);
+                    validMagnets.emplace(nextZIndex + i, minPoint);
                 }
             }
 
-            if (!minPoints.empty()) {
-                cv::Point2f delta;
-                if (magnetNeighborUseAverage_) {
+            if (!validMagnets.empty()) {
+                cv::Point2f finalMagnet;
+                if (magnetSettings_.magnetNeighborSliceAvgMode == 0) {
+                    // Linear average mode
                     cv::Point2f sum = std::accumulate(
-                        minPoints.begin(), minPoints.end(),
-                        cv::Point2f(0.0f, 0.0f), std::plus<cv::Point2f>());
-                    delta = sum / (int)minPoints.size();
-                } else {
-                    // Find nearest point
-                    double minDistance = magnetMaxDistance_;
-                    for (auto minPoint : minPoints) {
-                        cv::Point2f a(updatedPt.x, updatedPt.y);
-                        double distance = cv::norm(a - minPoint);
-                        if (distance < minDistance) {
-                            delta = minPoint;
-                            minDistance = distance;
+                        validMagnets.begin(), validMagnets.end(),
+                        cv::Point2f(0.0f, 0.0f), [] (cv::Point2f value, const std::map<float, cv::Point2f> ::value_type& p)
+                        { return value + p.second; }
+                    );
+                    finalMagnet = sum / (int)validMagnets.size();
+                } else if (magnetSettings_.magnetNeighborSliceAvgMode == 1|| magnetSettings_.magnetNeighborSliceAvgMode == 2) {
+                    // Weighted average mode
+                    float weightRemainder = 100;
+                    float weightSum = 0;
+                    float weight = magnetSettings_.magnetNeighborSliceAvgMode == 1 ? 50 : 75;
+                    int weightDivisor = 2;
+                    cv::Point2f sum;
+
+                    // For main index first
+                    sum += weight / 100 * validMagnets.at(nextZIndex);
+                    weightSum += weight;
+                    weightRemainder -= weight;
+                    weight = weightRemainder / weightDivisor;
+
+                    // Now for all neighbors (each getting half the weight)
+                    for (int i = 0; i < magnetSettings_.magnetNeighborSlices; ++i) {
+
+                        auto it = validMagnets.find(nextZIndex - i);
+                        if (it != validMagnets.end()) {
+                            sum += weight / 2 / 100 * it->second;
+                        }
+
+                        it = validMagnets.find(nextZIndex + i);
+                        if (it != validMagnets.end()) {
+                            sum += weight / 2 / 100 * it->second;
+                        }
+                        
+                        weightSum += weight;
+                        weightRemainder -= weight;
+                        weight = weightRemainder / weightDivisor;
+                    }
+                    finalMagnet = sum * 100 / weightSum;
+                } else if (magnetSettings_.magnetNeighborSliceAvgMode == 3) {
+                    // Nearest-only mode
+                    double minDistance = magnetSettings_.maxDistance;
+                    for (auto magnet : validMagnets) {                        
+                        if (magnet.first < minDistance) {
+                            finalMagnet = magnet.second;
+                            minDistance = magnet.first;
                         }
                     }
                 }
 
-                updatedPt.x += magnetStrength * (delta.x - updatedPt.x);
-                updatedPt.y += magnetStrength * (delta.y - updatedPt.y);
+                updatedPt.x += magnetStrength * (finalMagnet.x - updatedPt.x);
+                updatedPt.y += magnetStrength * (finalMagnet.y - updatedPt.y);
             }
         }
 

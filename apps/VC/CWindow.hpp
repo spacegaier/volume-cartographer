@@ -22,7 +22,7 @@
 #include "SegmentationStruct.hpp"
 
 #include "vc/core/types/VolumePkg.hpp"
-#include "vc/segmentation/ChainSegmentationAlgorithm.hpp"
+#include "vc/segmentation/OpticalFlowSegmentation.hpp"
 
 #include <thread>
 #include <condition_variable>
@@ -97,11 +97,8 @@ public:
         int edge_bounce_distance;
         int smoothness_interpolation_percent;
         int step_size{1};
-        // OFS Overlay PointCloud
-        int magnet_max_distance;
-        int magnet_strenght;
-        int magnet_neighbor_slices;
-        bool magnet_neighbor_use_average;
+        // OFS Magnet PointCloud
+        volcart::segmentation::OpticalFlowSegmentationClass::MagnetSettings magnet_settings;
     };
 
     using Segmenter = volcart::segmentation::ChainSegmentationAlgorithm;

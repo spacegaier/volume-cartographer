@@ -30,7 +30,8 @@ namespace volcart::segmentation
  * within a page layer.
  * The ending index is inclusive.
  *
- * Warning: This Algorithm is not deterministic and yields slightly different results each run.
+ * Warning: This Algorithm is not deterministic and yields slightly different
+ * results each run.
  *
  * @ingroup ofsc
  */
@@ -173,11 +174,19 @@ public:
     /** @brief Returns the maximum progress value */
     [[nodiscard]] auto progressIterations() const -> std::size_t override;
 
+    struct MagnetSettings 
+    {
+        bool enable;
+        int maxDistance;
+        int magnetStrength;
+        int magnetsPerSlice;
+        int magnetSliceAvgMode;
+        int magnetNeighborSlices;
+        int magnetNeighborSliceAvgMode;
+    };
+
     void setOverlayLoader(ChaoVis::COverlayLoader* loader) { overlayLoader_ = loader; }
-    void setMagnetStrength(int strength) { magnetStrength_ = strength; }
-    void setMagnetMaxDistance(int distance) { magnetMaxDistance_ = distance; }
-    void setMagnetNeighborSlices(int slices) { magnetNeighborSlices_ = slices; }
-    void setMagnetNeighborUseAverage(bool average) { magnetNeighborUseAverage_ = average; }
+    void setMagnetSettings(MagnetSettings settings) { magnetSettings_ = settings; }
 
     cv::Point2f findMagnetPoint(cv::Rect roi, cv::Point2f curvePoint, int zIndex, int numPointsOnSlice);
 
@@ -294,9 +303,6 @@ private:
     volcart::OrderedPointSet<cv::Vec3d> masterCloud_;
     mutable std::shared_mutex display_mutex_;
     ChaoVis::COverlayLoader* overlayLoader_;
-    int magnetStrength_;
-    int magnetMaxDistance_;
-    int magnetNeighborSlices_;
-    bool magnetNeighborUseAverage_{false};
+    MagnetSettings magnetSettings_;
 };
 }  // namespace volcart::segmentation
