@@ -35,15 +35,15 @@ __Note:__ The first 5 slices from https://dl.ash2txt.org/full-scrolls/Scroll1/PH
 If a point cloud is loaded, it can be used as an addition to the OFS algorithm to better guide it through the scrolls. This allows longer segmentation runs while keeping the curves on the papyrus. The point cloud points serve as magnets to pull on the OFS output points.
 
 Corresponding new parameters have been added to the OFS segmentation panel:
-1. Use Magnet: Toggles the magnet logic on/off
-2. Magnet Strength: Strength with which the magnets pull the OFS points towards them. 70 means, that the OFS point will be pulled 70% of the distance delta between magnet and OFS point.
-3. Magnet Max Distance: How far a potential magnet point may be away from the OFS point, in order to be relevant for pulling.
-4. Magnets per Slice: How many magnets will be considered per slice.
-5. Magnets Slice Average Mode: Determines how the relevant magnets will be combined.
+1. `Use Magnets`: Toggles the magnet logic on/off
+2. `Magnet Strength`: Strength with which the magnets pull the OFS points towards them. 70 means, that the OFS point will be pulled 70% of the distance delta between magnet and OFS point.
+3. `Magnet Max Distance`: How far a potential magnet point may be away from the OFS point, in order to be relevant for pulling.
+4. `Magnets per Slice`: How many magnets will be considered per slice.
+5. `Magnets Slice Average Mode`: Determines how the relevant magnets will be combined.
     * Linear Average: Gives the same weight to each magnet
     * Weighted Average: Gives the highest weight to the nearest magnet, and then halves the weight for next magnet and so on. There are two variants, one where the first magnet weight is 50% and one with 75%.
-6. Magnet Neighbor Slices: How many slices besides the one that OFS is currently being run for, should be used to look for magnets. A value of 1, means that one slice above and one below will be considered, 2 means two slices above and below and so on.
-7. Magnet Neighbor Slices Average Mode: If neighbor slices are used, then for each slice the magnet determination runs based on the provided parameters. At the end that means for each considered slice we have one magnet point (might be a virtual one if multiple magnets on the slice were averaged together). This parameter controls, how those virtual magnets for each slice will be now averaged to get the final magnet that then actually pulls on the OFS point.
+6. `Magnet Neighbor Slices`: How many slices besides the one that OFS is currently being run for, should be used to look for magnets. A value of 1, means that one slice above and one below will be considered, 2 means two slices above and below and so on.
+7. `Magnet Neighbor Slices Average Mode`: If neighbor slices are used, then for each slice the magnet determination runs based on the provided parameters. At the end that means for each considered slice we have one magnet point (might be a virtual one if multiple magnets on the slice were averaged together). This parameter controls, how those virtual magnets for each slice will be now averaged to get the final magnet that then actually pulls on the OFS point.
     * Linear Average: Gives the same weight to each magnet
     * Weighted Average: Gives the highest weight to the magnet on the slice OFS is currently running on, then half of that for the direct neighbors (one slice above and below, which means they effectively get a quarter each), then again half to the next further away neighbor pair (so an eight each) and so on
     * Nearest Only. Selects the nearest magnet of all the virtual slice magnets and only uses that one to pull the OFS point
