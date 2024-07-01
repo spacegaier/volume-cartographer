@@ -1,11 +1,14 @@
 // COverlayLoader.cpp
 // Philip Allgaier 2024 May
 #include "COverlayLoader.hpp"
+#include "CVolumeViewer.hpp"
 
 #include "CVolumeViewer.hpp"
 #include "vc/core/io/OBJReader.hpp"
 #include "vc/core/io/PLYReader.hpp"
 #include "vc/core/types/ITKMesh.hpp"
+
+#include "ui_VCOverlayImportDlg.h"
 
 using namespace ChaoVis;
 namespace vc = volcart;
@@ -19,17 +22,69 @@ auto roundDownToNearestMultiple(float numToRound, int multiple)  ->int
     return ((static_cast<int>(numToRound) / multiple) * multiple);
 }
 
+void COverlayLoader::resetData()
+{
+    settings = OverlaySettings();
+    chunkSliceData.clear();
+}
+
+void COverlayLoader::showOverlayImportDlg(const std::string& path, CVolumeViewer* viewer)
+{
+    if (path.size() == 0) {
+        return;
+    }
+
+    QString qtPath = QString::fromStdString(path);
+
+    auto dlg = new QDialog();
+    auto overlayImportDlg = new Ui::VCOverlayImportDlg();
+    overlayImportDlg->setupUi(dlg);
+    QObject::connect(overlayImportDlg->comboBoxNamePattern, &QComboBox::currentIndexChanged, dlg, [this, qtPath, dlg, overlayImportDlg, viewer]() {
+        // Set defaults for patterns        
+        if (overlayImportDlg->comboBoxNamePattern->currentIndex() == 0) {
+            overlayImportDlg->spinBoxOffset->setValue(-125);
+            overlayImportDlg->comboBox1stAxis->setCurrentIndex(1);
+            overlayImportDlg->comboBox2ndAxis->setCurrentIndex(2);
+            overlayImportDlg->comboBox3rdAxis->setCurrentIndex(0);
+            overlayImportDlg->doubleSpinBoxScalingFactor->setValue(4);
+            overlayImportDlg->spinBoxChunkSize->setValue(25);
+
+        } else if (overlayImportDlg->comboBoxNamePattern->currentIndex() == 1) {
+            overlayImportDlg->spinBoxOffset->setValue(-500);
+            overlayImportDlg->comboBox1stAxis->setCurrentIndex(1);
+            overlayImportDlg->comboBox2ndAxis->setCurrentIndex(2);
+            overlayImportDlg->comboBox3rdAxis->setCurrentIndex(0);
+            overlayImportDlg->doubleSpinBoxScalingFactor->setValue(1);
+            overlayImportDlg->spinBoxChunkSize->setValue(200);
+        }
+    });
+    // Enforce change so that matching values are set by callback
+    overlayImportDlg->comboBoxNamePattern->setCurrentIndex(-1);
+    overlayImportDlg->comboBoxNamePattern->setCurrentIndex(0);
+
+    QObject::connect(overlayImportDlg->buttonBox, &QDialogButtonBox::accepted, dlg, [this, qtPath, dlg, overlayImportDlg, viewer]() {
+        OverlaySettings overlaySettings;
+        overlaySettings.singleFile = qtPath.endsWith(".ply") || qtPath.endsWith(".obj");
+        overlaySettings.path = qtPath.toStdString();
+        overlaySettings.namePattern = overlayImportDlg->comboBoxNamePattern->currentIndex();
+        overlaySettings.xAxis = overlayImportDlg->comboBox1stAxis->currentText() == "X" ? 0 : overlayImportDlg->comboBox2ndAxis->currentText() == "X" ? 1 : 2;
+        overlaySettings.yAxis = overlayImportDlg->comboBox1stAxis->currentText() == "Y" ? 0 : overlayImportDlg->comboBox2ndAxis->currentText() == "Y" ? 1 : 2;
+        overlaySettings.zAxis = overlayImportDlg->comboBox1stAxis->currentText() == "Z" ? 0 : overlayImportDlg->comboBox2ndAxis->currentText() == "Z" ? 1 : 2;
+        overlaySettings.offset = overlayImportDlg->spinBoxOffset->value();
+        overlaySettings.scale = overlayImportDlg->doubleSpinBoxScalingFactor->value();
+        overlaySettings.chunkSize = overlayImportDlg->spinBoxChunkSize->value();
+
+        setOverlaySettings(overlaySettings);
+        viewer->ScheduleOverlayUpdate();
+        dlg->close();
+    });
+    QObject::connect(overlayImportDlg->buttonBox, &QDialogButtonBox::rejected, dlg, &QDialog::reject);
+    dlg->show();
+}
+
 void COverlayLoader::setOverlaySettings(OverlaySettings overlaySettings)
 { 
-    settings = overlaySettings; 
-
-    // Hard-code for testing
-    // settings.offset = -125;
-    // settings.xAxis = 2;
-    // settings.yAxis = 0;
-    // settings.zAxis = 1;
-    // settings.scale = 4;
-    // settings.chunkSize = 25;
+    settings = overlaySettings;
 }
 
 auto COverlayLoader::determineChunks(cv::Rect rect, int zIndex) const -> OverlayChunkIDs
@@ -39,55 +94,85 @@ auto COverlayLoader::determineChunks(cv::Rect rect, int zIndex) const -> Overlay
     if (settings.path.size() == 0) {
         return {};
     }
+
+    int xIndexStart, yIndexStart, zIndexStart;
+    int xIndexEnd, yIndexEnd, zIndexEnd;
  
-    auto xIndexStart = std::max(100, roundDownToNearestMultiple((rect.x - 100) / settings.scale, settings.chunkSize) - settings.offset);
-    xIndexStart -= settings.chunkSize; // due to the fact that file 000100 contains from -100 to 100, 000125 contains from 0 to 200, 000150 from 100 to 300
-    auto yIndexStart = std::max(100, roundDownToNearestMultiple((rect.y - 100) / settings.scale, settings.chunkSize) - settings.offset);
-    yIndexStart -= settings.chunkSize;
+    if (settings.namePattern == 0) {
+        xIndexStart = std::max(100, roundDownToNearestMultiple((rect.x - 100) / settings.scale, settings.chunkSize) - settings.offset);
+        xIndexStart -= settings.chunkSize; // due to the fact that file 000100 contains from -100 to 100, 000125 contains from 0 to 200, 000150 from 100 to 300
+        yIndexStart = std::max(100, roundDownToNearestMultiple((rect.y - 100) / settings.scale, settings.chunkSize) - settings.offset);
+        yIndexStart -= settings.chunkSize;
 
-    auto zIndexEnd = std::max(100, roundDownToNearestMultiple((zIndex - 100) / settings.scale, settings.chunkSize) - settings.offset);
-    auto zIndexStart = zIndexEnd - settings.chunkSize;
+        zIndexStart  = std::max(100, roundDownToNearestMultiple((zIndex - 100) / settings.scale, settings.chunkSize) - settings.offset);
+        zIndexStart -= settings.chunkSize;
+        zIndexEnd = zIndexStart;
 
-    auto xIndexEnd = roundDownToNearestMultiple((rect.br().x - 100) / settings.scale, settings.chunkSize) - settings.offset;
-    auto yIndexEnd = roundDownToNearestMultiple((rect.br().y - 100) / settings.scale, settings.chunkSize) - settings.offset;
+        xIndexEnd = roundDownToNearestMultiple((rect.br().x - 100) / settings.scale, settings.chunkSize) - settings.offset;
+        yIndexEnd = roundDownToNearestMultiple((rect.br().y - 100) / settings.scale, settings.chunkSize) - settings.offset;
+
+    } else if (settings.namePattern == 1) {
+        // The cells number the chunks sequentially, opposed to the pattern above, where the chunk names are the coordinates
+        xIndexStart = std::max(1, (rect.x - settings.offset) / settings.chunkSize);
+        yIndexStart = std::max(1, (rect.y - settings.offset) / settings.chunkSize);
+        
+        zIndexStart = std::max(1, (zIndex - settings.offset) / settings.chunkSize);
+        zIndexEnd = zIndexStart;
+
+        xIndexEnd = (rect.br().x - settings.offset) / settings.chunkSize;
+        yIndexEnd = (rect.br().y - settings.offset) / settings.chunkSize;        
+    }
 
     OverlayChunkID id;
-    for (auto z = zIndexStart; z <= zIndexEnd; z += settings.chunkSize) {
-        for (auto x = xIndexStart; x <= xIndexEnd; x += settings.chunkSize) {
-            for (auto y = yIndexStart; y <= yIndexEnd; y += settings.chunkSize) {
-                id[settings.xAxis] = x;
-                id[settings.yAxis] = y;
-                id[settings.zAxis] = z;
+        for (auto z = zIndexStart; z <= zIndexEnd; ++z) {
+            for (auto x = xIndexStart; x <= xIndexEnd; ++x) {
+                for (auto y = yIndexStart; y <= yIndexEnd; ++y) {
+                    id[settings.xAxis] = x;
+                    id[settings.yAxis] = y;
+                    id[settings.zAxis] = z;
 
-                res.push_back(id);
+                    res.push_back(id);
+                }
             }
         }
-    }
 
     return res;
 }
 
 auto COverlayLoader::determineNotLoadedFiles(OverlayChunkIDs chunks) const -> OverlayChunkFiles
 {
-    QString folder;
+    QString folder, fileName;
     OverlayChunkFiles fileList;
     QDir overlayMainFolder(QString::fromStdString(settings.path));
     auto absPath = overlayMainFolder.absolutePath();
 
     for (auto chunk : chunks) {
         if (chunkSliceData.find(chunk) == chunkSliceData.end()) {
-            // TODO:Check if the settings logic for axis really works here
-            folder = QStringLiteral("%1")
-                         .arg(chunk[settings.yAxis], 6, 10, QLatin1Char('0'))
-                         .append("_" + QStringLiteral("%1").arg(chunk[settings.zAxis], 6, 10, QLatin1Char('0')))
-                         .append("_" + QStringLiteral("%1").arg(chunk[settings.xAxis], 6, 10, QLatin1Char('0')));
+            if (settings.namePattern == 0) {
+                // TODO:Check if the settings logic for axis really works here
+                folder = QStringLiteral("%1")
+                            .arg(chunk[settings.yAxis], 6, 10, QLatin1Char('0'))
+                            .append("_" + QStringLiteral("%1").arg(chunk[settings.zAxis], 6, 10, QLatin1Char('0')))
+                            .append("_" + QStringLiteral("%1").arg(chunk[settings.xAxis], 6, 10, QLatin1Char('0')));
 
-            QDir overlayFolder(absPath + QDir::separator() + folder);
-            QStringList files = overlayFolder.entryList({"*.ply", "*.obj"}, QDir::NoDotAndDotDot | QDir::Files);
+                QDir overlayFolder(absPath + QDir::separator() + folder);
+                QStringList files = overlayFolder.entryList({"*.ply", "*.obj"}, QDir::NoDotAndDotDot | QDir::Files);
 
-            for (auto file : files) {
-                file = overlayFolder.path() + QDir::separator() + file;
-                fileList[chunk].push_back(file.toStdString());
+                for (auto file : files) {
+                    file = overlayFolder.path() + QDir::separator() + file;
+                    fileList[chunk].push_back(file.toStdString());
+                }
+            } else if (settings.namePattern == 1) {
+                fileName = QStringLiteral("cell_yxz_%1")
+                            .arg(chunk[settings.yAxis], 3, 10, QLatin1Char('0'))
+                            .append("_" + QStringLiteral("%1").arg(chunk[settings.xAxis], 3, 10, QLatin1Char('0')))
+                            .append("_" + QStringLiteral("%1.ply").arg(chunk[settings.zAxis], 3, 10, QLatin1Char('0')));
+
+                QDir overlayFile(absPath + QDir::separator() + fileName);
+                if (QFileInfo::exists(overlayFile.path())) {
+                    std::cout << "File: " << overlayFile.path().toStdString() << std::endl;
+                    fileList[chunk].push_back(overlayFile.path().toStdString());
+                }
             }
         }
     }
@@ -122,7 +207,6 @@ void COverlayLoader::loadOverlayData(OverlayChunkFiles chunksToLoad)
 
     // Ensures that for each thread we have a map entry existing
     for (int i = 0; i < numThreads; ++i) {
-        // threadData[i].clear();
         threadSliceData[i].clear();
     }
 
@@ -174,10 +258,6 @@ void COverlayLoader::loadSingleOverlayFile(const std::string& file, OverlayChunk
     }
 
     auto numPoints = mesh->GetNumberOfPoints();
-    // threadData[threadNum][chunkID].reserve(numPoints);
-    // auto it = threadData.find(threadNum)->second.find(chunkID);
-    // TODO: Any heuristics to reserve memory already for each Z slice?
-    // threadSliceData[threadNum][chunkID].reserve(numPoints);
     auto it = threadSliceData.find(threadNum)->second.find(chunkID);
     if (it == threadSliceData.find(threadNum)->second.end()) {
         threadSliceData[threadNum][chunkID].clear();
@@ -211,34 +291,6 @@ void COverlayLoader::mergeThreadData() const
 {
     std::lock_guard<std::shared_mutex> lock(mergeMutex);
 
-    // for (auto it = threadData.begin(); it != threadData.end(); ++it) {
-    //     std::pair<OverlayChunkData::iterator, bool> ins = chunkData.insert(*it);
-    //     if (!ins.second) {  
-    //         // Map key already existed, so we have to merge the slice data
-    //         OverlayData* vec1 = &(it->second);
-    //         OverlayData* vec2 = &(ins.first->second);
-    //         vec2->insert(vec2->end(), vec1->begin(), vec1->end());
-    //     }
-    // }
-    
-    // for (auto it = threadData.begin(); it != threadData.end(); ++it) {
-    //     for (auto jt = it->second.begin(); jt != it->second.end(); ++jt) {
-    //         std::pair<OverlayChunkData::iterator, bool> ins = chunkData.insert(*jt);
-    //         if (!ins.second) {
-    //             // Map key already existed, so we have to merge the slice data
-    //             OverlayData* vec1 = &(jt->second);
-    //             OverlayData* vec2 = &(ins.first->second);
-    //             vec2->insert(vec2->end(), vec1->begin(), vec1->end());
-    //         }
-
-    //         // // Cluster into Z slices
-    //         // for (auto& point : jt->second) {
-    //         //     chunkSliceData[jt->first][point.z].push_back(
-    //         //         cv::Point2f(point.x, point.y));
-    //         // }
-    //     }
-    // }
-
     for (auto it = threadSliceData.begin(); it != threadSliceData.end(); ++it) {
         for (auto jt = it->second.begin(); jt != it->second.end(); ++jt) {
            
@@ -248,40 +300,10 @@ void COverlayLoader::mergeThreadData() const
                 for (auto& data : jt->second) {
                     chunkSliceData[jt->first][data.first].insert(chunkSliceData[jt->first][data.first].end(), data.second.begin(), data.second.end());
                 }
-
-                // OverlaySliceData* vec1 = &(jt->second);
-                // OverlaySliceData* vec2 = &(ins.first->second);
-                // vec2->insert(vec2->end(), vec1->begin(), vec1->end());
             }
         }
     }
-
-    // for (auto& data : chunkData) {
-    //     std::sort(
-    //         data.second.begin(), data.second.end(),
-    //         [](const auto& a, const auto& b) { 
-    //             return (a[0] < b[0]) || (a[0] == b[0] && a[1] < b[1]) || (a[0] == b[0] && a[1] == b[1] && a[2] < b[2]);
-    //         }
-    //     );
-    //     data.second.erase(
-    //         std::unique(data.second.begin(), data.second.end()),
-    //         data.second.end());
-    // }
-
-
 }
-
-// auto COverlayLoader::getOverlayData(cv::Rect rect) const -> OverlayChunkDataRef
-// {
-//     OverlayChunkDataRef res;
-//     auto chunks = determineChunks(rect);
-
-//     for (auto chunk : chunks) {
-//         res[chunk] = &chunkData[chunk];
-//     }
-
-//     return res;
-// }
 
 auto COverlayLoader::getOverlayData(cv::Rect2d rect, int zIndex) -> OverlaySliceData
 {
@@ -291,26 +313,18 @@ auto COverlayLoader::getOverlayData(cv::Rect2d rect, int zIndex) -> OverlaySlice
 
     cv::Point2f point2f;
     for (auto& chunk : chunks) {
-        auto it = chunkSliceData[chunk].find(zIndex);
-        if (it != chunkSliceData[chunk].end()) {
-            for (auto& point : it->second) {
-                point2f = cv::Point2f(point.x, point.y);
-                if (rect.contains(point2f))
-                    res.push_back(point2f);
+        auto it = chunkSliceData.find(chunk);
+        if (it != chunkSliceData.end()) {
+            auto zt = it->second.find(zIndex);
+            if (zt != it->second.end()) {
+                for (auto& point : zt->second) {
+                    point2f = cv::Point2f(point.x, point.y);
+                    if (rect.contains(point2f))
+                        res.push_back(point2f);
+                }
             }
         }
     }
-
-    // cv::Point2f point2f;
-    // for (auto& chunk : chunks) {
-    //     for (auto& point : chunkData[chunk]) {
-    //         if (point.z == zIndex) {
-    //             point2f = cv::Point2f(point.x, point.y);
-    //             if (rect.contains(point2f))
-    //                 res.push_back(point2f);
-    //         }
-    //     }
-    // }
 
     // There are quite some point duplicates across chunks, so we remove them
     // now for faster rendering and processing.

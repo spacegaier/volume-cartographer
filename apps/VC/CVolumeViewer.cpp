@@ -281,6 +281,8 @@ void CVolumeViewer::SetNumSlices(int num)
 
 void CVolumeViewer::SetOverlaySettings(COverlayLoader::OverlaySettings overlaySettings)
 {
+    fOverlayLoader->resetData();
+    UpdateOverlay();
     fOverlayLoader->setOverlaySettings(overlaySettings);
 }
 
@@ -482,6 +484,11 @@ void CVolumeViewer::UpdateButtons(void)
     fResetBtn->setEnabled(fImgQImage != nullptr && fabs(fScaleFactor - 1.0) > 1e-6);
     fNextBtn->setEnabled(fImgQImage != nullptr);
     fPrevBtn->setEnabled(fImgQImage != nullptr);
+}
+
+void CVolumeViewer::ShowOverlayImportDlg(const QString& path)
+{
+    fOverlayLoader->showOverlayImportDlg(path.toStdString(), this);
 }
 
 void CVolumeViewer::ScheduleOverlayUpdate()

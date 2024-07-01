@@ -20,8 +20,6 @@
 #include "vc/segmentation/LocalResliceParticleSim.hpp"
 #include "vc/segmentation/OpticalFlowSegmentation.hpp"
 
-#include "ui_VCOverlayImportDlg.h"
-
 namespace vc = volcart;
 namespace vcs = volcart::segmentation;
 namespace fs = std::filesystem;
@@ -636,7 +634,8 @@ void CWindow::CreateMenus(void)
     fFileMenu->addSeparator();
     fFileMenu->addAction(fSavePointCloudAct);
     fFileMenu->addSeparator();
-    // fFileMenu->addAction(fAddOverlay);
+    //fFileMenu->addAction(fAddOverlayFile);
+    fFileMenu->addAction(fAddOverlayFolder);
     fFileMenu->addSeparator();
     fFileMenu->addAction(fSettingsAct);
     fFileMenu->addSeparator();
@@ -688,8 +687,10 @@ void CWindow::CreateActions(void)
         fSavePointCloudAct, SIGNAL(triggered()), this, SLOT(SavePointCloud()));
     fSavePointCloudAct->setShortcut(QKeySequence::Save);
 
-    // fAddOverlay = new QAction(style()->standardIcon(QStyle::SP_DialogOpenButton), tr("Add overlay..."), this);
-    // connect(fAddOverlay, &QAction::triggered, this, [=]() { ShowOverlayImportDlg(); });
+    fAddOverlayFile = new QAction(style()->standardIcon(QStyle::SP_DialogOpenButton), tr("Add overlay file"), this);
+    connect(fAddOverlayFile, &QAction::triggered, this, [=]() { ShowOverlayImportDlg(SelectOverlayFile()); });
+    fAddOverlayFolder = new QAction(style()->standardIcon(QStyle::SP_DialogOpenButton), tr("Add overlay folder"), this);
+    connect(fAddOverlayFolder, &QAction::triggered, this, [=]() { ShowOverlayImportDlg(SelectOverlayFolder()); });
 
     fSettingsAct = new QAction(tr("Settings"), this);
     connect(fSettingsAct, SIGNAL(triggered()), this, SLOT(ShowSettings()));
@@ -1954,40 +1955,43 @@ void CWindow::OpenRecent()
         Open(action->data().toString());
 }
 
-void CWindow::ShowOverlayImportDlg(const QString& path)
+QString CWindow::SelectOverlayFile()
 {
     QSettings settings("VC.ini", QSettings::IniFormat);
-    auto overlayPath = path;
-
+    auto overlayPath = QFileDialog::getOpenFileUrl(
+        this, tr("Open overlay file"), settings.value("volpkg/default_path").toString(), "*.ply *.obj", nullptr,
+        QFileDialog::DontUseNativeDialog).path();
+    // Dialog box cancelled
     if (overlayPath.isEmpty()) {
-        overlayPath = QFileDialog::getOpenFileUrl(
-            this, tr("Open overlay file"), settings.value("volpkg/default_path").toString(), "*.ply *.obj", nullptr,
-            QFileDialog::DontUseNativeDialog).path();
-        // Dialog box cancelled
-        if (overlayPath.isEmpty()) {
-            vc::Logger()->info("Adding overlay canceled");
-            return;
-        }
+        vc::Logger()->info("Adding overlay canceled");
+        return "";
+    }
+    
+    return overlayPath;
+}
+
+QString CWindow::SelectOverlayFolder()
+{
+    QSettings settings("VC.ini", QSettings::IniFormat);
+    auto overlayPath = QFileDialog::getExistingDirectory(
+                           this, tr("Open overlay folder"), settings.value("volpkg/default_path").toString(),
+                           QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks);
+    // Dialog box cancelled
+    if (overlayPath.isEmpty()) {
+        vc::Logger()->info("Adding overlay canceled");
+        return "";
+    }
+    
+    return overlayPath;
+}
+
+void CWindow::ShowOverlayImportDlg(const QString& path)
+{
+    if (path.isEmpty()) {
+        return;
     }
 
-    auto dlg = new QDialog(this);
-    auto overlayImportDlg = new Ui::VCOverlayImportDlg();
-    overlayImportDlg->setupUi(dlg);
-    QObject::connect(overlayImportDlg->buttonBox, &QDialogButtonBox::accepted, this, [this, overlayPath, dlg, overlayImportDlg]() {
-        COverlayLoader::OverlaySettings overlaySettings;
-        overlaySettings.path = overlayPath.toStdString();
-        overlaySettings.xAxis = overlayImportDlg->comboBox1stAxis->currentText() == "X" ? 0 : overlayImportDlg->comboBox2ndAxis->currentText() == "X" ? 1 : 2;
-        overlaySettings.yAxis = overlayImportDlg->comboBox1stAxis->currentText() == "Y" ? 0 : overlayImportDlg->comboBox2ndAxis->currentText() == "Y" ? 1 : 2;
-        overlaySettings.zAxis = overlayImportDlg->comboBox1stAxis->currentText() == "Z" ? 0 : overlayImportDlg->comboBox2ndAxis->currentText() == "Z" ? 1 : 2;
-        overlaySettings.offset = overlayImportDlg->spinBoxOffset->value();
-        overlaySettings.scale = overlayImportDlg->doubleSpinBoxScalingFactor->value();
-        overlaySettings.chunkSize = overlayImportDlg->spinBoxChunkSize->value();
-
-        fVolumeViewerWidget->SetOverlaySettings(overlaySettings);
-        dlg->close();
-    });
-    QObject::connect(overlayImportDlg->buttonBox, &QDialogButtonBox::rejected, dlg, &QDialog::reject);
-    dlg->show();
+    fVolumeViewerWidget->ShowOverlayImportDlg(path);
 }
 
 // Pop up about dialog

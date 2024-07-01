@@ -182,6 +182,8 @@ private slots:
     void ShowSettings();
     void PrintDebugInfo();
     
+    QString SelectOverlayFile();
+    QString SelectOverlayFolder();
     void ShowOverlayImportDlg(const QString& path = "");
 
     void OnNewPathClicked(void);
@@ -277,7 +279,8 @@ private:
     QAction* fOpenVolAct;
     QAction* fOpenRecentVolpkg[MAX_RECENT_VOLPKG]{};
     QAction* fSavePointCloudAct;
-    QAction* fAddOverlay;
+    QAction* fAddOverlayFile;
+    QAction* fAddOverlayFolder;
     QAction* fSettingsAct;
     QAction* fExitAct;
     QAction* fKeybinds;

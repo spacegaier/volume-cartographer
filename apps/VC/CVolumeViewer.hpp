@@ -81,6 +81,7 @@ public:
     void Rotate(int delta);
     void ResetRotation();
 
+    void ShowOverlayImportDlg(const QString& path);
     void SetOverlaySettings(COverlayLoader::OverlaySettings settings);
     auto GetOverlayLoader() -> COverlayLoader* { return fOverlayLoader; };
     void ScheduleOverlayUpdate();
