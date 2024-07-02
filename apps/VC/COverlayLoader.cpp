@@ -97,6 +97,7 @@ auto COverlayLoader::determineChunks(cv::Rect rect, int zIndex) const -> Overlay
 
     int xIndexStart, yIndexStart, zIndexStart;
     int xIndexEnd, yIndexEnd, zIndexEnd;
+    int step;
  
     if (settings.namePattern == 0) {
         xIndexStart = std::max(100, roundDownToNearestMultiple((rect.x - 100) / settings.scale, settings.chunkSize) - settings.offset);
@@ -111,6 +112,8 @@ auto COverlayLoader::determineChunks(cv::Rect rect, int zIndex) const -> Overlay
         xIndexEnd = roundDownToNearestMultiple((rect.br().x - 100) / settings.scale, settings.chunkSize) - settings.offset;
         yIndexEnd = roundDownToNearestMultiple((rect.br().y - 100) / settings.scale, settings.chunkSize) - settings.offset;
 
+        step = settings.chunkSize;
+
     } else if (settings.namePattern == 1) {
         // The cells number the chunks sequentially, opposed to the pattern above, where the chunk names are the coordinates
         xIndexStart = std::max(1, (rect.x - settings.offset) / settings.chunkSize);
@@ -120,13 +123,15 @@ auto COverlayLoader::determineChunks(cv::Rect rect, int zIndex) const -> Overlay
         zIndexEnd = zIndexStart;
 
         xIndexEnd = (rect.br().x - settings.offset) / settings.chunkSize;
-        yIndexEnd = (rect.br().y - settings.offset) / settings.chunkSize;        
+        yIndexEnd = (rect.br().y - settings.offset) / settings.chunkSize;      
+
+        step = 1;  
     }
 
     OverlayChunkID id;
-        for (auto z = zIndexStart; z <= zIndexEnd; ++z) {
-            for (auto x = xIndexStart; x <= xIndexEnd; ++x) {
-                for (auto y = yIndexStart; y <= yIndexEnd; ++y) {
+        for (auto z = zIndexStart; z <= zIndexEnd; z += step) {
+            for (auto x = xIndexStart; x <= xIndexEnd; x += step) {
+                for (auto y = yIndexStart; y <= yIndexEnd; y += step) {
                     id[settings.xAxis] = x;
                     id[settings.yAxis] = y;
                     id[settings.zAxis] = z;
@@ -308,6 +313,10 @@ void COverlayLoader::mergeThreadData() const
 auto COverlayLoader::getOverlayData(cv::Rect2d rect, int zIndex) -> OverlaySliceData
 {
     OverlaySliceData res;
+    if (settings.path.size() == 0) {
+        return res;
+    }
+
     auto chunks = determineChunks(rect, zIndex);
     loadOverlayData(determineNotLoadedFiles(chunks));
 
