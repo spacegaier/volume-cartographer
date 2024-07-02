@@ -105,9 +105,8 @@ auto COverlayLoader::determineChunks(cv::Rect rect, int zIndex) const -> Overlay
         yIndexStart = std::max(100, roundDownToNearestMultiple((rect.y - 100) / settings.scale, settings.chunkSize) - settings.offset);
         yIndexStart -= settings.chunkSize;
 
-        zIndexStart  = std::max(100, roundDownToNearestMultiple((zIndex - 100) / settings.scale, settings.chunkSize) - settings.offset);
-        zIndexStart -= settings.chunkSize;
-        zIndexEnd = zIndexStart;
+        zIndexEnd = std::max(100, roundDownToNearestMultiple((zIndex - 100) / settings.scale, settings.chunkSize) - settings.offset);
+        zIndexStart = zIndexEnd - settings.chunkSize;
 
         xIndexEnd = roundDownToNearestMultiple((rect.br().x - 100) / settings.scale, settings.chunkSize) - settings.offset;
         yIndexEnd = roundDownToNearestMultiple((rect.br().y - 100) / settings.scale, settings.chunkSize) - settings.offset;
@@ -129,17 +128,17 @@ auto COverlayLoader::determineChunks(cv::Rect rect, int zIndex) const -> Overlay
     }
 
     OverlayChunkID id;
-        for (auto z = zIndexStart; z <= zIndexEnd; z += step) {
-            for (auto x = xIndexStart; x <= xIndexEnd; x += step) {
-                for (auto y = yIndexStart; y <= yIndexEnd; y += step) {
-                    id[settings.xAxis] = x;
-                    id[settings.yAxis] = y;
-                    id[settings.zAxis] = z;
+    for (auto z = zIndexStart; z <= zIndexEnd; z += step) {
+        for (auto x = xIndexStart; x <= xIndexEnd; x += step) {
+            for (auto y = yIndexStart; y <= yIndexEnd; y += step) {
+                id[settings.xAxis] = x;
+                id[settings.yAxis] = y;
+                id[settings.zAxis] = z;
 
-                    res.push_back(id);
-                }
+                res.push_back(id);
             }
         }
+    }
 
     return res;
 }
