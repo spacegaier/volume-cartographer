@@ -80,6 +80,8 @@ public:
     void SetRotation(int degress);
     void Rotate(int delta);
     void ResetRotation();
+    auto GetZoomFactor() const -> float { return fScaleFactor; }
+    auto GetViewRectInfo() -> QString;
 
     void ShowOverlayImportDlg(const QString& path);
     void SetOverlaySettings(COverlayLoader::OverlaySettings settings);
@@ -106,6 +108,7 @@ signals:
     void SendSignalStatusMessageAvailable(QString text, int timeout);
     void SendSignalImpactRangeUp(void);
     void SendSignalImpactRangeDown(void);
+    void SendSignalViewRectChanged(const QString& info);
 
 protected:
     void ScaleImage(double nFactor);

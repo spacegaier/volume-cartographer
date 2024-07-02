@@ -226,6 +226,7 @@ private slots:
 
     void OnPathChanged(std::string segID, PathChangePointVector before, PathChangePointVector after);
     void OnAnnotationChanged(void);
+    void OnViewRectChanged(const QString& info);
 
     void UpdateSegmentCheckboxes(std::string aSegID);
     void toggleDisplayAll(bool checked);
@@ -351,6 +352,7 @@ private:
     Ui_VCMainWindow ui;
 
     QStatusBar* statusBar;
+    QLabel* permanentStatusBarLabel;
 
     bool can_change_volume_();
 

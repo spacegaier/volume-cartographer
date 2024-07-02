@@ -232,11 +232,17 @@ void CWindow::CreateWidgets(void)
 {
     QSettings settings("VC.ini", QSettings::IniFormat);
 
+    // Set up the status bar
+    statusBar = this->findChild<QStatusBar*>("statusBar");
+    permanentStatusBarLabel = new QLabel();
+    statusBar->addPermanentWidget(permanentStatusBarLabel);
+
     // add volume viewer
     fVolumeViewerWidget = new CVolumeViewerWithCurve(fSegStructMap);
     connect(fVolumeViewerWidget, &CVolumeViewerWithCurve::SendSignalStatusMessageAvailable, this, &CWindow::onShowStatusMessage);
     connect(fVolumeViewerWidget, &CVolumeViewerWithCurve::SendSignalImpactRangeUp, this, &CWindow::onImpactRangeUp);
     connect(fVolumeViewerWidget, &CVolumeViewerWithCurve::SendSignalImpactRangeDown, this, &CWindow::onImpactRangeDown);
+    connect(fVolumeViewerWidget, &CVolumeViewer::SendSignalViewRectChanged, this, &CWindow::OnViewRectChanged);    
 
     auto aWidgetLayout = new QVBoxLayout;
     aWidgetLayout->addWidget(fVolumeViewerWidget);
@@ -527,9 +533,6 @@ void CWindow::CreateWidgets(void)
     });
 
     connect(ui.btnEvenlySpacePoints, &QPushButton::clicked, this, &CWindow::OnEvenlySpacePoints);
-
-    // Set up the status bar
-    statusBar = this->findChild<QStatusBar*>("statusBar");
 
     // setup shortcuts
     slicePrev = new QShortcut(QKeySequence(Qt::Key_Left), this);
@@ -1026,8 +1029,6 @@ void CWindow::UpdateView(void)
 
     fVolumeViewerWidget->UpdateView();
     UpdateAnnotationList();
-
-    // update();
 }
 
 // Reset point cloud
@@ -3022,6 +3023,11 @@ void CWindow::OnPathChanged(std::string segID, PathChangePointVector before, Pat
 void CWindow::OnAnnotationChanged(void)
 {
     UpdateAnnotationList();
+}
+
+void CWindow::OnViewRectChanged(const QString& info)
+{
+    permanentStatusBarLabel->setText(info);
 }
 
 auto CWindow::can_change_volume_() -> bool

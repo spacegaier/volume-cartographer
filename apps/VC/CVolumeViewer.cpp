@@ -211,13 +211,17 @@ CVolumeViewer::CVolumeViewer(QWidget* parent)
     timerOverlayUpdate->setSingleShot(true);
     connect(timerOverlayUpdate, &QTimer::timeout, this, &CVolumeViewer::UpdateOverlay);
     connect(this->GetView()->verticalScrollBar(), &QScrollBar::valueChanged, this, [this]() {
+        SendSignalViewRectChanged(GetViewRectInfo());
         ScheduleOverlayUpdate();
     });
     connect(this->GetView()->horizontalScrollBar(), &QScrollBar::valueChanged, this, [this]() {
+        SendSignalViewRectChanged(GetViewRectInfo());
         ScheduleOverlayUpdate();
     });
 
     UpdateButtons();
+    // Trigger delayed, so that the viewer has been rendered on the screen and we have the correct dimensions
+    QTimer::singleShot(1000, this, [=]() { SendSignalViewRectChanged(GetViewRectInfo()); });
 }
 
 // Destructor
@@ -319,6 +323,8 @@ bool CVolumeViewer::eventFilter(QObject* watched, QEvent* event)
             if (fCenterOnZoomEnabled) {
                 CenterOn(fGraphicsView->mapToScene(wheelEvent->position().toPoint()));
             }
+
+            SendSignalViewRectChanged(GetViewRectInfo());
 
             return true;
         }
@@ -484,6 +490,17 @@ void CVolumeViewer::UpdateButtons(void)
     fResetBtn->setEnabled(fImgQImage != nullptr && fabs(fScaleFactor - 1.0) > 1e-6);
     fNextBtn->setEnabled(fImgQImage != nullptr);
     fPrevBtn->setEnabled(fImgQImage != nullptr);
+}
+
+auto CVolumeViewer::GetViewRectInfo() -> QString
+{
+    auto polygon = fGraphicsView->mapToScene(fGraphicsView->viewport()->rect());
+    return QString("X: %1 | Y: %2 | W: %3 | W: %4 | Zoom: %5")
+        .arg(QString::number(polygon.at(0).x(), 'f', 2))
+        .arg(QString::number(polygon.at(0).y(), 'f', 2))
+        .arg(QString::number(polygon.at(2).x() - polygon.at(0).x(), 'f', 2))
+        .arg(QString::number(polygon.at(2).y() - polygon.at(0).y(), 'f', 2))
+        .arg(QString::number(GetZoomFactor(), 'f', 2));
 }
 
 void CVolumeViewer::ShowOverlayImportDlg(const QString& path)
