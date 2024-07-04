@@ -237,44 +237,77 @@ std::vector<std::vector<Voxel>> OpticalFlowSegmentationClass::interpolateGaps(st
     return points;
 }
 
-cv::Point2f OpticalFlowSegmentationClass::findMagnetPoint(cv::Rect roi, cv::Point2f curvePoint, int zIndex, int numPointsOnSlice)
+auto OpticalFlowSegmentationClass::findMagnetPoint(cv::Rect roi, const cv::Point2f curvePoint, int curvePointIndex, int zIndex, int numPointsOnSlice) -> cv::Point2f
 {
     float minDistance = magnetSettings_.maxDistance;
-    std::map<float, cv::Point2f> validMagnets;
+    // Distance to curve point and magnet point position
+    std::map<float, cv::Point2f> potentialMagnets, validMagnets;
     auto overlay = overlayLoader_->getOverlayData(roi, zIndex);
+    cv::Point2f invalid(-1, -1);
     float distance;
 
-    for (auto point : overlay) {
-
-        cv::Point2f a(point.x, point.y);
-        distance = cv::norm(a - curvePoint);
+    for (auto& magnet : overlay) {
+        distance = cv::norm(magnet - curvePoint);
 
         if (distance < minDistance) {
-            validMagnets[distance] = a;
+            potentialMagnets[distance] = magnet;
         }
     }
 
-    if (validMagnets.empty()) {
-        return cv::Point2f(-1, -1);
+    if (potentialMagnets.empty()) {
+        return invalid;
     } else {
         cv::Point2f sum;
-        auto avgPoints = std::min((int)validMagnets.size(), numPointsOnSlice);   
-        auto it = validMagnets.begin();
+        auto avgPoints = std::min((int)potentialMagnets.size(), numPointsOnSlice);   
+        auto it = potentialMagnets.begin();
 
-        if (magnetSettings_.magnetSliceAvgMode == 1 || magnetSettings_.magnetSliceAvgMode == 2) {    
-            // Weighted average mode
-            float weightRemainder = 100;
-            float weightSum = 0;
-            float weight = magnetSettings_.magnetSliceAvgMode == 1 ? 50 : 75;
+        // Potential optimization: Rather than going through all potential magnets and checking if they are valid, 
+        // do that in the averaging logic below so we can stop once we found and processed the number of required 
+        // magnets on this slice.
+        if (magnetSettings_.magnetCompetition) {
+            for (auto& magnet : potentialMagnets) {      
+                auto competitionPoint = checkForMagnetCompetition(magnet.second, curvePointIndex, distance);
+
+                if (competitionPoint != invalid) {
+                    if (magnetSettings_.mangetCompetitionRepelDistance <= 0) {
+                        // Competition found and repelling not active => skip this magnet
+                        continue;
+                    } else {
+                        // Competition found and repelling distance set => repel OFS points away
+                        // auto distance = cv::norm(curvePoint - it->second);
+                        // auto newMagnetPoint = distance * ()
+                        continue;
+                    }
+                }
+
+                validMagnets[magnet.first] = magnet.second;
+            }
+        } else {
+            validMagnets = potentialMagnets;
+        }
+
+        if (magnetSettings_.magnetSliceAvgMode == 0) {   
+            // Weighted average mode (by distance value)
+            auto finalMagnet = curvePoint;
             for (int i = 0; i < avgPoints; ++i) {
-                sum += weight / 100 * it->second;
+                finalMagnet += (1 - it->first / magnetSettings_.maxDistance) * (curvePoint - it->second);
+                ++it;
+            }
+            return finalMagnet;
+        } else if (magnetSettings_.magnetSliceAvgMode == 1 || magnetSettings_.magnetSliceAvgMode == 2) {    
+            // Weighted average mode (by distance index)
+            auto finalMagnet = curvePoint;
+            float weightRemainder = 100;
+            float weight = magnetSettings_.magnetSliceAvgMode == 1 ? 50 : 75;           
 
-                weightSum += weight;
+            for (int i = 0; i < avgPoints; ++i) {
+                finalMagnet += (it->second - curvePoint) * weight / 100;                
+
                 weightRemainder -= weight;
                 weight = weightRemainder / 2;
                 ++it;
             }
-            return sum * 100 / weightSum;
+            return finalMagnet;
         } else {    
             // Default: Linear average mode      
             for (int i = 0; i < avgPoints; ++i)  {
@@ -284,6 +317,31 @@ cv::Point2f OpticalFlowSegmentationClass::findMagnetPoint(cv::Rect roi, cv::Poin
             return sum / avgPoints;
         }
     }
+}
+
+auto OpticalFlowSegmentationClass::checkForMagnetCompetition(const cv::Point2f magnetPoint, int pointIndex, float distance) -> cv::Point2f
+{
+    int index = -1;
+    int lowerBound = std::max(0, pointIndex - 10);
+    int upperBound = std::min((int)computeSubCurrentVs.size() - 1, pointIndex + 10);
+    for (auto& point : computeSubCurrentVs) {
+        ++index;
+
+        if (index > lowerBound || index < upperBound) {
+            // Points that are near the point we are processing with OFS currently,
+            // are not "eligible"" competition targets, as we are only intersted in points
+            // from other papyrus sheets, so we skip them here.
+            continue;
+        }
+
+        cv::Point2f competition(point[0], point[1]);
+        if (cv::norm(competition - magnetPoint) < distance) {
+            return competition;
+        }
+
+    }
+
+    return cv::Point2f(-1, -1);
 }
 
 // Multithreaded computation of splitted curve segment
@@ -431,7 +489,7 @@ std::vector<Voxel> OpticalFlowSegmentationClass::computeCurve(
     }
 
     // Last determined magnet point
-    cv::Point2f lastMagnet;
+    cv::Point2f lastMagnet = cv::Point2f(-1, -1);
     // Last magnet pull vector
     cv::Point2f lastMagnetPull;
 
@@ -602,21 +660,26 @@ std::vector<Voxel> OpticalFlowSegmentationClass::computeCurve(
         if (magnetSettings_.enable && magnetStrength > 0) {
             // Map of slice index and magnet point
             std::map<int, cv::Point2f> validMagnets;
+            cv::Point2f invalid(-1, -1);
 
-            auto minPoint = findMagnetPoint(roiMagnets, updatedPt, nextZIndex, magnetSettings_.magnetStrength);
-            if (minPoint != cv::Point2f(-1, -1)) {
-                validMagnets.emplace(nextZIndex, minPoint);
+            auto magnet = findMagnetPoint(roiMagnets, updatedPt, i, nextZIndex, magnetSettings_.magnetStrength);
+            if (magnet != invalid) {
+                validMagnets.emplace(nextZIndex, magnet);
             }
 
-            for (int i = 0; i < magnetSettings_.magnetNeighborSlices; ++i) {
-                minPoint = findMagnetPoint(roiMagnets, updatedPt, std::clamp(nextZIndex - i,0 , vol_->numSlices()), magnetSettings_.magnetStrength);
-                if (minPoint != cv::Point2f(-1, -1)) {
-                    validMagnets.emplace(nextZIndex - i, minPoint);
+            for (int neighborOffset = 1; neighborOffset <= magnetSettings_.magnetNeighborSlices; ++neighborOffset) {
+                magnet = findMagnetPoint(roiMagnets, updatedPt, i, 
+                    std::clamp(nextZIndex - neighborOffset, 0, vol_->numSlices()), 
+                    magnetSettings_.magnetStrength);
+                if (magnet != invalid) {
+                    validMagnets.emplace(nextZIndex - neighborOffset, magnet);
                 }
 
-                minPoint = findMagnetPoint(roiMagnets, updatedPt, std::clamp(nextZIndex + i,0 , vol_->numSlices()), magnetSettings_.magnetStrength);
-                if (minPoint != cv::Point2f(-1, -1)) {
-                    validMagnets.emplace(nextZIndex + i, minPoint);
+                magnet = findMagnetPoint(roiMagnets, updatedPt, i, 
+                    std::clamp(nextZIndex + neighborOffset, 0, vol_->numSlices()), 
+                    magnetSettings_.magnetStrength);
+                if (magnet != invalid) {
+                    validMagnets.emplace(nextZIndex + neighborOffset, magnet);
                 }
             }
 
@@ -624,7 +687,45 @@ std::vector<Voxel> OpticalFlowSegmentationClass::computeCurve(
             // to determine from those the final (virtual) magnet point via the chosen method.
             if (!validMagnets.empty()) {
                 cv::Point2f finalMagnet;
+
                 if (magnetSettings_.magnetNeighborSliceAvgMode == 0) {
+                    // Weighted average mode (by distance value)
+                    finalMagnet = updatedPt;
+                    for (auto& magnet : validMagnets) {
+                        finalMagnet += (1 - cv::norm(magnet.second - updatedPt) / magnetSettings_.maxDistance) * (updatedPt - magnet.second);
+                    }
+                } else if (magnetSettings_.magnetNeighborSliceAvgMode == 1 || magnetSettings_.magnetNeighborSliceAvgMode == 2) {
+                    // Weighted average mode (by slice index)
+                    float weightRemainder = 100;
+                    float weight = magnetSettings_.magnetNeighborSliceAvgMode == 1 ? 50 : 75;
+                    int weightDivisor = 2;                    
+
+                    // Main index first (if there was no magnet found for it, we use
+                    // the OFS curve point to ensure we have an "anchor" for the weight logic)
+                    finalMagnet = updatedPt;
+                    auto it = validMagnets.find(nextZIndex);
+                    cv::Point2f mainPoint = (it == validMagnets.end()) ? updatedPt : it->second;                    
+                    finalMagnet += (mainPoint - updatedPt) * weight / 100;
+                    weightRemainder -= weight;
+                    weight = weightRemainder / weightDivisor;
+
+                    // Now for all neighbors (each getting half the weight)
+                    for (int neighbor = 1; neighbor <= magnetSettings_.magnetNeighborSlices; ++neighbor) {
+
+                        auto it = validMagnets.find(nextZIndex - neighbor);
+                        if (it != validMagnets.end()) {
+                            finalMagnet += (it->second - updatedPt) * weight / 2 / 100;
+                        }
+
+                        it = validMagnets.find(nextZIndex + neighbor);
+                        if (it != validMagnets.end()) {
+                            finalMagnet += (it->second - updatedPt) * weight / 2 / 100;
+                        }
+                        
+                        weightRemainder -= weight;
+                        weight = weightRemainder / weightDivisor;
+                    }
+                } else if (magnetSettings_.magnetNeighborSliceAvgMode == 3) {
                     // Linear average mode
                     cv::Point2f sum = std::accumulate(
                         validMagnets.begin(), validMagnets.end(),
@@ -632,42 +733,7 @@ std::vector<Voxel> OpticalFlowSegmentationClass::computeCurve(
                         { return value + p.second; }
                     );
                     finalMagnet = sum / (int)validMagnets.size();
-                } else if (magnetSettings_.magnetNeighborSliceAvgMode == 1|| magnetSettings_.magnetNeighborSliceAvgMode == 2) {
-                    // Weighted average mode
-                    float weightRemainder = 100;
-                    float weightSum = 0;
-                    float weight = magnetSettings_.magnetNeighborSliceAvgMode == 1 ? 50 : 75;
-                    int weightDivisor = 2;
-                    cv::Point2f sum;
-
-                    // Main index first (if there was not magnet found for it, we use)
-                    // the OFS curve point to ensure we have an "anchor" for the weight logic
-                    auto it = validMagnets.find(nextZIndex);
-                    cv::Point2f mainPoint = (it == validMagnets.end()) ? updatedPt : it->second;                    
-                    sum += weight / 100 * mainPoint;
-                    weightSum += weight;
-                    weightRemainder -= weight;
-                    weight = weightRemainder / weightDivisor;
-
-                    // Now for all neighbors (each getting half the weight)
-                    for (int i = 0; i < magnetSettings_.magnetNeighborSlices; ++i) {
-
-                        auto it = validMagnets.find(nextZIndex - i);
-                        if (it != validMagnets.end()) {
-                            sum += weight / 2 / 100 * it->second;
-                        }
-
-                        it = validMagnets.find(nextZIndex + i);
-                        if (it != validMagnets.end()) {
-                            sum += weight / 2 / 100 * it->second;
-                        }
-                        
-                        weightSum += weight;
-                        weightRemainder -= weight;
-                        weight = weightRemainder / weightDivisor;
-                    }
-                    finalMagnet = sum * 100 / weightSum;
-                } else if (magnetSettings_.magnetNeighborSliceAvgMode == 3) {
+                } else if (magnetSettings_.magnetNeighborSliceAvgMode == 4) {
                     // Nearest-only mode
                     double minDistance = magnetSettings_.maxDistance;
                     for (auto& magnet : validMagnets) {
@@ -682,7 +748,7 @@ std::vector<Voxel> OpticalFlowSegmentationClass::computeCurve(
                 lastMagnet = finalMagnet;
                 lastMagnetPull = finalMagnet - updatedPt;
                 updatedPt += magnetStrength * (finalMagnet - updatedPt);
-            } else if (magnetSettings_.lastMagnetPropagation && lastMagnet != cv::Point2f()) {
+            } else if (magnetSettings_.lastMagnetPropagation && lastMagnet != invalid) {
                 // Check if the last magnet is within the max propagation distance of the current OFS point
                 auto distance = cv::norm(lastMagnet - updatedPt);
                 if (distance < magnetSettings_.lastMagnetPropagationDistance) {
@@ -1157,6 +1223,7 @@ ChainSegmentationAlgorithm::Status OpticalFlowSegmentationClass::computeSub(std:
         // 0. Resample current positions so they are evenly spaced
         FittedCurve currentCurve(currentVs, zIndex);
         currentVs = currentCurve.evenlySpacePoints();
+        computeSubCurrentVs = currentVs;
 
         // Dump entire curve for easy viewing
         if (dumpVis_) {

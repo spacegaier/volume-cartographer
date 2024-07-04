@@ -131,9 +131,9 @@ CWindow::CWindow()
     fSegParams.magnet_settings.magnetStrength = 70;
     fSegParams.magnet_settings.maxDistance = 5;
     fSegParams.magnet_settings.magnetsPerSlice = 5;
-    fSegParams.magnet_settings.magnetSliceAvgMode = 1;
+    fSegParams.magnet_settings.magnetSliceAvgMode = 0;
     fSegParams.magnet_settings.magnetNeighborSlices = 1;
-    fSegParams.magnet_settings.magnetNeighborSliceAvgMode = 2;
+    fSegParams.magnet_settings.magnetNeighborSliceAvgMode = 0;
     fSegParams.magnet_settings.lastMagnetPropagation = true;
     fSegParams.magnet_settings.lastMagnetPropagationDistance = 20;
 
@@ -148,6 +148,7 @@ CWindow::CWindow()
     CreateActions();
     CreateMenus();
     UpdateRecentVolpkgActions();
+    UpdateRecentOverlayActions();
     CreateBackend();
 
     if (QGuiApplication::styleHints()->colorScheme() == Qt::ColorScheme::Dark) {
@@ -271,6 +272,9 @@ void CWindow::CreateWidgets(void)
     connect(
         fVolumeViewerWidget, SIGNAL(SendSignalAnnotationChanged()), this,
         SLOT(OnAnnotationChanged()));
+    connect(
+        fVolumeViewerWidget, SIGNAL(SendSignalOverlayFolderAdded(const QString&)), this,
+        SLOT(OnOverlayAdded(const QString&)));
 
     // new and remove path buttons
     connect(ui.btnNewPath, SIGNAL(clicked()), this, SLOT(OnNewPathClicked()));
@@ -349,6 +353,7 @@ void CWindow::CreateWidgets(void)
     auto* spinMagnetStrength = new QSpinBox();
     spinMagnetStrength->setMinimum(0);
     spinMagnetStrength->setMaximum(100);
+    spinMagnetStrength->setSuffix("%");
     spinMagnetStrength->setValue(fSegParams.magnet_settings.magnetStrength);
     auto* spinMagnetMaxDistance = new QSpinBox();
     spinMagnetMaxDistance->setMinimum(0);
@@ -358,18 +363,20 @@ void CWindow::CreateWidgets(void)
     spinMagnetsPerSlice->setMinimum(0);
     spinMagnetsPerSlice->setValue(fSegParams.magnet_settings.magnetsPerSlice);
     auto* cmbMagnetSliceAvgMode = new QComboBox();
-    cmbMagnetSliceAvgMode->addItem(tr("Linear Average"));
+    cmbMagnetSliceAvgMode->addItem(tr("Weighted Average (by distance)"));
     cmbMagnetSliceAvgMode->addItem(tr("Weighted Average (nearest = 50%)"));
     cmbMagnetSliceAvgMode->addItem(tr("Weighted Average (nearest = 75%)"));
+    cmbMagnetSliceAvgMode->addItem(tr("Linear Average"));
     cmbMagnetSliceAvgMode->setCurrentIndex(fSegParams.magnet_settings.magnetSliceAvgMode);
     auto* spinMagnetNeighborSlices = new QSpinBox();
     spinMagnetNeighborSlices->setMinimum(0);
     spinMagnetNeighborSlices->setMaximum(100);
     spinMagnetNeighborSlices->setValue(fSegParams.magnet_settings.magnetNeighborSlices);
     auto* cmbMagnetNeighborSlicesAvgMode = new QComboBox();
-    cmbMagnetNeighborSlicesAvgMode->addItem(tr("Linear Average"));
+    cmbMagnetNeighborSlicesAvgMode->addItem(tr("Weighted Average (by distance)"));
     cmbMagnetNeighborSlicesAvgMode->addItem(tr("Weighted Average (start index = 50%)"));
     cmbMagnetNeighborSlicesAvgMode->addItem(tr("Weighted Average (start index = 75%)"));
+    cmbMagnetNeighborSlicesAvgMode->addItem(tr("Linear Average"));
     cmbMagnetNeighborSlicesAvgMode->addItem(tr("Nearest Only"));
     cmbMagnetNeighborSlicesAvgMode->setCurrentIndex(fSegParams.magnet_settings.magnetNeighborSliceAvgMode);
     auto* chkUseLastMagnetPropagation = new QCheckBox(tr("Use Last Magnet Propagation"));
@@ -378,6 +385,8 @@ void CWindow::CreateWidgets(void)
     spinLastMagnetPropagationDistance->setMinimum(0);
     spinLastMagnetPropagationDistance->setMaximum(100);
     spinLastMagnetPropagationDistance->setValue(fSegParams.magnet_settings.lastMagnetPropagationDistance);
+    auto* chkUseMagnetCompetition = new QCheckBox(tr("Use Magnet Competition"));
+    chkUseLastMagnetPropagation->setChecked(fSegParams.magnet_settings.magnetCompetition);
 
     connect(chkUseMagnets, &QCheckBox::toggled, [=](bool c){fSegParams.magnet_settings.enable = c;});
     connect(spinMagnetStrength, &QSpinBox::valueChanged, [=](int v){fSegParams.magnet_settings.magnetStrength = v;});
@@ -388,6 +397,7 @@ void CWindow::CreateWidgets(void)
     connect(cmbMagnetNeighborSlicesAvgMode, &QComboBox::currentIndexChanged, [=](int v){fSegParams.magnet_settings.magnetNeighborSliceAvgMode = v;});
     connect(chkUseLastMagnetPropagation, &QCheckBox::toggled, [=](bool c){fSegParams.magnet_settings.lastMagnetPropagation = c;});
     connect(spinLastMagnetPropagationDistance, &QSpinBox::valueChanged, [=](int v){fSegParams.magnet_settings.lastMagnetPropagationDistance = v;});
+    connect(chkUseMagnetCompetition, &QCheckBox::toggled, [=](bool c){fSegParams.magnet_settings.magnetCompetition = c;});
 
     // Optical Flow Segmentation Parameters
     auto* edtOutsideThreshold = new QSpinBox();
@@ -461,6 +471,7 @@ void CWindow::CreateWidgets(void)
     opticalFlowParamsLayout->addWidget(chkUseLastMagnetPropagation);
     opticalFlowParamsLayout->addWidget(new QLabel(tr("Last Magnet Propagation Distance")));
     opticalFlowParamsLayout->addWidget(spinLastMagnetPropagationDistance);    
+    opticalFlowParamsLayout->addWidget(chkUseMagnetCompetition);    
 
     QFrame* hFrame = new QFrame;
     hFrame->setFrameShape(QFrame::HLine);
@@ -657,6 +668,14 @@ void CWindow::CreateMenus(void)
     fFileMenu->addSeparator();
     //fFileMenu->addAction(fAddOverlayFile);
     fFileMenu->addAction(fAddOverlayFolder);
+    // "Recent Overlay Folder" menu
+    fRecentOverlayFolderMenu = new QMenu(tr("Add recent overlay folder"), this);
+    fRecentOverlayFolderMenu->setEnabled(false);
+    for (auto& action : fAddRecentOverlayFolder)
+    {
+        fRecentOverlayFolderMenu->addAction(action);
+    }
+    fFileMenu->addMenu(fRecentOverlayFolderMenu);
     fFileMenu->addSeparator();
     fFileMenu->addAction(fSettingsAct);
     fFileMenu->addSeparator();
@@ -712,6 +731,13 @@ void CWindow::CreateActions(void)
     connect(fAddOverlayFile, &QAction::triggered, this, [=]() { ShowOverlayImportDlg(SelectOverlayFile()); });
     fAddOverlayFolder = new QAction(style()->standardIcon(QStyle::SP_DialogOpenButton), tr("Add overlay folder"), this);
     connect(fAddOverlayFolder, &QAction::triggered, this, [=]() { ShowOverlayImportDlg(SelectOverlayFolder()); });
+
+    for (auto& action : fAddRecentOverlayFolder)
+    {
+        action = new QAction(this);
+        action->setVisible(false);
+        connect(action, &QAction::triggered, this, &CWindow::OpenRecentOverlay);
+    }
 
     fSettingsAct = new QAction(tr("Settings"), this);
     connect(fSettingsAct, SIGNAL(triggered()), this, SLOT(ShowSettings()));
@@ -841,14 +867,61 @@ void CWindow::UpdateRecentVolpkgList(const QString& path)
     UpdateRecentVolpkgActions();
 }
 
-void CWindow::RemoveEntryFromRecentVolpkg(const QString& path)
+void CWindow::UpdateRecentOverlayActions()
 {
     QSettings settings("VC.ini", QSettings::IniFormat);
-    QStringList files = settings.value("volpkg/recent").toStringList();
-    files.removeAll(path);
-    settings.setValue("volpkg/recent", files);
+    QStringList files = settings.value("overlay/recent").toStringList();
+    if (files.isEmpty()) {
+        return;
+    }
 
-    UpdateRecentVolpkgActions();
+    // The automatic conversion to string list from the settings, (always?) adds an
+    // empty entry at the end. Remove it if present.
+    if (files.last().isEmpty()) {
+        files.removeLast();
+    }
+
+    const int numRecentFiles = qMin(files.size(), static_cast<int>(MAX_RECENT_OVERLAY));
+
+    for (int i = 0; i < numRecentFiles; ++i) {
+        // Replace "&" with "&&" since otherwise they will be hidden and interpreted
+        // as mnemonics
+        QString path = QFileInfo(files[i]).canonicalPath();
+
+        if (path == "."){
+            path = tr("Directory not available!");
+        } else {
+            path.replace("&", "&&");
+        }
+
+        QString text = tr("&%1 | %2").arg(i + 1).arg(path);
+        fAddRecentOverlayFolder[i]->setText(text);
+        fAddRecentOverlayFolder[i]->setData(files[i]);
+        fAddRecentOverlayFolder[i]->setVisible(true);
+    }
+
+    for (int j = numRecentFiles; j < MAX_RECENT_OVERLAY; ++j) {
+        fAddRecentOverlayFolder[j]->setVisible(false);
+    }
+
+    fRecentOverlayFolderMenu->setEnabled(numRecentFiles > 0);
+}
+
+void CWindow::UpdateRecentOverlayList(const QString& path)
+{
+    QSettings settings("VC.ini", QSettings::IniFormat);
+    QStringList files = settings.value("overlay/recent").toStringList();
+    const QString pathCanonical = QFileInfo(path).absoluteFilePath();
+    files.removeAll(pathCanonical);
+    files.prepend(pathCanonical);
+
+    while(files.size() > MAX_RECENT_OVERLAY) {
+        files.removeLast();
+    }
+
+    settings.setValue("overlay/recent", files);
+
+    UpdateRecentOverlayActions();
 }
 
 // Asks User to Save Data Prior to VC.app Exit
@@ -1975,6 +2048,13 @@ void CWindow::OpenRecent()
         Open(action->data().toString());
 }
 
+void CWindow::OpenRecentOverlay()
+{
+    auto action = qobject_cast<QAction*>(sender());
+    if (action)
+        ShowOverlayImportDlg(action->data().toString());
+}
+
 QString CWindow::SelectOverlayFile()
 {
     QSettings settings("VC.ini", QSettings::IniFormat);
@@ -3047,6 +3127,11 @@ void CWindow::OnAnnotationChanged(void)
 void CWindow::OnViewRectChanged(const QString& info)
 {
     permanentStatusBarLabel->setText(info);
+}
+
+void CWindow::OnOverlayAdded(const QString& path)
+{
+    UpdateRecentOverlayList(path);
 }
 
 auto CWindow::can_change_volume_() -> bool

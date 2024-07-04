@@ -74,7 +74,8 @@ void COverlayLoader::showOverlayImportDlg(const std::string& path, CVolumeViewer
         overlaySettings.scale = overlayImportDlg->doubleSpinBoxScalingFactor->value();
         overlaySettings.chunkSize = overlayImportDlg->spinBoxChunkSize->value();
 
-        setOverlaySettings(overlaySettings);
+        // Call via the viewer, so that the main window gets the signal to update the recent overlay list 
+        viewer->SetOverlaySettings(overlaySettings);
         viewer->ScheduleOverlayUpdate();
         dlg->close();
     });
@@ -268,6 +269,7 @@ void COverlayLoader::loadSingleOverlayFile(const std::string& file, OverlayChunk
         it = threadSliceData.find(threadNum)->second.find(chunkID);
     }
     auto estimatedPointsPerDim = numPoints / 3;
+    int zIndex;
 
     for (std::uint64_t pnt_id = 0; pnt_id < numPoints; pnt_id++) {
         point = mesh->GetPoint(pnt_id);
@@ -279,12 +281,12 @@ void COverlayLoader::loadSingleOverlayFile(const std::string& file, OverlayChunk
         point[2] *= settings.scale;
 
         if (point[0] >= 0 && point[1] >= 0 && point[2] >= 0) {
-            // it->second.push_back({point[settings.xAxis], point[settings.yAxis], point[settings.zAxis]});
-            auto jt = it->second.find(point[settings.zAxis]);
+            zIndex = std::round(point[settings.zAxis]);
+            auto jt = it->second.find(zIndex);
             if (jt == it->second.end()) {
-                it->second[point[settings.zAxis]].reserve(estimatedPointsPerDim);
+                it->second[zIndex].reserve(estimatedPointsPerDim);
                 // Now it has to exist
-                jt = it->second.find(point[settings.zAxis]);
+                jt = it->second.find(zIndex);
             }
             jt->second.push_back({(float)point[settings.xAxis], (float)point[settings.yAxis]});
         }

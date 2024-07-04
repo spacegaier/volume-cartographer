@@ -109,6 +109,7 @@ signals:
     void SendSignalImpactRangeUp(void);
     void SendSignalImpactRangeDown(void);
     void SendSignalViewRectChanged(const QString& info);
+    void SendSignalOverlayFolderAdded(const QString& path);
 
 protected:
     void ScaleImage(double nFactor);

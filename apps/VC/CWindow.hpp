@@ -33,6 +33,7 @@
 #include <unordered_map>
 
 #define MAX_RECENT_VOLPKG 10
+#define MAX_RECENT_OVERLAY 10
 
 // Volpkg version required by this app
 static constexpr int VOLPKG_MIN_VERSION = 6;
@@ -124,9 +125,13 @@ private:
     void CreateActions(void);
     void CreateBackend(void);
 
+    // Recent volpkg handling
     void UpdateRecentVolpkgActions(void);
     void UpdateRecentVolpkgList(const QString& path);
-    void RemoveEntryFromRecentVolpkg(const QString& path);
+
+    // Recen pointcloud overlay handling
+    void UpdateRecentOverlayActions(void);
+    void UpdateRecentOverlayList(const QString& path);
 
     void closeEvent(QCloseEvent* event);
 
@@ -183,6 +188,7 @@ private slots:
     void ShowSettings();
     void PrintDebugInfo();
     
+    void OpenRecentOverlay();
     QString SelectOverlayFile();
     QString SelectOverlayFolder();
     void ShowOverlayImportDlg(const QString& path = "");
@@ -228,6 +234,7 @@ private slots:
     void OnPathChanged(std::string segID, PathChangePointVector before, PathChangePointVector after);
     void OnAnnotationChanged(void);
     void OnViewRectChanged(const QString& info);
+    void OnOverlayAdded(const QString& path);
 
     void UpdateSegmentCheckboxes(std::string aSegID);
     void toggleDisplayAll(bool checked);
@@ -277,12 +284,14 @@ private:
     QMenu* fViewMenu;
     QMenu* fHelpMenu;
     QMenu* fRecentVolpkgMenu{};
+    QMenu* fRecentOverlayFolderMenu{};
 
     QAction* fOpenVolAct;
     QAction* fOpenRecentVolpkg[MAX_RECENT_VOLPKG]{};
     QAction* fSavePointCloudAct;
     QAction* fAddOverlayFile;
     QAction* fAddOverlayFolder;
+    QAction* fAddRecentOverlayFolder[MAX_RECENT_OVERLAY]{};
     QAction* fSettingsAct;
     QAction* fExitAct;
     QAction* fKeybinds;

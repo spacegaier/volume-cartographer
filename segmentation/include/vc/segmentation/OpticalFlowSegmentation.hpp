@@ -189,12 +189,12 @@ public:
         int magnetNeighborSliceAvgMode;
         bool lastMagnetPropagation;
         int lastMagnetPropagationDistance;
+        bool magnetCompetition;
+        int mangetCompetitionRepelDistance;
     };
 
     void setOverlayLoader(ChaoVis::COverlayLoader* loader) { overlayLoader_ = loader; }
     void setMagnetSettings(MagnetSettings settings) { magnetSettings_ = settings; }
-
-    cv::Point2f findMagnetPoint(cv::Rect roi, cv::Point2f curvePoint, int zIndex, int numPointsOnSlice);
 
 private:
     /**
@@ -274,6 +274,9 @@ private:
     auto computeSub(std::vector<std::vector<Voxel>>& points, Chain currentVs, int startChainIndex, int endChainIndex, int endIndex, int initialStepAdjustment, bool backwards, size_t& iteration, bool insertFront, const fs::path outputDir, const fs::path wholeChainDir)
         -> ChainSegmentationAlgorithm::Status;
 
+    auto findMagnetPoint(cv::Rect roi, const cv::Point2f curvePoint, int curvePointIndex, int zIndex, int numPointsOnSlice) -> cv::Point2f;
+    auto checkForMagnetCompetition(const cv::Point2f magnetPoint, int pointIndex, float distance) -> cv::Point2f;
+
     /** Start z-index */
     int startIndex_{0};
     /** Target z-index */
@@ -308,6 +311,7 @@ private:
     /** Alternate the direction from which the curve will be split into segments for the threads */
     bool alternate_thread_splitting_direction_{false};
     Chain reSegStartingChain_;
+    Chain computeSubCurrentVs;
     volcart::OrderedPointSet<cv::Vec3d> masterCloud_;
     mutable std::shared_mutex display_mutex_;
     ChaoVis::COverlayLoader* overlayLoader_;

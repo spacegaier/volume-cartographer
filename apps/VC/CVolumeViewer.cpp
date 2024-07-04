@@ -288,6 +288,7 @@ void CVolumeViewer::SetOverlaySettings(COverlayLoader::OverlaySettings overlaySe
     fOverlayLoader->resetData();
     UpdateOverlay();
     fOverlayLoader->setOverlaySettings(overlaySettings);
+    SendSignalOverlayFolderAdded(QString::fromStdString(overlaySettings.path));
 }
 
 bool CVolumeViewer::eventFilter(QObject* watched, QEvent* event)
