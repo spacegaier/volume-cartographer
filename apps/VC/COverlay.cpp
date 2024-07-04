@@ -24,16 +24,12 @@ void COverlayGraphicsItem::paint(QPainter* painter, const QStyleOptionGraphicsIt
 
     painter->setPen(pen);
     painter->setBrush(brush);
-    int count = 0;
 
     for (auto point : points) {
 
         QPoint center(point.x - sceneRect.x(), point.y - sceneRect.y());
         painter->drawEllipse(center, pointWidth, pointWidth);
-        count++;
     }
-
-    std::cout << "Rendered overlay points: " << count << std::endl;
 }
 
 auto COverlayGraphicsItem::boundingRect() const -> QRectF

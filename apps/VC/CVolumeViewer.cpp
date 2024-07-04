@@ -495,12 +495,18 @@ void CVolumeViewer::UpdateButtons(void)
 auto CVolumeViewer::GetViewRectInfo() -> QString
 {
     auto polygon = fGraphicsView->mapToScene(fGraphicsView->viewport()->rect());
-    return QString("X: %1 | Y: %2 | W: %3 | W: %4 | Zoom: %5")
+    auto info = QString("X: %1 | Y: %2 | W: %3 | W: %4 | Zoom: %5")
         .arg(QString::number(polygon.at(0).x(), 'f', 2))
         .arg(QString::number(polygon.at(0).y(), 'f', 2))
         .arg(QString::number(polygon.at(2).x() - polygon.at(0).x(), 'f', 2))
         .arg(QString::number(polygon.at(2).y() - polygon.at(0).y(), 'f', 2))
         .arg(QString::number(GetZoomFactor(), 'f', 2));
+
+    if (fOverlayRenderCount > 0) {
+        info.prepend(QString(tr("Overlay Points: %1 | ").arg(fOverlayRenderCount)));
+    }
+
+    return info;
 }
 
 void CVolumeViewer::ShowOverlayImportDlg(const QString& path)
@@ -520,9 +526,10 @@ void CVolumeViewer::UpdateOverlay()
         delete overlay;
     }
     overlayItems.clear();
+    fOverlayRenderCount = 0;
 
     if (showOverlay) {
-        const int alpha = 100;    
+        const int alpha = 100;            
 
         auto polygon = fGraphicsView->mapToScene(fGraphicsView->viewport()->rect());
         auto sceneRect = cv::Rect(polygon.at(0).x(), polygon.at(0).y(), polygon.at(2).x() - polygon.at(0).x(), polygon.at(2).y() - polygon.at(0).y());
@@ -538,6 +545,7 @@ void CVolumeViewer::UpdateOverlay()
                     overlayM2->setPos(sceneRect.x, sceneRect.y);
                     fScene->addItem(overlayM2);
                     overlayItems.append(overlayM2);
+                    fOverlayRenderCount += dataM2.size();
                 }   
             } 
 
@@ -550,6 +558,7 @@ void CVolumeViewer::UpdateOverlay()
                     overlayP2->setPos(sceneRect.x, sceneRect.y);
                     fScene->addItem(overlayP2);
                     overlayItems.append(overlayP2);
+                    fOverlayRenderCount += dataP2.size();
                 }
             }
         }
@@ -564,6 +573,7 @@ void CVolumeViewer::UpdateOverlay()
                     overlayM1->setPos(sceneRect.x, sceneRect.y);
                     fScene->addItem(overlayM1);
                     overlayItems.append(overlayM1);
+                    fOverlayRenderCount += dataM1.size();
                 }   
             } 
 
@@ -576,6 +586,7 @@ void CVolumeViewer::UpdateOverlay()
                     overlayP1->setPos(sceneRect.x, sceneRect.y);
                     fScene->addItem(overlayP1);
                     overlayItems.append(overlayP1);
+                    fOverlayRenderCount += dataP1.size();
                 }
             }
         }        
@@ -588,8 +599,11 @@ void CVolumeViewer::UpdateOverlay()
             overlay->setPos(sceneRect.x, sceneRect.y);
             fScene->addItem(overlay);
             overlayItems.append(overlay);
+            fOverlayRenderCount += data.size();
         }
     }
+
+    SendSignalViewRectChanged(GetViewRectInfo());
 }
 
 // Reset the viewer

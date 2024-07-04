@@ -146,6 +146,7 @@ protected:
     int fScrollSpeed{-1};
     bool fSkipImageFormatConv;
     int fOverlaySliceNeighbors{1};
+    int fOverlayRenderCount;
 
     QGraphicsPixmapItem* fBaseImageItem;
     QList<COverlayGraphicsItem*> overlayItems;
