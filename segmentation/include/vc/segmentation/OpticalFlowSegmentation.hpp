@@ -139,6 +139,10 @@ public:
      */
     int getInterpolationDistance() { return smoothness_interpolation_distance_; }
 
+    /** @brief Set whether the splitting of the curve into thread segments should alternate every slice
+    */
+    void setAlternateThreadSplittingDirection(bool alternate) { alternate_thread_splitting_direction_ = alternate; }
+
     /** @brief Set the already computed masterCloud OrderedPointSet
      */
     void setOrderedPointSet(volcart::OrderedPointSet<cv::Vec3d> masterCloud) { masterCloud_ = masterCloud; }
@@ -183,6 +187,8 @@ public:
         int magnetSliceAvgMode;
         int magnetNeighborSlices;
         int magnetNeighborSliceAvgMode;
+        bool lastMagnetPropagation;
+        int lastMagnetPropagationDistance;
     };
 
     void setOverlayLoader(ChaoVis::COverlayLoader* loader) { overlayLoader_ = loader; }
@@ -299,6 +305,8 @@ private:
     bool interpolate_master_cloud{true};
     int smoothness_interpolation_window_{5}; //  window for interpolation (number if slices from interpolation distance/center in either direction)
     int smoothness_interpolation_distance_{25}; // distance from start slice where the interpolation center is
+    /** Alternate the direction from which the curve will be split into segments for the threads */
+    bool alternate_thread_splitting_direction_{false};
     Chain reSegStartingChain_;
     volcart::OrderedPointSet<cv::Vec3d> masterCloud_;
     mutable std::shared_mutex display_mutex_;

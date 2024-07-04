@@ -97,6 +97,7 @@ public:
         int edge_bounce_distance;
         int smoothness_interpolation_percent;
         int step_size{1};
+        bool alternate_thread_splitting_direction;
         // OFS Magnet PointCloud
         volcart::segmentation::OpticalFlowSegmentationClass::MagnetSettings magnet_settings;
     };

@@ -430,6 +430,11 @@ std::vector<Voxel> OpticalFlowSegmentationClass::computeCurve(
         roiMagnets = cv::Rect(x_min, y_min, x_max - x_min + 1, y_max - y_min + 1);
     }
 
+    // Last determined magnet point
+    cv::Point2f lastMagnet;
+    // Last magnet pull vector
+    cv::Point2f lastMagnetPull;
+
     for (int i = 0; i < int(currentCurve.size()); ++i) {
         // Get the current point
         Voxel pt_ = currentCurve(i);
@@ -674,8 +679,19 @@ std::vector<Voxel> OpticalFlowSegmentationClass::computeCurve(
                     }
                 }
 
-                updatedPt.x += magnetStrength * (finalMagnet.x - updatedPt.x);
-                updatedPt.y += magnetStrength * (finalMagnet.y - updatedPt.y);
+                lastMagnet = finalMagnet;
+                lastMagnetPull = finalMagnet - updatedPt;
+                updatedPt += magnetStrength * (finalMagnet - updatedPt);
+            } else if (magnetSettings_.lastMagnetPropagation && lastMagnet != cv::Point2f()) {
+                // Check if the last magnet is within the max propagation distance of the current OFS point
+                auto distance = cv::norm(lastMagnet - updatedPt);
+                if (distance < magnetSettings_.lastMagnetPropagationDistance) {
+                    // The further away the last magnet is from the current OFS point, the weaker
+                    // the propagation pull should be (linearly decreasing)
+                    auto propagationStrength = 1 - distance / magnetSettings_.lastMagnetPropagationDistance;
+
+                    updatedPt += magnetStrength * propagationStrength * lastMagnetPull;
+                }
             }
         }
 
@@ -1104,6 +1120,10 @@ ChainSegmentationAlgorithm::Status OpticalFlowSegmentationClass::computeSub(std:
 {
     int loopCounter = 0;
     auto adjustedStepSize = stepSize_ + (backwards ? -initialStepAdjustment : initialStepAdjustment);
+    // Controls whether we start splitting the curve segments for the threads from the start or end
+    // of the curve. Alternating that will ensure that for every other slice we have a slightly
+    // different curve point set for each thread.
+    bool normalDirection = true;
 
     for (int zIndex = startChainIndex; backwards ? zIndex > endIndex : zIndex < endIndex;
          zIndex += backwards ? -adjustedStepSize : adjustedStepSize) {
@@ -1160,7 +1180,7 @@ ChainSegmentationAlgorithm::Status OpticalFlowSegmentationClass::computeSub(std:
         num_threads = static_cast<int>(std::floor(((float)total_points) / (float)points_per_thread));
         int num_concurrent_threads = std::min(num_threads, num_available_threads);
         int base_segment_length = static_cast<int>(std::floor(((float)total_points) / (float)num_threads));
-        int num_threads_with_extra_point = total_points % num_threads;
+        int num_threads_with_extra_point = total_points % num_threads;        
 
         // std::cout << "Total points: " << total_points << " Num threads: " << num_threads << " Points per thread: " << points_per_thread << " Num concurrent threads: " << num_concurrent_threads << " Base segment length: " << base_segment_length << " Num threads with extra point: " << num_threads_with_extra_point;
 
@@ -1182,7 +1202,12 @@ ChainSegmentationAlgorithm::Status OpticalFlowSegmentationClass::computeSub(std:
                 // Change start_idx and end_idx to include overlap
                 int start_idx_padded = (i == 0) ? 0 : (start_idx - 2);
                 int end_idx_padded = (i == num_threads - 1) ? total_points : (end_idx + 2);
-                std::vector<Voxel> subsegment(currentVs.begin() + start_idx_padded, currentVs.begin() + end_idx_padded);
+                std::vector<Voxel> subsegment(max_points_per_thread);
+                if (normalDirection) {
+                    subsegment = std::vector<Voxel>(currentVs.begin() + start_idx_padded, currentVs.begin() + end_idx_padded);
+                } else {
+                    subsegment = std::vector<Voxel>(currentVs.rbegin() + start_idx_padded, currentVs.rbegin() + end_idx_padded);
+                }
                 subsegment_vectors[i-job] = subsegment;
                 start_idx = end_idx;
             }
@@ -1216,7 +1241,11 @@ ChainSegmentationAlgorithm::Status OpticalFlowSegmentationClass::computeSub(std:
             if (i < num_threads - 1) {
                 subsegment_points[i].erase(subsegment_points[i].end() - 2, subsegment_points[i].end());
             }
-            stitched_curve.insert(stitched_curve.end(), subsegment_points[i].begin(), subsegment_points[i].end());
+            if (normalDirection) {
+                stitched_curve.insert(stitched_curve.end(), subsegment_points[i].begin(), subsegment_points[i].end());
+            } else {
+                stitched_curve.insert(stitched_curve.begin(), subsegment_points[i].rbegin(), subsegment_points[i].rend());
+            }
         }
 
         // Generate nextVs by evenly spacing points in the stitched curve
@@ -1253,6 +1282,11 @@ ChainSegmentationAlgorithm::Status OpticalFlowSegmentationClass::computeSub(std:
             points.insert(points.begin(), nextVs);
         } else {
             points.push_back(nextVs);
+        }
+
+        if (alternate_thread_splitting_direction_) {
+            // Invert the boolean (and hence the thread splitting direction) every slice
+            normalDirection = !normalDirection;
         }
 
         loopCounter++;

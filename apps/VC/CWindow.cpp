@@ -125,6 +125,7 @@ CWindow::CWindow()
     fSegParams.edge_bounce_distance = 3;
     fSegParams.smoothness_interpolation_percent = 40;
     fSegParams.step_size = 1;
+    fSegParams.alternate_thread_splitting_direction = true;
 
     fSegParams.magnet_settings.enable = true;
     fSegParams.magnet_settings.magnetStrength = 70;
@@ -133,6 +134,8 @@ CWindow::CWindow()
     fSegParams.magnet_settings.magnetSliceAvgMode = 1;
     fSegParams.magnet_settings.magnetNeighborSlices = 1;
     fSegParams.magnet_settings.magnetNeighborSliceAvgMode = 2;
+    fSegParams.magnet_settings.lastMagnetPropagation = true;
+    fSegParams.magnet_settings.lastMagnetPropagationDistance = 20;
 
     // Process the raw impact and scan ranges string and convert to step vectors
     impactRangeSteps = SettingsDialog::expandSettingToIntRange(settings.value("viewer/impact_range_steps", "1-3, 5, 8, 11, 15, 20, 28, 40, 60, 100, 200").toString());
@@ -369,48 +372,58 @@ void CWindow::CreateWidgets(void)
     cmbMagnetNeighborSlicesAvgMode->addItem(tr("Weighted Average (start index = 75%)"));
     cmbMagnetNeighborSlicesAvgMode->addItem(tr("Nearest Only"));
     cmbMagnetNeighborSlicesAvgMode->setCurrentIndex(fSegParams.magnet_settings.magnetNeighborSliceAvgMode);
+    auto* chkUseLastMagnetPropagation = new QCheckBox(tr("Use Last Magnet Propagation"));
+    chkUseLastMagnetPropagation->setChecked(fSegParams.magnet_settings.lastMagnetPropagation);
+    auto* spinLastMagnetPropagationDistance = new QSpinBox();
+    spinLastMagnetPropagationDistance->setMinimum(0);
+    spinLastMagnetPropagationDistance->setMaximum(100);
+    spinLastMagnetPropagationDistance->setValue(fSegParams.magnet_settings.lastMagnetPropagationDistance);
 
-    connect(chkUseMagnets, &QCheckBox::toggled, [=](bool checked){fSegParams.magnet_settings.enable = checked;});
+    connect(chkUseMagnets, &QCheckBox::toggled, [=](bool c){fSegParams.magnet_settings.enable = c;});
     connect(spinMagnetStrength, &QSpinBox::valueChanged, [=](int v){fSegParams.magnet_settings.magnetStrength = v;});
     connect(spinMagnetMaxDistance, &QSpinBox::valueChanged, [=](int v){fSegParams.magnet_settings.maxDistance = v;});
     connect(spinMagnetsPerSlice, &QSpinBox::valueChanged, [=](int v){fSegParams.magnet_settings.magnetsPerSlice = v;});
     connect(cmbMagnetSliceAvgMode, &QComboBox::currentIndexChanged, [=](int v){fSegParams.magnet_settings.magnetSliceAvgMode = v;});
     connect(spinMagnetNeighborSlices, &QSpinBox::valueChanged, [=](int v){fSegParams.magnet_settings.magnetNeighborSlices = v;});
     connect(cmbMagnetNeighborSlicesAvgMode, &QComboBox::currentIndexChanged, [=](int v){fSegParams.magnet_settings.magnetNeighborSliceAvgMode = v;});
+    connect(chkUseLastMagnetPropagation, &QCheckBox::toggled, [=](bool c){fSegParams.magnet_settings.lastMagnetPropagation = c;});
+    connect(spinLastMagnetPropagationDistance, &QSpinBox::valueChanged, [=](int v){fSegParams.magnet_settings.lastMagnetPropagationDistance = v;});
 
     // Optical Flow Segmentation Parameters
     auto* edtOutsideThreshold = new QSpinBox();
     edtOutsideThreshold->setMinimum(0);
     edtOutsideThreshold->setMaximum(255);
-    edtOutsideThreshold->setValue(80);
+    edtOutsideThreshold->setValue(fSegParams.outside_threshold);
     auto* edtOpticalFlowPixelThreshold = new QSpinBox();
     edtOpticalFlowPixelThreshold->setMinimum(0);
     edtOpticalFlowPixelThreshold->setMaximum(255);
-    edtOpticalFlowPixelThreshold->setValue(50);
+    edtOpticalFlowPixelThreshold->setValue(fSegParams.optical_flow_pixel_threshold);
     auto* edtOpticalFlowDisplacementThreshold = new QSpinBox();
     edtOpticalFlowDisplacementThreshold->setMinimum(0);
-    edtOpticalFlowDisplacementThreshold->setValue(10);
+    edtOpticalFlowDisplacementThreshold->setValue(fSegParams.optical_flow_displacement_threshold);
     auto* edtSmoothenPixelThreshold = new QSpinBox();
     edtSmoothenPixelThreshold->setMinimum(0);
     edtSmoothenPixelThreshold->setMaximum(256);
-    edtSmoothenPixelThreshold->setValue(100);
+    edtSmoothenPixelThreshold->setValue(fSegParams.smoothen_by_brightness);
     auto* chkEnableSmoothenOutlier = new QCheckBox(tr("Smoothen Outlier Points"));
-    chkEnableSmoothenOutlier->setChecked(true);
+    chkEnableSmoothenOutlier->setChecked(fSegParams.enable_smoothen_outlier);
     auto* chkEnableEdgeDetection = new QCheckBox(tr("Enable Edge Detection"));
-    chkEnableEdgeDetection->setChecked(false);
+    chkEnableEdgeDetection->setChecked(fSegParams.enable_edge);
     auto* edtEdgeJumpDistance = new QSpinBox();
     edtEdgeJumpDistance->setMinimum(0);
-    edtEdgeJumpDistance->setValue(6);
+    edtEdgeJumpDistance->setValue(fSegParams.edge_jump_distance);
     auto* edtEdgeBounceDistance = new QSpinBox();
     edtEdgeBounceDistance->setMinimum(0);
-    edtEdgeBounceDistance->setValue(3);
+    edtEdgeBounceDistance->setValue(fSegParams.edge_bounce_distance);
     edtSmoothenPixelThreshold->setMaximum(1000);
     edtInterpolationPercent = new QSpinBox();
     edtInterpolationPercent->setMinimum(0);
     edtInterpolationPercent->setMaximum(100);
-    edtInterpolationPercent->setValue(40);
+    edtInterpolationPercent->setValue(fSegParams.smoothness_interpolation_percent);
+    auto* chkAlternateThreadSplittingDir = new QCheckBox(tr("Alternate OFS Thread Direction"));
+    chkAlternateThreadSplittingDir->setChecked(fSegParams.alternate_thread_splitting_direction);
     auto* chkPurgeCache = new QCheckBox(tr("Purge Cache"));
-    chkPurgeCache->setChecked(false);
+    chkPurgeCache->setChecked(fSegParams.purge_cache);
     auto* edtCacheSize = new QSpinBox();
     edtCacheSize->setMinimum(-1);
     edtCacheSize->setMaximum(20000);
@@ -425,6 +438,7 @@ void CWindow::CreateWidgets(void)
     connect(edtEdgeJumpDistance, &QSpinBox::valueChanged, [=](int v){fSegParams.edge_jump_distance = v;});
     connect(edtEdgeBounceDistance, &QSpinBox::valueChanged, [=](int v){fSegParams.edge_bounce_distance = v;});
     connect(edtInterpolationPercent, &QSpinBox::valueChanged, [=](int v){fSegParams.smoothness_interpolation_percent = v;});
+    connect(chkAlternateThreadSplittingDir, &QCheckBox::toggled, [=](bool checked){fSegParams.alternate_thread_splitting_direction = checked;});
     connect(chkPurgeCache, &QCheckBox::toggled, [=](bool checked){fSegParams.purge_cache = checked;});
     connect(edtCacheSize, &QSpinBox::valueChanged, [=](int v){fSegParams.cache_slices = v;});
 
@@ -444,11 +458,15 @@ void CWindow::CreateWidgets(void)
     opticalFlowParamsLayout->addWidget(spinMagnetNeighborSlices);
     opticalFlowParamsLayout->addWidget(new QLabel(tr("Magnet Neighbor Slices Average Mode")));
     opticalFlowParamsLayout->addWidget(cmbMagnetNeighborSlicesAvgMode);
+    opticalFlowParamsLayout->addWidget(chkUseLastMagnetPropagation);
+    opticalFlowParamsLayout->addWidget(new QLabel(tr("Last Magnet Propagation Distance")));
+    opticalFlowParamsLayout->addWidget(spinLastMagnetPropagationDistance);    
 
     QFrame* hFrame = new QFrame;
     hFrame->setFrameShape(QFrame::HLine);
     opticalFlowParamsLayout->addWidget(hFrame);
 
+    opticalFlowParamsLayout->addWidget(chkAlternateThreadSplittingDir);
     opticalFlowParamsLayout->addWidget(new QLabel(tr("Optical Flow Displacement Threshold")));
     opticalFlowParamsLayout->addWidget(edtOpticalFlowDisplacementThreshold);
     opticalFlowParamsLayout->addWidget(new QLabel(tr("Optical Flow Dark Pixel Threshold")));
@@ -1332,6 +1350,7 @@ bool CWindow::prepareSegmentationOFS(std::string segID, bool forward, bool useAn
         ofsc->setInterpolationWindow(interpolationWindow);
         ofsc->setReSegmentationChain(reSegStartingChain);
         ofsc->setStepSize(fSegParams.step_size);
+        ofsc->setAlternateThreadSplittingDirection(fSegParams.alternate_thread_splitting_direction);
         ofsc->setChain(fSegStructMap[segID].fStartingPath);
         ofsc->setVolume(currentVolume);
         // OFS Magnet PointCloud
