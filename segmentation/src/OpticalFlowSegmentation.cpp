@@ -247,8 +247,7 @@ cv::Point2f OpticalFlowSegmentationClass::findMagnetPoint(cv::Rect roi, cv::Poin
     for (auto point : overlay) {
 
         cv::Point2f a(point.x, point.y);
-        cv::Point2f b(curvePoint.x, curvePoint.y);
-        distance = cv::norm(a - b);
+        distance = cv::norm(a - curvePoint);
 
         if (distance < minDistance) {
             validMagnets[distance] = a;
@@ -616,6 +615,8 @@ std::vector<Voxel> OpticalFlowSegmentationClass::computeCurve(
                 }
             }
 
+            // If we found valid magnets on the different checked slices, next step is
+            // to determine from those the final (virtual) magnet point via the chosen method.
             if (!validMagnets.empty()) {
                 cv::Point2f finalMagnet;
                 if (magnetSettings_.magnetNeighborSliceAvgMode == 0) {
