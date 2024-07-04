@@ -7,24 +7,22 @@ VC now supports to load and display PLY and OBJ point clouds, plus utilize them 
 ## Point cloud loading and rendering
 1.	Enabled the VC core logic to not only read ASCII PLY files, but also binary ones (not only for VC GUI but should work for all tools), as that is what Thaumato is outputting.
 
-3.	For now there is only one supported option to load point clouds:
-    * Specifying a path to a PLY/OBJ chunks directory via the `VC.ini` file (e.g. from Thaumato such as https://dl.ash2txt.org/full-scrolls/Scroll1/PHercParis4.volpkg/scroll1_surface_points/point_cloud_colorized_verso_subvolume_blocks/). Those chunks are read dynamically as required based on the shown scroll portion in the viewer window. Note that you need to unpack those TARs, VC will not do that on the fly.
-    * In the next version, opening PLY/OBJ folders will be supported through the GUI.
-    * Loading a single PLY/OBJ file as an overlay point cloud is also not supported yet, but will be added as well.
+2.	A point cloud can be loaded via the "File" menu entry "Add overlay folder". A folder selection dialog will appear where you have to select the folder that contains the point cloud data. Two variants are currently supported:
+    * A folder that contains the cell_yxz_*.ply files from Thaumato (before instance segmentation)
+    * A folder with subfolders containing Thaumato instance segmentation layer files (e.g. from https://dl.ash2txt.org/full-scrolls/Scroll1/PHercParis4.volpkg/scroll1_surface_points/point_cloud_colorized_verso_subvolume_blocks/). Note that you need to unpack those TAR files first, VC will not do that on the fly.
+    * For both variants, the chunk files are read dynamically from the selected folder as required based on the shown scroll portion in the viewer window. 
 
-4.	Once you load a point cloud, you will see a popup to input the information about scaling, offset, axis, ... The fields are pre-filled with values matching the Thaumato output chunks.
+__Note__: Loading a single, individual PLY/OBJ file as an overlay point cloud is also not supported yet, but will be added as well.
 
-5.	Once a point cloud was successfully loaded, its points will be overlayed on top of the slice images. You can toggle the rendering on/off via the checkbox below the viewer (next to the existing “Show Curve” checkbox) and also via the new keyboard shortcut “B”.
+3.	Once you selected a point cloud folder, you will see a popup to input the information about scaling, offset, axis, ... In the dropdown at the top you can select what data variant you selected. The fields will then get pre-filled with values matching the default Thaumato output.
 
-6.	There is no support yet for changing overlay user settings via the GUI, so for now that has to be manually done in the `VC.ini` file.
+4.	Once a point cloud was successfully loaded, its points will be overlayed on top of the slice images. You can toggle the rendering on/off via the checkbox below the viewer (next to the existing “Show Curve” checkbox) and also via the new keyboard shortcut “B”.
+
+5.	There is no support yet for changing overlay user settings via the GUI, so for now that has to be manually done in the `VC.ini` file.
     * Everything in a new setting section `[overlay]`
-    * `auto_open`: If set to “1”, the PLY/OBJ file or folder from `recent` will be automatically opened when you open a VOLPKG. If you switch between different scrolls, that might of course not match. Going forward, this will be improved.
-    * `recent`: File or directory to be used for `auto_open`
     * `display_neighbor_slices`: Default = 1, means VC will not only render the points for the currently viewed slice, but also the ones from the slice above and below. The coloring matches the gradient from the VC header bar. Points from current slice are orange, the ones below go towards yellow, the ones above towards purple/blue. Valid values are 0 (no neighbor slices used), 1 or 2.
 ```
 [overlay]
-auto_open=1
-recent=/scroll-3/dl.ash2txt.org/full-scrolls/Scroll1/PHercParis4.volpkg/scroll1_surface_points/point_cloud_colorized_verso_subvolume_blocks/
 display_neighbor_slices=1
 ```
 
