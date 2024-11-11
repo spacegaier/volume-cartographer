@@ -1626,7 +1626,14 @@ void CWindow::OpenSlice(void)
         prefetchSliceIndex = -1;
         cv.notify_one();
 
-        aImgMat = currentVolume->getSliceData(fPathOnSliceIndex);
+        try {
+            aImgMat = currentVolume->getSliceData(fPathOnSliceIndex);
+        } catch (volcart::IOException e) {
+            std::string statusMessage =
+                "ERROR: Requested slice (" + std::to_string(fPathOnSliceIndex) +
+                ") could not open because: " + std::string(e.what()) + ".";
+            statusBar->showMessage(tr(statusMessage.c_str()), 5000);
+        }
     } else {
         aImgMat = cv::Mat::zeros(10, 10, CV_8UC1);
     }
