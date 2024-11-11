@@ -148,6 +148,7 @@ private:
     void SetUpAnnotations(void);
 
     void prefetchSlices(void);
+    void prefetchSlice(volcart::Volume::Pointer volume, int index);
     void startPrefetching(int index);
     void OpenSlice(void);
 

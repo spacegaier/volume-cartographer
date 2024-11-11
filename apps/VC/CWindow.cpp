@@ -1058,6 +1058,11 @@ void CWindow::DoSegmentation(void)
                 if (!prepareSegmentationBaseBefore("LRPS", segID, true, ui.radioForwardAnchor->isChecked(), fSliceIndexToolStart, ui.spinForwardSlice->value())) {
                     prepareSegmentationLRPS(segID, true, ui.radioForwardAnchor->isChecked(), fSliceIndexToolStart, ui.spinForwardSlice->value());
                     prepareSegmentationBaseAfter("LRPS", segID, true, ui.radioForwardAnchor->isChecked(), fSegParams.targetIndex);
+                } else {
+                    QMessageBox::warning(
+                        this, "Warning",
+                        "Segmentation run was skipped. Please check console "
+                        "output to determine cause.");
                 }
             }
 
@@ -1066,6 +1071,11 @@ void CWindow::DoSegmentation(void)
                 if (!prepareSegmentationBaseBefore("OFS", segID, false, ui.radioBackwardAnchor->isChecked(), fSliceIndexToolStart, ui.spinBackwardSlice->value())) {
                     prepareSegmentationOFS(segID, false, ui.radioBackwardAnchor->isChecked(), fSliceIndexToolStart, ui.spinBackwardSlice->value());
                     prepareSegmentationBaseAfter("OFS", segID, false, ui.radioBackwardAnchor->isChecked(), fSegParams.targetIndex);
+                } else {
+                    QMessageBox::warning(
+                        this, "Warning",
+                        "Segmentation run was skipped. Please check console "
+                        "output to determine cause.");
                 }
             }
 
@@ -1073,6 +1083,11 @@ void CWindow::DoSegmentation(void)
                 if (!prepareSegmentationBaseBefore("OFS", segID, true, ui.radioForwardAnchor->isChecked(), fSliceIndexToolStart, ui.spinForwardSlice->value())) {
                     prepareSegmentationOFS(segID, true, ui.radioForwardAnchor->isChecked(), fSliceIndexToolStart, ui.spinForwardSlice->value());
                     prepareSegmentationBaseAfter("OFS", segID, true, ui.radioForwardAnchor->isChecked(), fSegParams.targetIndex);
+                } else {
+                    QMessageBox::warning(
+                        this, "Warning",
+                        "Segmentation run was skipped. Please check console "
+                        "output to determine cause.");
                 }
             }
         }
@@ -1125,6 +1140,33 @@ bool CWindow::prepareSegmentationBaseBefore(std::string algorithm, std::string s
     // If start and end index are the same, we can skip the run since nothing would happen
     if (!skipRun) {
         skipRun = (currentIndex == fSegParams.targetIndex);
+    }
+
+    // Validate that the volume has the required slice data to run.
+    {
+        std::vector<int> nodata = {};
+        int sliceIndex = currentIndex;
+        // Checks all slice data between range instead of a algorithm / parameter aware method
+        // where certain slices can be skipped due to step size or interpolation.
+        // Check current to target - 1 slice.
+        while (sliceIndex != fSegParams.targetIndex)
+        {
+            if (!currentVolume->hasSliceData(sliceIndex)) {
+                nodata.push_back(sliceIndex);
+                skipRun = true;  // Skip because volume is missing data.
+            }
+            sliceIndex += (forward ? 1 : -1);
+        }
+        // Check target slice.
+        if (!currentVolume->hasSliceData(sliceIndex)) {
+            nodata.push_back(sliceIndex);
+            skipRun = true;  // Skip because volume is missing data.
+        }
+        std::string message = algorithm + ": Volume is missing slice data: ";
+        for (auto sliceIndex : nodata) {
+            message += std::to_string(sliceIndex) + ",";
+        }
+        std::cout << message << std::endl;
     }
 
     if (skipRun) {
@@ -1588,11 +1630,11 @@ void CWindow::prefetchSlices(void) {
         for (int i = 0; i <= n; i++) {
             // Fetch the slice data on the right side
             if (currentSliceIndex + offset + i * stepSize <= end) {
-                threads.emplace_back(&volcart::Volume::getSliceData, currentVolume, currentSliceIndex + offset + i * stepSize);
+                threads.emplace_back(&CWindow::prefetchSlice, this, currentVolume, currentSliceIndex + offset + i * stepSize);
             }
             // Fetch the slice data on the left side
             if (currentSliceIndex - offset - i * stepSize >= start) {
-                threads.emplace_back(&volcart::Volume::getSliceData, currentVolume, currentSliceIndex - offset - i * stepSize);
+                threads.emplace_back(&CWindow::prefetchSlice, this, currentVolume, currentSliceIndex - offset - i * stepSize);
             }
         }
 
@@ -1608,6 +1650,22 @@ void CWindow::prefetchSlices(void) {
 
     prefetchSliceIndex = -1;
   }
+}
+
+void CWindow::prefetchSlice(volcart::Volume::Pointer volume, int index) {
+    if (volume) {
+        try {
+            volume->getSliceData(index);
+        } catch (volcart::IOException e) {
+            std::string statusMessage =
+                "ERROR: Requested slice (" + std::to_string(index) +
+                ") could not open because: " + std::string(e.what()) + ".";
+            QMetaObject::invokeMethod(
+                statusBar, "showMessage", Qt::QueuedConnection,
+                Q_ARG(QString, tr(statusMessage.c_str())),
+                Q_ARG(int, 5000));  // Messages are not buffered so only the last prefetch request is displayed.
+        }
+    }
 }
 
 // Function to start prefetching around a certain slice
@@ -1626,7 +1684,14 @@ void CWindow::OpenSlice(void)
         prefetchSliceIndex = -1;
         cv.notify_one();
 
-        aImgMat = currentVolume->getSliceData(fPathOnSliceIndex);
+        try {
+            aImgMat = currentVolume->getSliceData(fPathOnSliceIndex);
+        } catch (volcart::IOException e) {
+            std::string statusMessage =
+                "ERROR: Requested slice (" + std::to_string(fPathOnSliceIndex) +
+                ") could not open because: " + std::string(e.what()) + ".";
+            statusBar->showMessage(tr(statusMessage.c_str()), 5000);
+        }
     } else {
         aImgMat = cv::Mat::zeros(10, 10, CV_8UC1);
     }
