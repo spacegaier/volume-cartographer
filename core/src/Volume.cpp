@@ -278,3 +278,16 @@ void Volume::cachePurge() const
     cache_->purge();
 }
 
+bool Volume::hasSliceData(int index) const
+{
+    std::unique_lock<std::shared_mutex> lock(cache_mutex_);
+    if (cache_->contains(index)) {
+        return true;
+    }
+    auto slicePath = getSlicePath(index);
+    if (!fs::exists(slicePath.string())) {
+        return false;
+    }
+    return false;
+}
+

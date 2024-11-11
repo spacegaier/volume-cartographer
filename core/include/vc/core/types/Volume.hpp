@@ -213,6 +213,10 @@ public:
     void cachePurge() const;
     /**@}*/
 
+    /** @brief Returns whether slice data has been loaded to cache or can be loaded from disk. */
+    bool hasSliceData(int index) const;
+    /**@}*/
+
 protected:
     /** Slice width */
     int width_{0};
