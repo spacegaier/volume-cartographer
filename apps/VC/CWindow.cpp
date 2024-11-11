@@ -1588,11 +1588,11 @@ void CWindow::prefetchSlices(void) {
         for (int i = 0; i <= n; i++) {
             // Fetch the slice data on the right side
             if (currentSliceIndex + offset + i * stepSize <= end) {
-                threads.emplace_back(&volcart::Volume::getSliceData, currentVolume, currentSliceIndex + offset + i * stepSize);
+                threads.emplace_back(&CWindow::prefetchSlice, this, currentVolume, currentSliceIndex + offset + i * stepSize);
             }
             // Fetch the slice data on the left side
             if (currentSliceIndex - offset - i * stepSize >= start) {
-                threads.emplace_back(&volcart::Volume::getSliceData, currentVolume, currentSliceIndex - offset - i * stepSize);
+                threads.emplace_back(&CWindow::prefetchSlice, this, currentVolume, currentSliceIndex - offset - i * stepSize);
             }
         }
 
@@ -1608,6 +1608,22 @@ void CWindow::prefetchSlices(void) {
 
     prefetchSliceIndex = -1;
   }
+}
+
+void CWindow::prefetchSlice(volcart::Volume::Pointer volume, int index) {
+    if (volume) {
+        try {
+            volume->getSliceData(index);
+        } catch (volcart::IOException e) {
+            std::string statusMessage =
+                "ERROR: Requested slice (" + std::to_string(index) +
+                ") could not open because: " + std::string(e.what()) + ".";
+            QMetaObject::invokeMethod(
+                statusBar, "showMessage", Qt::QueuedConnection,
+                Q_ARG(QString, tr(statusMessage.c_str())),
+                Q_ARG(int, 5000));  // Messages are not buffered so only the last prefetch request is displayed.
+        }
+    }
 }
 
 // Function to start prefetching around a certain slice
