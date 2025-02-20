@@ -1,5 +1,8 @@
 project(libvc_core VERSION ${VC_VERSION} LANGUAGES CXX)
 
+# Check for memory mapping support
+include(CheckMemMap)
+
 set(io_srcs
     src/OBJReader.cpp
     src/OBJWriter.cpp
@@ -35,6 +38,7 @@ set(landmark_srcs
 )
 
 set(type_srcs
+    src/Annotation.cpp
     src/DiskBasedObjectBaseClass.cpp
     src/ITKMesh.cpp
     src/Metadata.cpp
@@ -60,6 +64,7 @@ set(util_srcs
     src/ApplyLUT.cpp
     src/ColorMaps.cpp
     src/Debug.cpp
+    src/MemMap.cpp
 )
 
 set(logging_srcs
@@ -83,6 +88,7 @@ add_library(VC::core ALIAS vc_core)
 target_include_directories(vc_core
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<BUILD_INTERFACE:${libcore_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>
 )
 target_link_libraries(vc_core
@@ -177,6 +183,10 @@ set(test_srcs
     test/IterationTest.cpp
     test/TIFFIOTest.cpp
     test/TransformsTest.cpp
+    test/SegmentationTest.cpp
+    test/VolumePkgTest.cpp
+    test/AnnotationTest.cpp
+    test/MemMapTest.cpp
 )
 
 # Add a test executable for each src

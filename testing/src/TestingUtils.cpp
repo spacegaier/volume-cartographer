@@ -25,7 +25,7 @@ void vctest::ExpectNear(
     double observed, double expected, double pctDiffTolerance)
 {
     double absError =
-        std::fabs(((observed + expected) / 2) + (pctDiffTolerance / 100));
+        std::fabs((observed + expected) / 2 + pctDiffTolerance / 100);
     EXPECT_NEAR(observed, expected, absError);
 }
 
@@ -33,6 +33,15 @@ void vctest::AssertNear(
     double observed, double expected, double pctDiffTolerance)
 {
     double absError =
-        std::fabs(((observed + expected) / 2) + (pctDiffTolerance / 100));
+        std::fabs((observed + expected) / 2 + pctDiffTolerance / 100);
     ASSERT_NEAR(observed, expected, absError);
+}
+
+auto vctest::KilledByAnyOfSignal::operator()(int exit_status) const -> bool
+{
+    bool res{false};
+    for (const auto& s : signals_) {
+        res = res or ::testing::KilledBySignal(s)(exit_status);
+    }
+    return res;
 }

@@ -196,7 +196,7 @@ CWindow::CWindow()
 }
 
 // Destructor
-CWindow::~CWindow(void)
+CWindow::~CWindow()
 {
     stopPrefetching.store(true);
     cv.notify_one();  // Wake up the thread if it's waitings
@@ -209,7 +209,7 @@ CWindow::~CWindow(void)
 }
 
 // Create widgets
-void CWindow::CreateWidgets(void)
+void CWindow::CreateWidgets()
 {
     QSettings settings("VC.ini", QSettings::IniFormat);
 
@@ -254,7 +254,8 @@ void CWindow::CreateWidgets(void)
         volSelect, &QComboBox::currentIndexChanged, [this](const int& index) {
             vc::Volume::Pointer newVolume;
             try {
-                newVolume = fVpkg->volume(volSelect->currentData().toString().toStdString());
+                const auto volID = fVpkg->volumeIDs().at(index);
+                newVolume = fVpkg->volume(volID);
             } catch (const std::out_of_range& e) {
                 QMessageBox::warning(this, "Error", "Could not load volume.");
                 return;
@@ -539,7 +540,7 @@ void CWindow::CreateWidgets(void)
 }
 
 // Create menus
-void CWindow::CreateMenus(void)
+void CWindow::CreateMenus()
 {
     // "Recent Volpkg" menu
     fRecentVolpkgMenu = new QMenu(tr("Open &recent volpkg"), this);
@@ -587,7 +588,7 @@ void CWindow::CreateMenus(void)
 }
 
 // Create actions
-void CWindow::CreateActions(void)
+void CWindow::CreateActions()
 {
     fOpenVolAct = new QAction(style()->standardIcon(QStyle::SP_DialogOpenButton), tr("&Open volpkg..."), this);
     connect(fOpenVolAct, SIGNAL(triggered()), this, SLOT(Open()));
@@ -796,7 +797,7 @@ void CWindow::setDefaultWindowWidth(vc::Volume::Pointer volume)
     fEdtWindowWidth->setValue(static_cast<int>(winWidth));
 }
 
-auto CWindow::SaveDialog(void) -> CWindow::SaveResponse
+auto CWindow::SaveDialog() -> CWindow::SaveResponse
 {
     // First check the state of the segmentation tool
     if (fSegTool->isChecked() && SaveDialogSegTool() == SaveResponse::Cancelled) {
@@ -869,7 +870,7 @@ CWindow::SaveResponse CWindow::SaveDialogSegTool(void)
 }
 
 // Update the widgets
-void CWindow::UpdateView(void)
+void CWindow::UpdateView()
 {
     if (fVpkg == nullptr) {
         setWidgetsEnabled(false);  // Disable Widgets for User
@@ -993,7 +994,7 @@ void CWindow::RemovePathItem(std::string segID)
 }
 
 // Split fMasterCloud into fUpperCloud and fLowerCloud
-void CWindow::SplitCloud(void)
+void CWindow::SplitCloud()
 {
     for (auto& seg : fSegStructMap) {
         auto& segStruct = seg.second;
@@ -1003,7 +1004,7 @@ void CWindow::SplitCloud(void)
 }
 
 // Do segmentation given the starting point cloud
-void CWindow::DoSegmentation(void)
+void CWindow::DoSegmentation()
 {
     statusBar->clearMessage();
     fFinalTargetIndexForward = fFinalTargetIndexBackward = -1;
@@ -1454,7 +1455,7 @@ void CWindow::onShowStatusMessage(QString text, int timeout)
     statusBar->showMessage(text, timeout);
 }
 
-void CWindow::CleanupSegmentation(void)
+void CWindow::CleanupSegmentation()
 {
     for (auto& seg : fSegStructMap) {
         seg.second.ForgetChangedCurves();
@@ -1469,7 +1470,7 @@ void CWindow::CleanupSegmentation(void)
 }
 
 // Set up the parameters for doing segmentation
-auto CWindow::SetUpSegParams(void) -> bool
+auto CWindow::SetUpSegParams() -> bool
 {
     bool aIsOk;
 
@@ -1532,7 +1533,7 @@ auto CWindow::SetUpSegParams(void) -> bool
 }
 
 // Get the curves for all the slices
-void CWindow::SetUpCurves(void)
+void CWindow::SetUpCurves()
 {
     // if (fVpkg == nullptr || fSegStructMap[fSegmentationId].fMasterCloud.empty()) {
     //     statusBar->showMessage(tr("Selected point cloud is empty"));
@@ -1617,7 +1618,7 @@ void CWindow::startPrefetching(int index) {
 }
 
 // Open slice
-void CWindow::OpenSlice(void)
+void CWindow::OpenSlice()
 {
     QImage aImgQImage;
     cv::Mat aImgMat;
@@ -1659,7 +1660,7 @@ void CWindow::OpenSlice(void)
 }
 
 // Initialize path list
-void CWindow::InitPathList(void)
+void CWindow::InitPathList()
 {
     fPathListWidget->clear();
     if (fVpkg != nullptr) {
@@ -1683,7 +1684,7 @@ void CWindow::UpdateAnnotationList(void)
 {
     fAnnotationListWidget->clear();
 
-    if (!fHighlightedSegmentationId.empty() && fVpkg != nullptr && fSegStructMap[fHighlightedSegmentationId].fSegmentation && fSegStructMap[fHighlightedSegmentationId].fSegmentation->hasAnnotations()) {
+    if (!fHighlightedSegmentationId.empty() && fVpkg != nullptr && fSegStructMap[fHighlightedSegmentationId].fSegmentation && fSegStructMap[fHighlightedSegmentationId].fSegmentation->hasAnnotationSet()) {
 
         // Add or update the annotation rows
         for (auto a : fSegStructMap[fHighlightedSegmentationId].fAnnotations) {
@@ -1708,7 +1709,7 @@ void CWindow::UpdateAnnotationList(void)
 }
 
 // Update the Master cloud with the path we drew
-void CWindow::SetPathPointCloud(void)
+void CWindow::SetPathPointCloud()
 {
     // calculate the path and save that to a MasterCloud
     std::vector<cv::Vec2f> aSamplePts;
@@ -1734,12 +1735,14 @@ void CWindow::SetPathPointCloud(void)
     fSegStructMap[fSegmentationId].fMasterCloud.setWidth(aSamplePts.size());
     fSegStructMap[fSegmentationId].fAnnotationCloud.setWidth(aSamplePts.size());
     std::vector<cv::Vec3d> points;
-    std::vector<volcart::Segmentation::Annotation> annotations;
+    std::vector<volcart::Annotation> annotations;
+    volcart::AnnotationFlag flags;
+    flag::set(flags, volcart::ANNO_ANCHOR, volcart::ANNO_MANUAL);
     double initialPos = 0;
 
     for (const auto& pt : aSamplePts) {
         points.emplace_back(pt[0], pt[1], fPathOnSliceIndex);
-        annotations.emplace_back(volcart::Segmentation::Annotation((long)fPathOnSliceIndex, (long)(AnnotationBits::ANO_ANCHOR | AnnotationBits::ANO_MANUAL), initialPos, initialPos));
+        annotations.emplace_back(volcart::Annotation(fPathOnSliceIndex, flags, initialPos, initialPos));
     }
 
     /// Evenly space the points on the initial drawn curve
@@ -1811,7 +1814,7 @@ void CWindow::OpenVolume(const QString& path)
         const QSignalBlocker blocker{volSelect};
         volSelect->clear();
     }
-    QStringList volIds;
+    QStringList labels;
     for (const auto& id : fVpkg->volumeIDs()) {
         volSelect->addItem(
             QString("%1 (%2)").arg(QString::fromStdString(id)).arg(QString::fromStdString(fVpkg->volume(id)->name())),
@@ -1821,7 +1824,7 @@ void CWindow::OpenVolume(const QString& path)
     UpdateRecentVolpkgList(aVpkgPath);
 }
 
-void CWindow::CloseVolume(void)
+void CWindow::CloseVolume()
 {
     fVpkg = nullptr;
     fSegmentationId = "";
@@ -1840,7 +1843,7 @@ void CWindow::CloseVolume(void)
 }
 
 // Handle open request
-void CWindow::Open(void)
+void CWindow::Open()
 {
     Open(QString());
 }
@@ -1915,7 +1918,7 @@ void CWindow::Keybindings(void)
 }
 
 // Pop up about dialog
-void CWindow::About(void)
+void CWindow::About()
 {
     // REVISIT - FILL ME HERE
     QMessageBox::information(
@@ -1948,7 +1951,7 @@ void CWindow::PrintDebugInfo()
         std::cout << "I ";
         std::cout << std::defaultfloat << std::setfill('0') << std::setw(4) << i;
         std::cout << " : S ";
-        std::cout << std::defaultfloat << std::setfill('0') << std::setw(4) << std::get<long>(row[0][ANO_EL_SLICE]);
+        std::cout << std::defaultfloat << std::setfill('0') << std::setw(4) << row[0].index;
         std::cout << " (M: ";
         if (i < fSegStructMap[fHighlightedSegmentationId].fMasterCloud.height()) {
             auto masterRow = fSegStructMap[fHighlightedSegmentationId].fMasterCloud.getRow(i);
@@ -1958,14 +1961,14 @@ void CWindow::PrintDebugInfo()
         }
         std::cout << ") | ";
 
-        // Print lags & coordinates
+        // Print flags & coordinates
         for (auto ano : row) {
-            std::cout << std::get<long>(ano[ANO_EL_FLAGS]);
+            std::cout << ano.flags;
 
             // Print coordinates
             if (printCoordinates) {
-                std::cout << " (" << QString("%1").arg(std::get<double>(ano[ANO_EL_POS_X]), 6, 'f', 2, '0').toStdString()
-                          << ", " << QString("%1").arg(std::get<double>(ano[ANO_EL_POS_Y]), 6, 'f', 2, '0').toStdString() << ")";
+                std::cout << " (" << QString("%1").arg(ano.pt[0], 6, 'f', 2, '0').toStdString()
+                          << ", " << QString("%1").arg(ano.pt[1], 6, 'f', 2, '0').toStdString() << ")";
             }
 
             std::cout << " | ";
@@ -2009,7 +2012,7 @@ void CWindow::SavePointCloud()
 }
 
 // Create new path
-void CWindow::OnNewPathClicked(void)
+void CWindow::OnNewPathClicked()
 {
     // Save if we need to
     if (SaveDialog() == SaveResponse::Cancelled) {
@@ -2516,7 +2519,7 @@ void CWindow::ActivateSegmentationTool() {
 }
 
 // Toggle the status of the pen tool
-void CWindow::TogglePenTool(void)
+void CWindow::TogglePenTool()
 {
     if (fPenTool->isChecked()) {
         fWindowState = EWindowState::WindowStateDrawPath;
@@ -2551,7 +2554,7 @@ void CWindow::TogglePenTool(void)
 }
 
 // Toggle the status of the segmentation tool
-void CWindow::ToggleSegmentationTool(void)
+void CWindow::ToggleSegmentationTool()
 {
     if (fSegTool->isChecked()) {
         // If the prefetching worker is not yet running, start it
@@ -2568,8 +2571,8 @@ void CWindow::ToggleSegmentationTool(void)
 
         // Adjust the algorithm widgets based on whether we have annotations for the highlighted segment
         if (!fHighlightedSegmentationId.empty()) {
-            lblInterpolationPercent->setVisible(fSegStructMap[fHighlightedSegmentationId].fSegmentation->hasAnnotations());
-            edtInterpolationPercent->setVisible(fSegStructMap[fHighlightedSegmentationId].fSegmentation->hasAnnotations());
+            lblInterpolationPercent->setVisible(fSegStructMap[fHighlightedSegmentationId].fSegmentation->hasAnnotationSet());
+            edtInterpolationPercent->setVisible(fSegStructMap[fHighlightedSegmentationId].fSegmentation->hasAnnotationSet());
         }
 
         // Set / calculate backward and forward index

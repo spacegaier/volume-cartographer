@@ -35,32 +35,60 @@ public:
     DiskBasedObjectBaseClass() = delete;
 
     /** @brief Get the "unique" ID for the object */
-    Identifier id() const { return metadata_.get<std::string>("uuid"); }
+    [[nodiscard]] Identifier id() const;
 
     /** @brief Get the path to the object */
-    volcart::filesystem::path path() const { return path_; }
+    [[nodiscard]] auto path() const -> filesystem::path;
 
     /** @brief Get the human-readable name for the object */
-    std::string name() const { return metadata_.get<std::string>("name"); }
+    [[nodiscard]] auto name() const -> std::string;
 
     /** @brief Set the human-readable name of the object */
-    void setName(std::string n) { metadata_.set("name", std::move(n)); }
+    void setName(std::string n);
+
+    /**
+     * @brief Set a metadata entry
+     *
+     * @see Metadata::set
+     *
+     * @warning This provides direct access to the underlying metadata object,
+     * making it possible to manually override metadata values for standard
+     * VC types (e.g. Volume, Segmentation, Render). This can lead to unexpected
+     * behavior if you modify one of the required metadata entries incorrect.
+     * Prefer to use the metadata setter functions provided by child classes.
+     */
+    template <typename T>
+    void setMetadataEntry(const std::string& key, T value)
+    {
+        metadata_.set(key, value);
+    }
+
+    /**
+     * @brief Get a metadata entry
+     *
+     * @see Metadata::get
+     */
+    template <typename T>
+    auto getMetadataEntry(const std::string& key) const -> std::optional<T>
+    {
+        return metadata_.get<T>(key);
+    }
 
     /** @brief Update metadata on disk */
-    void saveMetadata() { metadata_.save(); }
+    void saveMetadata() const;
 
 protected:
     /** Load the object from file */
-    explicit DiskBasedObjectBaseClass(volcart::filesystem::path path);
+    explicit DiskBasedObjectBaseClass(filesystem::path path);
 
     /** Make a new object */
     DiskBasedObjectBaseClass(
-        volcart::filesystem::path path, Identifier uuid, std::string name);
+        filesystem::path path, Identifier uuid, std::string name);
 
     /** Metadata */
-    volcart::Metadata metadata_;
+    Metadata metadata_;
 
     /** Location for the object on disk */
-    volcart::filesystem::path path_;
+    filesystem::path path_;
 };
 }  // namespace volcart

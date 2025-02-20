@@ -619,7 +619,7 @@ void CVolumeViewerWithCurve::DrawIntersectionCurve(QGraphicsScene* scene) {
             // We only want to highlight manually moved points if they are on the highlighted curve
             bool manualPoint = false;
             if (segStruct.highlighted) {
-                manualPoint = (hasAnnotations && (std::get<long>(segStruct.fAnnotationCloud[pointIndex + i][ANO_EL_FLAGS]) & AnnotationBits::ANO_MANUAL))
+                manualPoint = (hasAnnotations && flag::is_set(segStruct.fAnnotationCloud[pointIndex + i].flags, volcart::ANNO_MANUAL))
                 || (segStruct.fPathOnSliceIndex == sliceIndexToolStart && segStruct.fBufferedChangedPoints.find(i) != segStruct.fBufferedChangedPoints.end());
             }
 

@@ -3,6 +3,7 @@
 /** @file */
 
 #include "vc/core/filesystem.hpp"
+#include "vc/core/types/Annotation.hpp"
 #include "vc/core/types/DiskBasedObjectBaseClass.hpp"
 #include "vc/core/types/OrderedPointSet.hpp"
 #include "vc/core/types/Volume.hpp"
@@ -33,22 +34,6 @@ public:
     /** Point set type */
     using PointSet = OrderedPointSet<cv::Vec3d>;
 
-    /** Annotation type [long, long, double, double]
-     *  The first long is used to store the slice index and the second as
-     *  a bit flag carrier and the two doubles contain the original point
-     *  position before any manual moves.
-     */
-    using Annotation = cv::Vec<std::variant<long, double>, 4>;
-
-    /** Annotation type (raw = only doubles) */
-    using AnnotationRaw = cv::Vec4d;
-
-    /** Annotation set type */
-    using AnnotationSet = OrderedPointSet<Annotation>;
-
-    /** Annotation set type (raw = only doubles) */
-    using AnnotationSetRaw = OrderedPointSet<AnnotationRaw>;
-
     /** Shared pointer type */
     using Pointer = std::shared_ptr<Segmentation>;
 
@@ -59,18 +44,22 @@ public:
     Segmentation(filesystem::path path, Identifier uuid, std::string name);
 
     /** @copydoc Segmentation(volcart::filesystem::path path) */
-    static Pointer New(filesystem::path path);
+    static auto New(const filesystem::path& path) -> Pointer;
 
     /** @copydoc Segmentation(volcart::filesystem::path path, Identifier uuid,
      * std::string name) */
-    static Pointer New(
-        filesystem::path path, Identifier uuid, std::string name);
+    static auto New(
+        const filesystem::path& path,
+        const Identifier& uuid,
+        const std::string& name) -> Pointer;
 
-    /** @brief Return if this Segmentation has an associated PointSet file */
-    bool hasPointSet() const
-    {
-        return metadata_.hasKey("vcps") && !metadata_.get<std::string>("vcps").empty();
-    }
+    /**
+     * @brief Return if this Segmentation has an associated PointSet file
+     *
+     * Returns false if the metadata file has no `vcps` entry, the `vcps` entry
+     * is `null`, or the `vcps` entry is an empty string.
+     */
+    [[nodiscard]] auto hasPointSet() const -> bool;
 
     /**
      * @brief Save a PointSet to the Segmentation file
@@ -85,13 +74,15 @@ public:
      *
      * PointSet data is never cached in memory and is always loaded from disk.
      */
-    PointSet getPointSet() const;
+    [[nodiscard]] auto getPointSet() const -> PointSet;
 
-    /** @brief Return if this Segmentation has an associated AnnotationSet file */
-    bool hasAnnotations() const
-    {
-        return metadata_.hasKey("vcano") && !metadata_.get<std::string>("vcano").empty();
-    }
+    /**
+     * @brief Return if this Segmentation has an associated AnnotationSet file
+     *
+     * Returns false if the metadata file has no `vcano` entry, the `vcano`
+     * entry is `null`, or the `vcps` entry is an empty string.
+     */
+    [[nodiscard]] auto hasAnnotationSet() const -> bool;
 
     /**
      * @brief Save AnnotationSet to the Segmentation file
@@ -104,27 +95,23 @@ public:
     /**
      * @brief Load the associated AnnotationSet from the Segmentation file
      *
-     * AnnotationSet data is never cached in memory and is always loaded from disk.
+     * AnnotationSet data is never cached in memory and is always loaded from
+     * disk.
      */
-    AnnotationSet getAnnotationSet() const;
+    [[nodiscard]] auto getAnnotationSet() const -> AnnotationSet;
 
-    /** @brief Return whether this Segmentation is associated with a Volume */
-    bool hasVolumeID() const
-    {
-        return metadata_.hasKey("volume") && !getVolumeID().empty();
-    }
+    /**
+     * @brief Return whether this Segmentation is associated with a Volume
+     *
+     * Returns false if the metadata file has no `volume` entry, the
+     * `volume` entry is `null`, or the `volume` entry is an empty string.
+     */
+    [[nodiscard]] auto hasVolumeID() const -> bool;
 
     /** @brief Get the ID of the Volume associated with this Segmentation */
-    Volume::Identifier getVolumeID() const
-    {
-        return metadata_.get<Volume::Identifier>("volume");
-    }
+    [[nodiscard]] auto getVolumeID() const -> Volume::Identifier;
 
     /** @brief Set the ID of the Volume associated with this Segmentation */
-    void setVolumeID(const Volume::Identifier& id)
-    {
-        metadata_.set<std::string>("volume", id);
-        metadata_.save();
-    }
+    void setVolumeID(const Volume::Identifier& id);
 };
 }  // namespace volcart

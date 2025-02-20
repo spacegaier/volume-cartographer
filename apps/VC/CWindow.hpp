@@ -116,12 +116,12 @@ public:
     ~CWindow(void);
 
 private:
-    void CreateWidgets(void);
-    void CreateMenus(void);
-    void CreateActions(void);
-    void CreateBackend(void);
+    void CreateWidgets();
+    void CreateMenus();
+    void CreateActions();
+    void CreateBackend();
 
-    void UpdateRecentVolpkgActions(void);
+    void UpdateRecentVolpkgActions();
     void UpdateRecentVolpkgList(const QString& path);
     void RemoveEntryFromRecentVolpkg(const QString& path);
 
@@ -131,31 +131,31 @@ private:
 
     bool InitializeVolumePkg(const std::string& nVpkgPath);
     void setDefaultWindowWidth(volcart::Volume::Pointer volume);
-    SaveResponse SaveDialog(void);
-    SaveResponse SaveDialogSegTool(void);
+    SaveResponse SaveDialog();
+    SaveResponse SaveDialogSegTool();
 
-    void UpdateView(void);
+    void UpdateView();
     void ChangePathItem(std::string segID);
     void RemovePathItem(std::string segID);
 
-    void SplitCloud(void);
-    void DoSegmentation(void);
-    void CleanupSegmentation(void);
-    bool SetUpSegParams(void);
+    void SplitCloud();
+    void DoSegmentation();
+    void CleanupSegmentation();
+    bool SetUpSegParams();
 
-    void SetUpCurves(void);
+    void SetUpCurves();
     void SetCurrentCurve(int nCurrentSliceIndex);
-    void SetUpAnnotations(void);
+    void SetUpAnnotations();
 
-    void prefetchSlices(void);
+    void prefetchSlices();
     void startPrefetching(int index);
-    void OpenSlice(void);
+    void OpenSlice();
 
-    void InitPathList(void);
-    void UpdateAnnotationList(void);
+    void InitPathList();
+    void UpdateAnnotationList();
 
-    void SetPathPointCloud(void);
-    void ResetPointCloud(void);
+    void SetPathPointCloud();
+    void ResetPointCloud();
 
     bool prepareSegmentationBaseBefore(std::string algorithm, std::string segID, bool forward, bool anchor, int startIndex, int endIndex);
     void prepareSegmentationBaseAfter(std::string algorithm, std::string segID, bool forward, bool anchor, int endIndex);
@@ -165,23 +165,23 @@ private:
     void executeNextSegmentation();
 
     void OpenVolume(const QString& path);
-    void CloseVolume(void);
+    void CloseVolume();
 
     static void audio_callback(void *user_data, Uint8 *raw_buffer, int bytes);
     void playPing();
 
 private slots:
-    void Open(void);
+    void Open();
     void Open(const QString& path);
     void OpenRecent();
-    void Keybindings(void);
-    void About(void);
+    void Keybindings();
+    void About();
     void SavePointCloud();
     void ShowSettings();
     void PrintDebugInfo();
 
-    void OnNewPathClicked(void);
-    void OnRemovePathClicked(void);
+    void OnNewPathClicked();
+    void OnRemovePathClicked();
     void OnPathItemClicked(QTreeWidgetItem* item, int column);
     void OnPathItemSelectionChanged();
 
@@ -195,8 +195,8 @@ private slots:
 
     void ActivatePenTool();
     void ActivateSegmentationTool();
-    void TogglePenTool(void);
-    void ToggleSegmentationTool(void);
+    void TogglePenTool();
+    void ToggleSegmentationTool();
 
     void OnChangeSegAlgo(int index);
 
@@ -209,7 +209,7 @@ private slots:
     void OnEdtWindowWidthChange(int);
     void OnOptIncludeMiddleClicked(bool clicked);
 
-    void OnBtnStartSegClicked(void);
+    void OnBtnStartSegClicked();
 
     void OnEdtImpactRange(int nImpactRange);
     void OnEvenlySpacePoints();
@@ -219,7 +219,7 @@ private slots:
     void OnLoadPrevSliceShift(int shift);
 
     void OnPathChanged(std::string segID, PathChangePointVector before, PathChangePointVector after);
-    void OnAnnotationChanged(void);
+    void OnAnnotationChanged();
 
     void UpdateSegmentCheckboxes(std::string aSegID);
     void toggleDisplayAll(bool checked);

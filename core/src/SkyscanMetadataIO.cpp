@@ -44,6 +44,7 @@ void SkyscanMetadataIO::parse_()
     // Reconstruction
     std::regex secRecon{"^\\[Reconstruction\\]"};
     std::regex datasetPrefix{"^Dataset Prefix"};
+    std::regex outputDirectory{"^Output Directory"};
     std::regex dateTime{"^Time and Date"};
     std::regex resultFileType{"^Result File Type"};
     std::regex resultFileHeaderLength{"^Result File Header Length"};
@@ -126,6 +127,12 @@ void SkyscanMetadataIO::parse_()
             metadata_.set<std::string>("dateTime", lineTokens[1]);
         }
 
+        else if (std::regex_match(lineTokens[0], outputDirectory)) {
+            // split into path parts (Windows-style path)
+            auto parts = split(lineTokens[1], '\\');
+            metadata_.set<std::string>("outputDirectory", parts.back());
+        }
+
         else if (std::regex_match(lineTokens[0], resultFileType)) {
             metadata_.set<std::string>("resultFileType", lineTokens[1]);
         }
@@ -186,9 +193,9 @@ void SkyscanMetadataIO::parse_()
 auto SkyscanMetadataIO::getSliceRegexString() -> std::string
 {
     // Get components
-    auto prefix = metadata_.get<std::string>("sliceImgPrefix");
-    auto idxLen = metadata_.get<int>("indexLength");
-    auto format = metadata_.get<std::string>("resultFileType");
+    const auto prefix = metadata_.get<std::string>("sliceImgPrefix").value();
+    const auto idxLen = metadata_.get<int>("indexLength").value();
+    const auto format = metadata_.get<std::string>("resultFileType").value();
 
     // Build regex string
     auto regexStr = prefix + "\\d{" + std::to_string(idxLen) + "}\\.";

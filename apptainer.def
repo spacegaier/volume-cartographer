@@ -1,0 +1,23 @@
+Bootstrap: docker
+From: ghcr.io/educelab/volume-cartographer:latest
+
+%labels
+  MAINTAINER Seth Parker <c.seth.parker@uky.edu>
+  OS Debian 12
+
+%post -c /bin/bash
+  # Basic installs
+  apt update
+  DEBIAN_FRONTEND=noninteractive apt install -y --no-install-recommends \
+    gdb \
+    nano \
+    vi
+
+%runscript
+#!/bin/bash
+  if [ $# -lt 1 ]; then
+      echo "Usage: ./container <command>"
+      exit 1
+  fi
+
+  exec "$@"
