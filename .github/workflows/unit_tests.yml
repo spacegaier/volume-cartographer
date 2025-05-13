@@ -92,6 +92,8 @@ jobs:
         run: |
           brew bundle
           brew install ninja
+          brew install gsl
+          brew install sdl2
 
       - name: Build volume-cartographer
         run: |
@@ -124,6 +126,8 @@ jobs:
         run: |
           brew bundle
           brew install ninja
+          brew install gsl
+          brew install sdl2
 
       - name: Build volume-cartographer
         run: |
