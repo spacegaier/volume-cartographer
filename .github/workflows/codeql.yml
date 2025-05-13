@@ -58,6 +58,11 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
+      
+    - name: Install requirements
+      run: |
+        apt-get -y update
+        apt-get install --fix-missing --fix-broken -y libsdl2-dev
 
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
