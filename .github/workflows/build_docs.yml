@@ -41,7 +41,7 @@ jobs:
       - name: Install documentation requirements
         run: |
           apt-get -y update
-          apt-get install --fix-missing --fix-broken -y doxygen graphviz
+          apt-get install --fix-missing --fix-broken -y doxygen graphviz libsdl2-dev
 
       - name: Build documentation
         run: |
