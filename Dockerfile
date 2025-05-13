@@ -3,6 +3,9 @@ LABEL org.opencontainers.image.authors="Seth Parker <c.seth.parker@uky.edu>"
 
 ARG VC_GIT_SHA1
 
+RUN apt-get update
+RUN apt-get -y install libsdl2-dev
+
 # Install volcart
 COPY ./ /volume-cartographer/
 RUN export CMAKE_PREFIX_PATH="/usr/local/Qt-6.7.2/" \
@@ -13,7 +16,7 @@ RUN export CMAKE_PREFIX_PATH="/usr/local/Qt-6.7.2/" \
       -DCMAKE_BUILD_TYPE=Release  \
       -DCMAKE_INSTALL_RPATH=/usr/local/Qt-6.7.2/lib \
       -DVC_BUILD_ACVD=ON  \
-    && cmake --build /volume-cartographer/build/ \
+    && cmake --build /volume-cartographer/build/ -j$(nproc --all) \
     && cmake --install /volume-cartographer/build/ \
     && rm -rf /volume-cartographer/
 
